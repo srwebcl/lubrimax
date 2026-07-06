@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-pure: #000000;
+  --color-brand-surface: #09090B;
+  --color-brand-blue: #1D4ED8;
+  --color-brand-cyan: #38BDF8;
+  --color-brand-chrome: #E4E4E7;
+
+  --animate-marquee-left: marquee-left 50s linear infinite;
+  --animate-marquee-right: marquee-right 50s linear infinite;
+
+  @keyframes marquee-left {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes marquee-right {
+    from {
+      transform: translateX(-50%);
+    }
+
+    to {
+      transform: translateX(0);
+    }
+  }
+}
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

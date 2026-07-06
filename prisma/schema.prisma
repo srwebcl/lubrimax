@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  duration    Int       // Duración en minutos (ej: 60, 360)
+  priceAuto   Int?
+  priceSuv2   Int?
+  priceSuv3   Int?
+  category    String    @default("Detailing")
+  bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Booking {
+  id            String   @id @default(cuid())
+  date          DateTime // Fecha específica de la reserva (sin hora, a las 00:00:00)
+  startTime     String   // Formato "HH:mm" (ej: "14:00")
+  endTime       String   // Formato "HH:mm" (ej: "20:00")
+  status        String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
+  paymentStatus String   @default("PENDING") // PENDING, PAID_RESERVATION, PAID_FULL
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  vehicleMake   String
+  vehicleModel  String
+  
+  serviceId     String
+  service       Service  @relation(fields: [serviceId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
