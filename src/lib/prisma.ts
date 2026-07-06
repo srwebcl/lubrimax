@@ -1,7 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-const globalForPrisma = global as unknown as { prisma_v2: PrismaClient };
+// Declaración global para evitar múltiples instancias en Next.js dev mode
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-export const prisma = globalForPrisma.prisma_v2 || new PrismaClient();
+// Configuramos la conexión con el driver de pg nativo
+const connectionString = process.env.DATABASE_URL!;
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma_v2 = prisma;
+// Inicializamos el Prisma Client con el adapter pg
+export const prisma =
+  globalForPrisma.prisma || new PrismaClient({ adapter });
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
