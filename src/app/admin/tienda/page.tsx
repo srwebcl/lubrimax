@@ -72,21 +72,18 @@ export default function TiendaPage() {
   };
 
   const uploadFileToR2 = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
     const res = await fetch("/api/upload", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: file.name, contentType: file.type })
+      body: formData
     });
-    const { signedUrl, publicUrl, error } = await res.json();
-    if (error) throw new Error(error);
-
-    const uploadRes = await fetch(signedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type },
-      body: file
-    });
-    if (!uploadRes.ok) throw new Error("Fallo al subir a R2");
-    return publicUrl;
+    
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || "Fallo al subir archivo");
+    
+    return data.publicUrl;
   };
 
   const handleProductSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
