@@ -21,10 +21,10 @@ export default async function Services() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-4">
-            Catálogo de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Tratamientos</span>
+          <h2 className="text-3xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-4 flex flex-col md:block">
+            <span>Catálogo de</span> <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Tratamientos</span>
           </h2>
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+          <p className="text-gray-400 max-w-2xl mx-auto text-sm md:text-lg">
             Tratamientos basados en nanotecnología que llevarán a tu vehículo a un nivel superior.
           </p>
         </div>

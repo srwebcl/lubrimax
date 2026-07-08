@@ -3,8 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { addMinutes, parse, format, isBefore, isAfter, isEqual } from "date-fns";
 
-const WORK_START_HOUR = 9; // 09:00 AM
-const WORK_END_HOUR = 18; // 18:00 PM (6 PM)
+import { getSettings } from "./admin-settings";
 
 /**
  * Obtiene todos los servicios disponibles
@@ -34,6 +33,13 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
     // Fecha consultada (asumimos formato YYYY-MM-DD)
     const queryDate = new Date(dateString);
     
+    // Obtener horarios de la BD
+    const settings = await getSettings();
+    const WORK_START_HOUR = settings.workStartHour;
+    const WORK_END_HOUR = settings.workEndHour;
+    const CONCURRENT_BAYS = settings.concurrentBays || 1;
+    const SLOT_INTERVAL = settings.slotInterval || 30;
+
     // Obtener todas las reservas existentes para ese día
     const existingBookings = await prisma.booking.findMany({
       where: {
@@ -64,7 +70,7 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
       }
 
       // Regla 2: Revisar colisiones con reservas existentes
-      let hasCollision = false;
+      let overlappingCount = 0;
       
       for (const booking of existingBookings) {
         const bookingStart = parse(booking.startTime, 'HH:mm', baseDate);
@@ -78,17 +84,16 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
           !isEqual(currentSlotTime, bookingEnd) && 
           !isEqual(slotEndTime, bookingStart)
         ) {
-          hasCollision = true;
-          break;
+          overlappingCount++;
         }
       }
 
-      if (!hasCollision) {
+      if (overlappingCount < CONCURRENT_BAYS) {
         availableSlots.push(format(currentSlotTime, 'HH:mm'));
       }
 
-      // Avanzar al siguiente bloque de 30 minutos para evaluación
-      currentSlotTime = addMinutes(currentSlotTime, 30);
+      // Avanzar al siguiente bloque dinámico
+      currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
     }
 
     return availableSlots;

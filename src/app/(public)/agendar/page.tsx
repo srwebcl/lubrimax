@@ -10,8 +10,6 @@ export const metadata = {
 export default function AgendarPage() {
   return (
     <div className="min-h-screen bg-brand-pure flex flex-col relative overflow-hidden">
-      {/* Navbar Minimalista (el Navbar global suele ir en layout, pero si está aquí se puede importar) */}
-      <Navbar />
 
       {/* Malla Hexagonal de Fondo Tenue */}
       <div 

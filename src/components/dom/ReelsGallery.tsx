@@ -47,12 +47,10 @@ export default function ReelsGallery() {
                 </svg>
               </div>
             </div>
-            <video
-              src={videoSrc}
-              autoPlay
-              muted
-              loop
-              playsInline
+            <img
+              src={videoSrc.replace('.mp4', '-thumbnail.webp')}
+              alt="Reel thumbnail"
+              loading="lazy"
               className="object-cover w-full h-full pointer-events-none relative z-10"
             />
           </div>
@@ -62,29 +60,27 @@ export default function ReelsGallery() {
       {/* ======================= */}
       {/* VERSIÓN DESKTOP (Marquee) */}
       {/* ======================= */}
-      <div className="hidden md:flex w-full overflow-hidden flex-col gap-6 py-8 group relative z-10">
+      <div className="hidden md:flex w-full overflow-x-clip overflow-y-visible flex-col gap-6 py-12 relative z-10">
         {/* Fila 1: Marquee a la izquierda */}
-        <div className="relative flex overflow-hidden w-full">
-          <div className="flex w-max gap-4 animate-marquee-left group-hover:[animation-play-state:paused]">
+        <div className="relative flex w-full">
+          <div className="flex w-max gap-4 animate-marquee-left">
             {ROW_1_VIDEOS.map((videoSrc, index) => (
               <div 
                 key={`row1-${index}`}
                 onClick={() => setActiveVideo(videoSrc)}
-                className="w-[250px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface transition-all duration-500 group-hover:blur-sm group-hover:opacity-40 hover:!blur-none hover:!opacity-100 hover:scale-[1.03] hover:z-10 relative cursor-pointer"
+                className="w-[250px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:border-brand-cyan/50 hover:z-10 relative cursor-pointer group/card"
               >
-                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
                   <div className="w-16 h-16 bg-brand-cyan/20 backdrop-blur-md rounded-full flex items-center justify-center border border-brand-cyan/50 shadow-[0_0_20px_rgba(56,189,248,0.5)]">
                     <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   </div>
                 </div>
-                <video
-                  src={videoSrc}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
+                <img
+                  src={videoSrc.replace('.mp4', '-thumbnail.webp')}
+                  alt="Reel thumbnail"
+                  loading="lazy"
                   className="object-cover w-full h-full pointer-events-none relative z-10"
                 />
               </div>
@@ -93,27 +89,25 @@ export default function ReelsGallery() {
         </div>
 
         {/* Fila 2: Marquee a la derecha */}
-        <div className="relative flex overflow-hidden w-full">
-          <div className="flex w-max gap-4 animate-marquee-right group-hover:[animation-play-state:paused]">
+        <div className="relative flex w-full">
+          <div className="flex w-max gap-4 animate-marquee-right">
             {ROW_2_VIDEOS.map((videoSrc, index) => (
               <div 
                 key={`row2-${index}`}
                 onClick={() => setActiveVideo(videoSrc)}
-                className="w-[250px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface transition-all duration-500 group-hover:blur-sm group-hover:opacity-40 hover:!blur-none hover:!opacity-100 hover:scale-[1.03] hover:z-10 relative cursor-pointer"
+                className="w-[250px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:border-brand-cyan/50 hover:z-10 relative cursor-pointer group/card"
               >
-                <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
                   <div className="w-16 h-16 bg-brand-cyan/20 backdrop-blur-md rounded-full flex items-center justify-center border border-brand-cyan/50 shadow-[0_0_20px_rgba(56,189,248,0.5)]">
                     <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>
                   </div>
                 </div>
-                <video
-                  src={videoSrc}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
+                <img
+                  src={videoSrc.replace('.mp4', '-thumbnail.webp')}
+                  alt="Reel thumbnail"
+                  loading="lazy"
                   className="object-cover w-full h-full pointer-events-none relative z-10"
                 />
               </div>

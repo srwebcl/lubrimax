@@ -1,0 +1,95 @@
+"use server";
+
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+
+export async function createService(formData: FormData) {
+  try {
+    const name = formData.get("name") as string;
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
+    const duration = parseInt(formData.get("duration") as string);
+    const priceAuto = formData.get("priceAuto") ? parseInt(formData.get("priceAuto") as string) : null;
+    const priceSuv2 = formData.get("priceSuv2") ? parseInt(formData.get("priceSuv2") as string) : null;
+    const priceSuv3 = formData.get("priceSuv3") ? parseInt(formData.get("priceSuv3") as string) : null;
+
+    if (!name || isNaN(duration)) {
+      return { success: false, error: "Faltan campos obligatorios o son inválidos." };
+    }
+
+    await prisma.service.create({
+      data: {
+        name,
+        description,
+        category,
+        duration,
+        priceAuto,
+        priceSuv2,
+        priceSuv3,
+      }
+    });
+
+    revalidatePath("/admin/servicios");
+    revalidatePath("/");
+    
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteService(id: string) {
+  try {
+    // Verificar si hay reservas asociadas (opcional: o borrar en cascada)
+    const bookings = await prisma.booking.count({ where: { serviceId: id } });
+    if (bookings > 0) {
+      return { success: false, error: "No se puede eliminar un servicio que tiene reservas activas." };
+    }
+
+    await prisma.service.delete({
+      where: { id }
+    });
+
+    revalidatePath("/admin/servicios");
+    revalidatePath("/");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateService(id: string, formData: FormData) {
+  try {
+    const name = formData.get("name") as string;
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
+    const duration = parseInt(formData.get("duration") as string);
+    const priceAuto = formData.get("priceAuto") ? parseInt(formData.get("priceAuto") as string) : null;
+    const priceSuv2 = formData.get("priceSuv2") ? parseInt(formData.get("priceSuv2") as string) : null;
+    const priceSuv3 = formData.get("priceSuv3") ? parseInt(formData.get("priceSuv3") as string) : null;
+
+    if (!name || isNaN(duration)) {
+      return { success: false, error: "Faltan campos obligatorios o son inválidos." };
+    }
+
+    await prisma.service.update({
+      where: { id },
+      data: {
+        name,
+        description,
+        category,
+        duration,
+        priceAuto,
+        priceSuv2,
+        priceSuv3,
+      }
+    });
+
+    revalidatePath("/admin/servicios");
+    revalidatePath("/agendar");
+    
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

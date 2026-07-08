@@ -39,3 +39,180 @@ model Booking {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+model Settings {
+  id             String   @id @default("global")
+  workStartHour  Int      @default(9)
+  workEndHour    Int      @default(18)
+  concurrentBays Int      @default(1)
+  slotInterval   Int      @default(30)
+  updatedAt      DateTime @updatedAt
+}
+
+// ==========================================
+// MÓDULO: CLIENTES Y CLUB LUBRIMAX
+// ==========================================
+
+model Customer {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  password       String    // Hashed
+  name           String
+  rut            String?   @unique
+  phone          String?
+  
+  // Membresía
+  membershipId   String?
+  membership     MembershipTier? @relation(fields: [membershipId], references: [id])
+  membershipSince DateTime?
+  membershipUntil DateTime?
+  
+  orders         Order[]
+  reviews        Review[]
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model MembershipTier {
+  id              String    @id @default(cuid())
+  name            String    // Ej: "Titanium"
+  price           Int       // Precio mensual o anual
+  discountPercent Int       // Ej: 15 (15% de descuento en servicios)
+  features        String[]  // Array de beneficios
+  isActive        Boolean   @default(true)
+  
+  customers       Customer[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Partner {
+  id          String    @id @default(cuid())
+  name        String
+  logo        String?
+  description String?
+  benefits    String[]
+  isActive    Boolean   @default(true)
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ==========================================
+// MÓDULO: TIENDA EN LÍNEA (E-COMMERCE)
+// ==========================================
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  isActive    Boolean   @default(true)
+  
+  products    Product[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  price       Int       // Precio base (desde)
+  stock       Int       @default(0) // Stock general o total
+  
+  categoryId  String?
+  category    ProductCategory? @relation(fields: [categoryId], references: [id])
+  
+  image       String?   // Imagen principal (Thumbnail)
+  images      ProductImage[]
+  variants    ProductVariant[]
+  reviews     Review[]
+  
+  isActive    Boolean   @default(true)
+  
+  orderItems  OrderItem[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  url       String
+  alt       String?
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model ProductVariant {
+  id          String   @id @default(cuid())
+  name        String   // Ej: "500ml", "1 Litro", "Olor Vainilla"
+  price       Int?     // Precio específico de esta variante (sobrescribe el base si existe)
+  stock       Int      @default(0)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  rating      Int      // 1 a 5
+  comment     String?
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  isApproved  Boolean  @default(true) // Admin puede ocultar reseñas abusivas
+  createdAt   DateTime @default(now())
+}
+
+model DiscountCode {
+  id          String   @id @default(cuid())
+  code        String   @unique // Ej: CYBER2026
+  discountPct Int      // Porcentaje (Ej: 15 para 15%)
+  isActive    Boolean  @default(true)
+  validUntil  DateTime?
+  usageLimit  Int?     // Veces que se puede usar en total
+  usedCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Order {
+  id            String    @id @default(cuid())
+  total         Int
+  status        String    @default("PENDING") // PENDING, PAID, FAILED, SHIPPED, DELIVERED
+  paymentId     String?   // Transbank Token
+  discountCode  String?   // Si aplicó algún cupón
+  discountTotal Int       @default(0) // Cuánto dinero ahorró
+  
+  // Datos de Envío
+  shippingType  String    @default("PICKUP") // DELIVERY o PICKUP
+  address       String?
+  city          String?
+  trackingCode  String?
+  notes         String?
+  
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  
+  items         OrderItem[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  quantity  Int
+  price     Int     // Precio al momento de la compra
+  
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}

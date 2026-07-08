@@ -1,5 +1,9 @@
-import ReelsGallery from "@/components/dom/ReelsGallery";
+import dynamic from "next/dynamic";
 import Hero from "@/components/dom/Hero";
+
+const ReelsGallery = dynamic(() => import("@/components/dom/ReelsGallery"), {
+  loading: () => <div className="h-[500px] w-full animate-pulse bg-white/5 rounded-2xl flex items-center justify-center text-white/50">Cargando resultados...</div>
+});
 import Services from "@/components/dom/Services";
 import Stats from "@/components/dom/Stats";
 import FinalCTA from "@/components/dom/FinalCTA";
@@ -18,8 +22,8 @@ export default function Home() {
 
       {/* Sección principal de Videos (Reels / Social Proof) */}
       <section id="resultados" className="py-24 max-w-7xl mx-auto px-4 w-full">
-        <h2 className="text-4xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-12">
-          Resultados <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Clínicos</span>
+        <h2 className="text-3xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-12 text-center flex flex-col md:block">
+          <span>Resultados</span> <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Clínicos</span>
         </h2>
         <ReelsGallery />
       </section>

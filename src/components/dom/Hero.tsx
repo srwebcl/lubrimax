@@ -45,14 +45,15 @@ export default function Hero() {
   }, { scope: container });
 
   return (
-    <section ref={container} className="relative h-[100dvh] w-full overflow-hidden flex items-center pt-20 bg-brand-pure">
+    <section ref={container} className="relative h-[100svh] w-full overflow-hidden flex items-center pt-20 bg-brand-pure">
 
       {/* Capa 1: Video Background Estático de Alta Calidad (GSAP fade in) */}
       <div className="absolute inset-0 z-0 bg-brand-pure hero-video-layer opacity-0">
         <video
           className="absolute inset-0 w-full h-full object-cover"
           style={{ filter: "brightness(0.4) contrast(1.1)" }}
-          src="/Luxury_car_in_detailing_studio_202606260210.mp4"
+          src="/hero-bg-optimized.mp4"
+          poster="/hero-poster.webp"
           autoPlay
           loop
           muted
@@ -69,13 +70,13 @@ export default function Hero() {
       <div className="absolute top-1/2 right-0 md:left-1/3 w-[300px] h-[300px] bg-brand-cyan/20 rounded-full blur-[90px] -translate-y-1/2 -z-10 animate-pulse pointer-events-none mix-blend-screen" style={{ animationDelay: '1s' }} />
 
       {/* Capa 4: Contenido DOM */}
-      <div className="relative z-30 container mx-auto px-4 lg:px-8 flex flex-col justify-center items-center text-center pointer-events-none h-full py-10 md:-mt-10">
+      <div className="relative z-30 container mx-auto px-4 lg:px-8 flex flex-col justify-center items-center text-center pointer-events-none h-full py-10 -mt-24 md:-mt-32">
 
-        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold tracking-widest text-zinc-100 leading-[1.05] mb-4 md:mb-6 flex flex-col items-center">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-widest text-zinc-100 leading-[1.05] mb-4 md:mb-6 flex flex-col items-center text-center">
           <div className="mb-2 w-full flex justify-center">
             <div className="hero-title-line uppercase text-xs sm:text-sm md:text-base tracking-[0.3em] font-semibold text-zinc-400 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">CLÍNICA DE</div>
           </div>
-          <div className="flex gap-3 sm:gap-4 md:gap-5 justify-center flex-wrap px-2">
+          <div className="flex gap-2 sm:gap-4 md:gap-5 justify-center flex-wrap px-2">
             <div className="hero-title-line uppercase text-transparent bg-clip-text bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-blue drop-shadow-[0_0_15px_rgba(56,189,248,0.5)] pb-1">ESTÉTICA</div>
             <div className="hero-title-line uppercase text-transparent bg-clip-text bg-gradient-to-r from-gray-400 via-white to-gray-500 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] pb-1">AUTOMOTRIZ</div>
           </div>

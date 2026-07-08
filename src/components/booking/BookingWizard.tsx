@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getServices, getAvailableSlots, createBooking } from "@/actions/booking";
+import { getSessionCustomer } from "@/actions/customer-auth";
 
 type Service = { 
   id: string; 
@@ -25,6 +26,7 @@ const VEHICLE_TYPES = [
 ] as const;
 
 export default function BookingWizard() {
+  const wizardRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,14 +47,26 @@ export default function BookingWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<any>(null);
 
   useEffect(() => {
-    async function loadServices() {
+    async function loadServicesAndSession() {
       const data = await getServices();
       setServices(data as Service[]);
+      
+      const session = await getSessionCustomer();
+      if (session) {
+        setCustomerInfo(session);
+        setFormData(prev => ({
+          ...prev,
+          name: session.name,
+          email: session.email,
+          phone: session.phone || ""
+        }));
+      }
       setLoading(false);
     }
-    loadServices();
+    loadServicesAndSession();
   }, []);
 
   // Fetch slots when date is selected
@@ -70,6 +84,14 @@ export default function BookingWizard() {
   const handleNext = () => setStep((s) => s + 1);
   const handlePrev = () => setStep((s) => s - 1);
 
+  // Auto-scroll to top of wizard when step changes
+  useEffect(() => {
+    if (wizardRef.current) {
+      const yOffset = wizardRef.current.getBoundingClientRect().top + window.scrollY - 100;
+      window.scrollTo({ top: yOffset, behavior: "smooth" });
+    }
+  }, [step]);
+
   const getExactPrice = (service: Service): number => {
     if (vehicleType === VEHICLE_TYPES[1]) return service.priceSuv2 || 0;
     if (vehicleType === VEHICLE_TYPES[2]) return service.priceSuv3 || 0;
@@ -77,7 +99,14 @@ export default function BookingWizard() {
   };
 
   const selectedServiceData = services.find(s => s.id === selectedService);
-  const totalAmount = selectedServiceData ? getExactPrice(selectedServiceData) : 0;
+  let totalAmount = selectedServiceData ? getExactPrice(selectedServiceData) : 0;
+  
+  // Aplicar descuento del club
+  const discountPercent = customerInfo?.membership?.discountPercent || 0;
+  if (discountPercent > 0) {
+    totalAmount = totalAmount - (totalAmount * (discountPercent / 100));
+  }
+  
   const reservationAmount = totalAmount * 0.2;
 
   const handlePayment = async (type: 'RESERVATION' | 'FULL') => {
@@ -156,15 +185,15 @@ export default function BookingWizard() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto bg-brand-surface/60 backdrop-blur-xl border border-white/10 rounded-xl p-6 md:p-10 relative overflow-hidden">
+    <div ref={wizardRef} className="max-w-4xl mx-auto bg-brand-surface/60 backdrop-blur-xl border border-white/10 rounded-xl p-6 md:p-10 relative overflow-hidden">
       {/* Progreso */}
       <div className="flex justify-between mb-8 relative z-10 border-b border-white/5 pb-8">
         {[1, 2, 3, 4].map((num) => (
           <div key={num} className="flex flex-col items-center flex-1">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mb-2 transition-colors duration-500 ${step >= num ? 'bg-brand-cyan text-brand-pure shadow-[0_0_15px_rgba(56,189,248,0.5)]' : 'bg-brand-pure border border-white/20 text-gray-500'}`}>
+            <div className={`w-8 h-8 md:w-10 md:h-10 text-sm md:text-base rounded-full flex items-center justify-center font-bold mb-2 transition-colors duration-500 ${step >= num ? 'bg-brand-cyan text-brand-pure shadow-[0_0_15px_rgba(56,189,248,0.5)]' : 'bg-brand-pure border border-white/20 text-gray-500'}`}>
               {num}
             </div>
-            <span className={`text-xs uppercase tracking-widest text-center ${step >= num ? 'text-brand-cyan' : 'text-gray-500'}`}>
+            <span className={`text-[9px] md:text-xs uppercase tracking-wider md:tracking-widest text-center ${step >= num ? 'text-brand-cyan' : 'text-gray-500'}`}>
               {num === 1 ? 'Vehículo' : num === 2 ? 'Servicio' : num === 3 ? 'Horario' : 'Checkout'}
             </span>
           </div>
@@ -199,7 +228,7 @@ export default function BookingWizard() {
               <button 
                 disabled={!vehicleType}
                 onClick={handleNext}
-                className="bg-brand-chrome text-brand-pure px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 disabled:hover:bg-brand-chrome transition-colors uppercase tracking-widest font-bold"
+                className="w-full sm:w-auto bg-brand-chrome text-brand-pure px-4 md:px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 disabled:hover:bg-brand-chrome transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
               >
                 Continuar a Servicios
               </button>
@@ -233,17 +262,17 @@ export default function BookingWizard() {
               })}
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-4">
               <button 
                 onClick={handlePrev}
-                className="bg-transparent border border-white/10 text-white px-8 py-3 rounded hover:bg-white/5 transition-colors uppercase tracking-widest font-bold"
+                className="w-full sm:w-auto bg-transparent border border-white/10 text-white px-4 md:px-8 py-3 rounded hover:bg-white/5 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
               >
                 Volver
               </button>
               <button 
                 disabled={!selectedService}
                 onClick={handleNext}
-                className="bg-brand-chrome text-brand-pure px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-widest font-bold"
+                className="w-full sm:w-auto bg-brand-chrome text-brand-pure px-4 md:px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
               >
                 Continuar al Calendario
               </button>
@@ -296,17 +325,17 @@ export default function BookingWizard() {
               </div>
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-4">
               <button 
                 onClick={handlePrev}
-                className="bg-transparent border border-white/10 text-white px-8 py-3 rounded hover:bg-white/5 transition-colors uppercase tracking-widest font-bold"
+                className="w-full sm:w-auto bg-transparent border border-white/10 text-white px-4 md:px-8 py-3 rounded hover:bg-white/5 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
               >
                 Volver
               </button>
               <button 
                 disabled={!selectedDate || !selectedSlot}
                 onClick={handleNext}
-                className="bg-brand-chrome text-brand-pure px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-widest font-bold"
+                className="w-full sm:w-auto bg-brand-chrome text-brand-pure px-4 md:px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
               >
                 Continuar al Checkout
               </button>
@@ -360,6 +389,12 @@ export default function BookingWizard() {
                         {selectedDate && format(selectedDate, "dd MMM", { locale: es })} @ {selectedSlot}
                       </span>
                     </div>
+                    {discountPercent > 0 && (
+                      <div className="flex justify-between text-sm bg-amber-500/10 border border-amber-500/20 p-2 rounded text-amber-500">
+                        <span className="font-bold">✓ Club LUBRIMAX</span>
+                        <span className="font-bold">-{discountPercent}% OFF</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t border-white/10 pt-4 mb-6">
@@ -381,15 +416,15 @@ export default function BookingWizard() {
                     <div className="space-y-3">
                       <button 
                         onClick={() => handlePayment('RESERVATION')}
-                        className="w-full bg-brand-chrome text-brand-pure py-3 rounded hover:bg-brand-cyan transition-colors uppercase tracking-widest font-bold text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(56,189,248,0.5)]"
+                        className="w-full bg-brand-chrome text-brand-pure py-3 px-2 rounded hover:bg-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(56,189,248,0.5)] flex flex-col sm:block items-center justify-center gap-1"
                       >
-                        Pagar Reserva (${reservationAmount.toLocaleString('es-CL')})
+                        <span>Pagar Reserva</span> <span className="opacity-75">(${reservationAmount.toLocaleString('es-CL')})</span>
                       </button>
                       <button 
                         onClick={() => handlePayment('FULL')}
-                        className="w-full bg-transparent border border-white/20 text-white py-3 rounded hover:border-brand-cyan hover:text-brand-cyan transition-colors uppercase tracking-widest font-bold text-xs"
+                        className="w-full bg-transparent border border-white/20 text-white py-3 px-2 rounded hover:border-brand-cyan hover:text-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-xs flex flex-col sm:block items-center justify-center gap-1"
                       >
-                        Pagar Total (${totalAmount.toLocaleString('es-CL')})
+                        <span>Pagar Total</span> <span className="opacity-75">(${totalAmount.toLocaleString('es-CL')})</span>
                       </button>
                     </div>
                   )}
