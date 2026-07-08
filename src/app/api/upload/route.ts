@@ -22,7 +22,11 @@ export async function POST(request: Request) {
     });
 
     // Generar la URL prefirmada, válida por 60 segundos
-    const signedUrl = await getSignedUrl(r2, command, { expiresIn: 60 });
+    // NOTA: Es CRÍTICO forzar la firma del header 'content-type' para que Cloudflare R2 no lance 403 CORS error en el frontend.
+    const signedUrl = await getSignedUrl(r2, command, { 
+      expiresIn: 60,
+      signableHeaders: new Set(["content-type"])
+    });
     
     // Calcular la URL pública final de la imagen
     const publicUrl = `${process.env.NEXT_PUBLIC_R2_DEV_URL}/${uniqueFilename}`;
