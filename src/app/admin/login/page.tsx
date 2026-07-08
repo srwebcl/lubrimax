@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { login } from "@/actions/auth";
 
 export default function LoginPage() {
@@ -29,9 +30,15 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md bg-brand-surface/80 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold uppercase tracking-widest text-white italic drop-shadow-md mb-2">
-            LUBRI<span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">MAX</span>
-          </h1>
+          <div className="flex justify-center mb-4">
+            <Image 
+              src="/logo-lubrimax.webp" 
+              alt="Lubrimax Admin" 
+              width={160} 
+              height={45} 
+              className="h-10 w-auto object-contain drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]"
+            />
+          </div>
           <p className="text-brand-cyan text-xs uppercase tracking-widest font-bold">Acceso Restringido</p>
         </div>
 

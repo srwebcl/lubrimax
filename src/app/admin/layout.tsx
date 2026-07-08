@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { logout } from "@/actions/auth";
 
 export default function AdminLayout({
@@ -32,10 +33,14 @@ export default function AdminLayout({
       {/* Sidebar Fijo */}
       <aside className="w-64 bg-brand-surface border-r border-white/5 hidden md:flex flex-col">
         <div className="p-6 border-b border-white/5 text-center">
-          <Link href="/admin">
-            <h1 className="text-xl font-bold uppercase tracking-widest text-white italic">
-              Centro<span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Max</span>
-            </h1>
+          <Link href="/admin" className="flex justify-center items-center">
+            <Image 
+              src="/logo-lubrimax.webp" 
+              alt="Lubrimax Admin" 
+              width={120} 
+              height={32} 
+              className="h-8 w-auto object-contain drop-shadow-[0_0_15px_rgba(56,189,248,0.3)]"
+            />
           </Link>
         </div>
         
