@@ -3,6 +3,17 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+export async function getAdminServices() {
+  try {
+    return await prisma.service.findMany({
+      orderBy: { category: 'asc' }
+    });
+  } catch (error) {
+    console.error("Error fetching admin services:", error);
+    return [];
+  }
+}
+
 export async function createService(formData: FormData) {
   try {
     const name = formData.get("name") as string;
@@ -12,6 +23,8 @@ export async function createService(formData: FormData) {
     const priceAuto = formData.get("priceAuto") ? parseInt(formData.get("priceAuto") as string) : null;
     const priceSuv2 = formData.get("priceSuv2") ? parseInt(formData.get("priceSuv2") as string) : null;
     const priceSuv3 = formData.get("priceSuv3") ? parseInt(formData.get("priceSuv3") as string) : null;
+    const badgesStr = formData.get("badges") as string;
+    const badges = badgesStr ? badgesStr.split(",").map(b => b.trim()).filter(b => b) : [];
 
     if (!name || isNaN(duration)) {
       return { success: false, error: "Faltan campos obligatorios o son inválidos." };
@@ -26,6 +39,7 @@ export async function createService(formData: FormData) {
         priceAuto,
         priceSuv2,
         priceSuv3,
+        badges,
       }
     });
 
@@ -67,6 +81,8 @@ export async function updateService(id: string, formData: FormData) {
     const priceAuto = formData.get("priceAuto") ? parseInt(formData.get("priceAuto") as string) : null;
     const priceSuv2 = formData.get("priceSuv2") ? parseInt(formData.get("priceSuv2") as string) : null;
     const priceSuv3 = formData.get("priceSuv3") ? parseInt(formData.get("priceSuv3") as string) : null;
+    const badgesStr = formData.get("badges") as string;
+    const badges = badgesStr ? badgesStr.split(",").map(b => b.trim()).filter(b => b) : [];
 
     if (!name || isNaN(duration)) {
       return { success: false, error: "Faltan campos obligatorios o son inválidos." };
@@ -82,6 +98,7 @@ export async function updateService(id: string, formData: FormData) {
         priceAuto,
         priceSuv2,
         priceSuv3,
+        badges,
       }
     });
 

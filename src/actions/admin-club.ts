@@ -109,6 +109,7 @@ export async function createPartner(formData: FormData) {
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const benefitsRaw = formData.get("benefits") as string;
+    const logo = formData.get("logo") as string;
     
     if (!name) {
       return { success: false, error: "Falta el nombre del comercio." };
@@ -121,8 +122,45 @@ export async function createPartner(formData: FormData) {
         name,
         description,
         benefits,
+        logo: logo || null,
         isActive: true
       }
+    });
+
+    revalidatePath("/admin/club");
+    revalidatePath("/club");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updatePartner(id: string, formData: FormData) {
+  try {
+    const name = formData.get("name") as string;
+    const description = formData.get("description") as string;
+    const benefitsRaw = formData.get("benefits") as string;
+    const logo = formData.get("logo") as string;
+    
+    if (!name) {
+      return { success: false, error: "Falta el nombre del comercio." };
+    }
+
+    const benefits = benefitsRaw ? benefitsRaw.split('\n').filter(b => b.trim() !== '') : [];
+
+    const data: any = {
+      name,
+      description,
+      benefits
+    };
+
+    if (logo) {
+      data.logo = logo;
+    }
+
+    await prisma.partner.update({
+      where: { id },
+      data
     });
 
     revalidatePath("/admin/club");

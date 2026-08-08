@@ -9,16 +9,78 @@ const tx = new WebpayPlus.Transaction(
   new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
 );
 
+// Recalcula el total desde los precios reales en la BD. Nunca confiar en el
+// monto/precio que envía el cliente: viene de localStorage y es manipulable.
+async function resolveOrderItems(cartItems: { id: string; quantity: number }[]) {
+  // El id de un item con variante viene como "productId-variantId" (ver CartProvider/tienda/[id])
+  const productIds = [...new Set(cartItems.map((item) => String(item.id).split("-")[0]))];
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    include: { variants: true },
+  });
+  const productById = new Map(products.map((p) => [p.id, p]));
+
+  const orderItems: { productId: string; quantity: number; price: number }[] = [];
+  let subtotal = 0;
+
+  for (const item of cartItems) {
+    const quantity = Number(item.quantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new Error("Cantidad inválida en el carrito.");
+    }
+
+    const rawId = String(item.id);
+    const [productId, variantId] = rawId.split("-");
+    const product = productById.get(productId);
+    if (!product || !product.isActive) {
+      throw new Error(`Producto no disponible: ${rawId}`);
+    }
+
+    let price = product.price;
+    if (variantId) {
+      const variant = product.variants.find((v) => v.id === variantId);
+      if (!variant) throw new Error(`Producto no disponible: ${rawId}`);
+      price = variant.price ?? product.price;
+    }
+
+    subtotal += price * quantity;
+    orderItems.push({ productId, quantity, price });
+  }
+
+  return { orderItems, subtotal };
+}
+
+async function resolveDiscount(couponCode: string | undefined, subtotal: number) {
+  if (!couponCode) return { discountTotal: 0, appliedCode: null as string | null };
+
+  const coupon = await prisma.discountCode.findUnique({ where: { code: couponCode.toUpperCase() } });
+  const isValid =
+    coupon &&
+    coupon.isActive &&
+    (!coupon.validUntil || new Date() <= coupon.validUntil) &&
+    (!coupon.usageLimit || coupon.usedCount < coupon.usageLimit);
+
+  if (!isValid) return { discountTotal: 0, appliedCode: null };
+
+  await prisma.discountCode.update({
+    where: { code: coupon.code },
+    data: { usedCount: { increment: 1 } },
+  });
+
+  return { discountTotal: Math.round(subtotal * (coupon.discountPct / 100)), appliedCode: coupon.code };
+}
+
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
     let customerSession = cookieStore.get('lubrimax_customer_session')?.value;
-    
-    const body = await request.json();
-    const { amount, items, customerName, customerEmail, shippingType, address, city, couponCode } = body;
 
-    if (!amount || amount <= 0 || !items || items.length === 0) {
-      return NextResponse.json({ error: "Carrito vacío o monto inválido." }, { status: 400 });
+    const body = await request.json();
+    const { items, customerName, customerEmail, shippingType, address, city, couponCode } = body;
+
+    if (!items || items.length === 0) {
+      return NextResponse.json({ error: "Carrito vacío." }, { status: 400 });
     }
 
     // Si no hay sesión, usar los datos de invitado para crear o encontrar al cliente
@@ -40,16 +102,18 @@ export async function POST(request: Request) {
       customerSession = guest.id;
     }
 
-    // Validar y registrar uso de cupón si existe
-    let discountTotal = 0;
-    if (couponCode) {
-      const coupon = await prisma.discountCode.findUnique({ where: { code: couponCode } });
-      if (coupon && coupon.isActive) {
-        await prisma.discountCode.update({
-          where: { code: couponCode },
-          data: { usedCount: { increment: 1 } }
-        });
-      }
+    let orderItems, subtotal;
+    try {
+      ({ orderItems, subtotal } = await resolveOrderItems(items));
+    } catch (validationError: any) {
+      return NextResponse.json({ error: validationError.message }, { status: 400 });
+    }
+
+    const { discountTotal, appliedCode } = await resolveDiscount(couponCode, subtotal);
+    const amount = subtotal - discountTotal;
+
+    if (amount <= 0) {
+      return NextResponse.json({ error: "Monto inválido." }, { status: 400 });
     }
 
     // Crear la orden en la BD (PENDING)
@@ -61,14 +125,10 @@ export async function POST(request: Request) {
         shippingType: shippingType || "PICKUP",
         address: address || null,
         city: city || null,
-        discountCode: couponCode || null,
-        discountTotal: discountTotal,
+        discountCode: appliedCode,
+        discountTotal,
         items: {
-          create: items.map((item: any) => ({
-            productId: item.id,
-            quantity: item.quantity,
-            price: item.price
-          }))
+          create: orderItems
         }
       }
     });
@@ -76,7 +136,7 @@ export async function POST(request: Request) {
     // Iniciar Transacción en Webpay
     const buyOrder = order.id;
     const sessionId = customerSession;
-    
+
     // Configurar URL de retorno absoluto (importante para producción vs dev)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const returnUrl = `${baseUrl}/api/webpay/commit`;

@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifyAdminSessionToken } from '@/lib/admin-session';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const url = request.nextUrl;
-  
+
   // Protect all /admin routes except /admin/login
   if (url.pathname.startsWith('/admin') && url.pathname !== '/admin/login') {
     const session = request.cookies.get('lubrimax_admin_session');
-    
-    if (!session || session.value !== 'authenticated') {
+
+    if (!(await verifyAdminSessionToken(session?.value))) {
       const loginUrl = new URL('/admin/login', request.url);
       return NextResponse.redirect(loginUrl);
     }
@@ -17,7 +18,7 @@ export function middleware(request: NextRequest) {
   // Redirect authenticated users away from the login page
   if (url.pathname === '/admin/login') {
     const session = request.cookies.get('lubrimax_admin_session');
-    if (session && session.value === 'authenticated') {
+    if (await verifyAdminSessionToken(session?.value)) {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
   }

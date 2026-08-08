@@ -18,6 +18,7 @@ type Partner = {
   name: string;
   description: string | null;
   benefits: string[];
+  logo: string | null;
 };
 
 export default function ClubPage() {
@@ -129,9 +130,14 @@ export default function ClubPage() {
                       whileInView={{ scale: 1, opacity: 1 }}
                       viewport={{ once: true }}
                       transition={{ delay: i * 0.1 }}
-                      className="bg-black/50 border border-white/10 p-6 rounded-2xl hover:border-brand-cyan/30 transition-colors"
+                      className="bg-black/50 border border-white/10 p-6 rounded-2xl hover:border-brand-cyan/30 transition-colors flex flex-col h-full"
                     >
-                      <h4 className="text-lg font-bold text-white mb-2">{p.name}</h4>
+                      {p.logo && (
+                        <div className="w-full h-24 mb-4 bg-white rounded-lg flex items-center justify-center p-2">
+                          <img src={p.logo} alt={p.name} className="max-h-full max-w-full object-contain" />
+                        </div>
+                      )}
+                      <h4 className="text-lg font-bold text-white mb-2 mt-auto">{p.name}</h4>
                       <p className="text-xs text-gray-500 mb-6">{p.description}</p>
                       
                       <div className="space-y-3">

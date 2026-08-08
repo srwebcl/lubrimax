@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { r2 } from "@/lib/r2";
+import { cookies } from "next/headers";
+import { verifyAdminSessionToken } from "@/lib/admin-session";
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const session = cookieStore.get("lubrimax_admin_session")?.value;
+    if (!(await verifyAdminSessionToken(session))) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
     

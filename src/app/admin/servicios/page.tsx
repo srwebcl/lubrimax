@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { createService, deleteService, updateService } from "@/actions/admin-services";
-import { getServices } from "@/actions/booking";
+import { createService, deleteService, updateService, getAdminServices } from "@/actions/admin-services";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Service = {
@@ -14,6 +13,7 @@ type Service = {
   priceSuv2: number | null;
   priceSuv3: number | null;
   category: string;
+  badges: string[];
 };
 
 export default function ServicesPage() {
@@ -23,10 +23,11 @@ export default function ServicesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const formRef = React.useRef<HTMLDivElement>(null);
 
   const fetchServices = async () => {
     setLoading(true);
-    const data = await getServices();
+    const data = await getAdminServices();
     setServices(data);
     setLoading(false);
   };
@@ -78,7 +79,9 @@ export default function ServicesPage() {
     setEditingService(svc);
     setShowForm(true);
     setMessage(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleCancelForm = () => {
@@ -102,12 +105,12 @@ export default function ServicesPage() {
       {/* HEADER */}
       <div className="mb-8 border-b border-white/10 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white uppercase tracking-widest italic">Catálogo <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">de Servicios</span></h2>
+          <h2 className="text-xl md:text-3xl font-bold text-white uppercase tracking-widest italic">Catálogo <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">de Servicios</span></h2>
           <p className="text-gray-400 text-sm mt-2">Administra los tratamientos, precios y duraciones disponibles para tus clientes.</p>
         </div>
         <button 
           onClick={() => showForm ? handleCancelForm() : setShowForm(true)}
-          className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors shadow-[0_0_20px_rgba(56,189,248,0.2)] whitespace-nowrap"
+          className="w-full md:w-auto bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors shadow-[0_0_20px_rgba(56,189,248,0.2)] whitespace-nowrap"
         >
           {showForm ? "✕ Cancelar" : "➕ Nuevo Servicio"}
         </button>
@@ -117,6 +120,7 @@ export default function ServicesPage() {
       <AnimatePresence>
         {showForm && (
           <motion.div 
+            ref={formRef}
             initial={{ opacity: 0, height: 0, marginBottom: 0 }}
             animate={{ opacity: 1, height: "auto", marginBottom: 32 }}
             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
@@ -156,6 +160,12 @@ export default function ServicesPage() {
                   <textarea name="description" rows={2} defaultValue={editingService?.description || ""} placeholder="Detalles de lo que incluye el servicio..." className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all"></textarea>
                 </div>
 
+                <div>
+                  <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Badges / Etiquetas (Separadas por comas)</label>
+                  <input type="text" name="badges" defaultValue={editingService?.badges ? editingService.badges.join(", ") : ""} placeholder="Ej. Nanotecnología, 7 Meses, Premium" className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all" />
+                  <p className="text-[10px] text-gray-500 mt-1">Aparecerán como pequeñas etiquetas resaltadas sobre el título del servicio.</p>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div>
                     <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Duración (Mins)</label>
@@ -181,11 +191,11 @@ export default function ServicesPage() {
                   </div>
                 )}
 
-                <div className="flex justify-end pt-4 gap-4">
-                  <button type="button" onClick={handleCancelForm} className="text-gray-400 font-bold uppercase tracking-widest text-sm px-6 py-4 hover:text-white transition-colors">
+                <div className="flex flex-col-reverse sm:flex-row justify-end pt-4 gap-4">
+                  <button type="button" onClick={handleCancelForm} className="w-full sm:w-auto text-gray-400 font-bold uppercase tracking-widest text-sm px-6 py-4 hover:text-white transition-colors">
                     Cancelar
                   </button>
-                  <button disabled={saving} type="submit" className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-sm px-10 py-4 rounded-lg hover:bg-white transition-colors disabled:opacity-50">
+                  <button disabled={saving} type="submit" className="w-full sm:w-auto bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-sm px-10 py-4 rounded-lg hover:bg-white transition-colors disabled:opacity-50">
                     {saving ? "Guardando..." : (editingService ? "Actualizar Servicio" : "Crear Servicio")}
                   </button>
                 </div>
@@ -222,6 +232,16 @@ export default function ServicesPage() {
                   {svc.duration} Min
                 </span>
               </div>
+
+              {svc.badges && svc.badges.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {svc.badges.map((badge, idx) => (
+                    <span key={idx} className="bg-brand-cyan/20 border border-brand-cyan/50 text-brand-cyan text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm">
+                      {badge}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               <h4 className="text-xl font-bold text-white uppercase tracking-wider mb-2">{svc.name}</h4>
               <p className="text-gray-500 text-sm mb-6 line-clamp-2 min-h-[40px]">{svc.description || "Sin descripción detallada."}</p>

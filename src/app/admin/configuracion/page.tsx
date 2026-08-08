@@ -12,6 +12,7 @@ export default function ConfigPage() {
   const [endHour, setEndHour] = useState(18);
   const [concurrentBays, setConcurrentBays] = useState(1);
   const [slotInterval, setSlotInterval] = useState(30);
+  const [advanceBookingHours, setAdvanceBookingHours] = useState(12);
 
   useEffect(() => {
     getSettings().then((settings) => {
@@ -19,6 +20,7 @@ export default function ConfigPage() {
       setEndHour(settings.workEndHour);
       setConcurrentBays(settings.concurrentBays || 1);
       setSlotInterval(settings.slotInterval || 30);
+      setAdvanceBookingHours(settings.advanceBookingHours || 12);
       setLoading(false);
     });
   }, []);
@@ -33,6 +35,7 @@ export default function ConfigPage() {
     formData.append("workEndHour", endHour.toString());
     formData.append("concurrentBays", concurrentBays.toString());
     formData.append("slotInterval", slotInterval.toString());
+    formData.append("advanceBookingHours", advanceBookingHours.toString());
 
     const result = await updateSettings(formData);
     
@@ -52,7 +55,7 @@ export default function ConfigPage() {
   return (
     <div className="p-4 sm:p-8">
       <div className="mb-8 border-b border-white/10 pb-4">
-        <h2 className="text-2xl font-bold text-white uppercase tracking-widest">Configuración Global</h2>
+        <h2 className="text-lg md:text-2xl font-bold text-white uppercase tracking-widest">Configuración Global</h2>
         <p className="text-gray-400 text-sm mt-1">Administra los horarios de funcionamiento y parámetros generales de la clínica.</p>
       </div>
 
@@ -149,6 +152,29 @@ export default function ConfigPage() {
                 </div>
               </div>
             </div>
+
+            <div>
+              <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Anticipación Mínima de Reserva</label>
+              <div className="relative">
+                <select 
+                  value={advanceBookingHours}
+                  onChange={(e) => setAdvanceBookingHours(parseInt(e.target.value))}
+                  className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white appearance-none focus:outline-none focus:border-brand-cyan transition-colors"
+                >
+                  <option value={1}>1 Hora (Solo hoy urgente)</option>
+                  <option value={6}>6 Horas de anticipación</option>
+                  <option value={12}>12 Horas de anticipación</option>
+                  <option value={24}>24 Horas (Mínimo un día antes)</option>
+                  <option value={48}>48 Horas (Dos días antes)</option>
+                  <option value={72}>72 Horas (Tres días antes)</option>
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-500">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
 
           <p className="text-xs text-gray-500 italic mt-6">
@@ -169,7 +195,7 @@ export default function ConfigPage() {
             <button 
               type="submit"
               disabled={saving}
-              className="bg-brand-cyan text-brand-pure px-6 py-3 rounded font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors disabled:opacity-50"
+              className="w-full md:w-auto bg-brand-cyan text-brand-pure px-6 py-3 rounded font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors disabled:opacity-50"
             >
               {saving ? "Guardando..." : "Guardar Configuración"}
             </button>

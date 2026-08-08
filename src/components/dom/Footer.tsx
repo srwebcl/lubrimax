@@ -19,6 +19,7 @@ export default function Footer() {
                 alt="Lubrimax" 
                 width={200} 
                 height={60} 
+                style={{ width: 'auto', height: 'auto' }}
                 className="h-12 w-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
               />
             </Link>
@@ -32,17 +33,32 @@ export default function Footer() {
             <h4 className="text-white font-bold uppercase tracking-widest mb-6">Navegación</h4>
             <ul className="space-y-4">
               <li>
-                <Link href="#servicios" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
-                  Nuestros Tratamientos
+                <Link href="/" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
+                  Inicio
                 </Link>
               </li>
               <li>
-                <Link href="#catalogo" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
-                  Resultados Clínicos
+                <Link href="/#servicios" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
+                  Servicios
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
+                <Link href="/tienda" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
+                  Tienda
+                </Link>
+              </li>
+              <li>
+                <Link href="/contacto" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide">
+                  Contacto
+                </Link>
+              </li>
+              <li>
+                <Link href="/club" className="text-amber-500/80 hover:text-amber-400 transition-colors text-sm uppercase tracking-wide">
+                  ★ Club VIP
+                </Link>
+              </li>
+              <li>
+                <Link href="/agendar" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide font-bold">
                   Agendar Cita
                 </Link>
               </li>

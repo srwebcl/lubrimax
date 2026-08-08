@@ -164,14 +164,14 @@ export default function TiendaPage() {
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-12">
       <div className="border-b border-white/10 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white uppercase tracking-widest italic">Gestión de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-green-400">Tienda</span></h2>
+          <h2 className="text-xl md:text-3xl font-bold text-white uppercase tracking-widest italic">Gestión de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-green-400">Tienda</span></h2>
           <p className="text-gray-400 text-sm mt-2">Inventario, Variantes e Imágenes 360.</p>
         </div>
-        <div className="flex gap-4">
-          <button onClick={() => setShowCategoryForm(!showCategoryForm)} className="border border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg transition-colors">
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          <button onClick={() => setShowCategoryForm(!showCategoryForm)} className="w-full sm:w-auto border border-brand-cyan text-brand-cyan hover:bg-brand-cyan/10 font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg transition-colors">
             {showCategoryForm ? "✕" : "✚ Categoría"}
           </button>
-          <button onClick={() => openForm()} className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+          <button onClick={() => openForm()} className="w-full sm:w-auto bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors shadow-[0_0_20px_rgba(56,189,248,0.2)]">
             {showForm ? "✕ Cancelar" : "✚ Producto Nuevo"}
           </button>
         </div>
@@ -181,7 +181,7 @@ export default function TiendaPage() {
         {showCategoryForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
              <div className="bg-brand-surface border border-white/10 rounded-2xl p-6 mb-8 flex flex-col md:flex-row gap-8">
-              <div className="flex-1 border-r border-white/5 pr-8">
+              <div className="flex-1 border-b md:border-b-0 md:border-r border-white/5 pb-6 md:pb-0 md:pr-8">
                 <h4 className="text-white text-sm font-bold uppercase tracking-widest mb-4">Nueva Categoría</h4>
                 <form onSubmit={handleCategorySubmit} className="flex gap-4">
                   <input type="text" name="name" required placeholder="Nombre" className="flex-1 bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan" />
@@ -285,7 +285,7 @@ export default function TiendaPage() {
                   </div>
                   
                   {variants.map((v, idx) => (
-                    <div key={idx} className="flex flex-col md:flex-row gap-4 items-end bg-black/40 p-4 rounded-lg border border-white/5">
+                    <div key={idx} className="flex flex-col md:flex-row gap-4 items-start md:items-end bg-black/40 p-4 rounded-lg border border-white/5">
                       <div className="flex-1 w-full">
                         <label className="block text-gray-500 text-[10px] uppercase font-bold mb-1">Nombre (Ej: 1 Litro)</label>
                         <input type="text" required value={v.name} onChange={e => { const newV = [...variants]; newV[idx].name = e.target.value; setVariants(newV); }} className="w-full bg-transparent border-b border-white/20 text-white py-1 focus:outline-none focus:border-brand-cyan" />
@@ -298,7 +298,7 @@ export default function TiendaPage() {
                         <label className="block text-gray-500 text-[10px] uppercase font-bold mb-1">Stock</label>
                         <input type="number" required value={v.stock} onChange={e => { const newV = [...variants]; newV[idx].stock = parseInt(e.target.value) || 0; setVariants(newV); }} className="w-full bg-transparent border-b border-white/20 text-white py-1 focus:outline-none focus:border-brand-cyan" />
                       </div>
-                      <button type="button" onClick={() => setVariants(variants.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-300 px-3 py-1 bg-red-500/10 rounded">✕</button>
+                      <button type="button" onClick={() => setVariants(variants.filter((_, i) => i !== idx))} className="w-full md:w-auto text-red-400 hover:text-red-300 px-3 py-2 md:py-1 bg-red-500/10 rounded mt-2 md:mt-0 font-bold uppercase text-xs md:text-sm">✕ Borrar</button>
                     </div>
                   ))}
                   {variants.length === 0 && <p className="text-xs text-gray-500 italic">No hay variantes configuradas. Se usará el precio y stock base.</p>}

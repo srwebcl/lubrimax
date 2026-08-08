@@ -68,10 +68,10 @@ export default function CuponesPage() {
       {/* HEADER */}
       <div className="border-b border-white/10 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white uppercase tracking-widest italic">Motor de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-green-400">Cupones</span></h2>
+          <h2 className="text-xl md:text-3xl font-bold text-white uppercase tracking-widest italic">Motor de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-green-400">Cupones</span></h2>
           <p className="text-gray-400 text-sm mt-2">Genera códigos de descuento para tus campañas de marketing.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors shadow-[0_0_20px_rgba(56,189,248,0.2)]">
+        <button onClick={() => setShowForm(!showForm)} className="w-full md:w-auto bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors shadow-[0_0_20px_rgba(56,189,248,0.2)]">
           {showForm ? "✕ Cancelar" : "✚ Nuevo Cupón"}
         </button>
       </div>

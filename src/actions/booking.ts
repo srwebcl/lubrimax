@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { addMinutes, parse, format, isBefore, isAfter, isEqual } from "date-fns";
 
 import { getSettings } from "./admin-settings";
+import { sendEmail } from "@/lib/email";
 
 /**
  * Obtiene todos los servicios disponibles
@@ -11,6 +12,11 @@ import { getSettings } from "./admin-settings";
 export async function getServices() {
   try {
     return await prisma.service.findMany({
+      where: {
+        priceAuto: {
+          not: null
+        }
+      },
       orderBy: { priceAuto: 'asc' }
     });
   } catch (error) {
@@ -31,7 +37,10 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
     if (!service) throw new Error("Servicio no encontrado");
 
     // Fecha consultada (asumimos formato YYYY-MM-DD)
-    const queryDate = new Date(dateString);
+    const [year, month, day] = dateString.split("-").map(Number);
+    
+    const queryStart = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const queryEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
     
     // Obtener horarios de la BD
     const settings = await getSettings();
@@ -44,8 +53,8 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
     const existingBookings = await prisma.booking.findMany({
       where: {
         date: {
-          gte: new Date(queryDate.setHours(0, 0, 0, 0)),
-          lte: new Date(queryDate.setHours(23, 59, 59, 999))
+          gte: queryStart,
+          lte: queryEnd
         },
         status: {
           not: "CANCELLED"
@@ -53,31 +62,40 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
       }
     });
 
-    // Generar todos los slots posibles cada 30 minutos
+    // Generar todos los slots posibles
     const availableSlots: string[] = [];
-    const baseDate = new Date(dateString);
     
-    let currentSlotTime = new Date(baseDate.setHours(WORK_START_HOUR, 0, 0, 0));
-    const endOfDayTime = new Date(baseDate.setHours(WORK_END_HOUR, 0, 0, 0));
+    let currentSlotTime = new Date(year, month - 1, day, WORK_START_HOUR, 0, 0, 0);
+    const endOfDayTime = new Date(year, month - 1, day, WORK_END_HOUR, 0, 0, 0);
+    const now = new Date(); // Para descartar horas pasadas de hoy
 
     while (isBefore(currentSlotTime, endOfDayTime)) {
       // Calcular a qué hora terminaría el servicio si empieza en este slot
       const slotEndTime = addMinutes(currentSlotTime, service.duration);
 
-      // Regla 1: El servicio NO puede terminar después del horario de cierre (18:00)
+      // Regla 1: El servicio NO puede terminar después del horario de cierre
       if (isAfter(slotEndTime, endOfDayTime)) {
-        break; // Como generamos cronológicamente, si este no entra, los siguientes tampoco
+        break; // Si este no entra, los siguientes tampoco
       }
 
-      // Regla 2: Revisar colisiones con reservas existentes
+      // Regla 2: Descartar horarios que no cumplen con la anticipación mínima
+      const advanceLimit = addMinutes(now, (settings.advanceBookingHours || 12) * 60);
+      
+      if (isBefore(currentSlotTime, advanceLimit)) {
+        currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
+        continue;
+      }
+
+      // Regla 3: Revisar colisiones con reservas existentes
       let overlappingCount = 0;
       
       for (const booking of existingBookings) {
-        const bookingStart = parse(booking.startTime, 'HH:mm', baseDate);
-        const bookingEnd = parse(booking.endTime, 'HH:mm', baseDate);
+        const [bHour, bMin] = booking.startTime.split(":").map(Number);
+        const [eHour, eMin] = booking.endTime.split(":").map(Number);
+        
+        const bookingStart = new Date(year, month - 1, day, bHour, bMin, 0, 0);
+        const bookingEnd = new Date(year, month - 1, day, eHour, eMin, 0, 0);
 
-        // Hay colisión si el nuevo slot empieza ANTES de que termine una reserva existente
-        // Y termina DESPUÉS de que empiece esa reserva existente
         if (
           (isBefore(currentSlotTime, bookingEnd) || isEqual(currentSlotTime, bookingEnd)) &&
           (isAfter(slotEndTime, bookingStart) || isEqual(slotEndTime, bookingStart)) &&
@@ -92,7 +110,7 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
         availableSlots.push(format(currentSlotTime, 'HH:mm'));
       }
 
-      // Avanzar al siguiente bloque dinámico
+      // Avanzar al siguiente bloque
       currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
     }
 
@@ -131,14 +149,16 @@ export async function createBooking(data: {
       throw new Error("El horario seleccionado ya no está disponible.");
     }
 
-    const baseDate = new Date(data.date);
-    const start = parse(data.startTime, 'HH:mm', baseDate);
+    const [year, month, day] = data.date.split("-").map(Number);
+    const [sHour, sMin] = data.startTime.split(":").map(Number);
+    const localDate = new Date(year, month - 1, day);
+    const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
     const end = addMinutes(start, service.duration);
     const endTimeStr = format(end, 'HH:mm');
 
     const booking = await prisma.booking.create({
       data: {
-        date: new Date(data.date),
+        date: new Date(data.date), // UTC para la base de datos
         startTime: data.startTime,
         endTime: endTimeStr,
         customerName: data.customerName,
@@ -152,7 +172,20 @@ export async function createBooking(data: {
       }
     });
 
-    // TODO: Disparar email con Resend aquí
+    if (data.customerEmail) {
+      const friendlyDate = format(localDate, "dd/MM/yyyy");
+      await sendEmail({
+        to: data.customerEmail,
+        subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
+        react: (
+          `<h1>¡Hola ${data.customerName}!</h1>
+           <p>Tu reserva para <strong>${service.name}</strong> quedó confirmada.</p>
+           <p>Fecha: ${friendlyDate}<br/>Hora: ${data.startTime} - ${endTimeStr}</p>
+           <p>Vehículo: ${data.vehicleMake} ${data.vehicleModel}</p>
+           <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
+        ) as any // Cast temporal para evitar error tipográfico si no usamos @react-email yet
+      });
+    }
 
     return { success: true, booking };
   } catch (error: unknown) {

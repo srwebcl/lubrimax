@@ -4,14 +4,17 @@ import Link from "next/link";
 export default function FinalCTA() {
   return (
     <section className="relative py-24 bg-brand-pure overflow-hidden border-t border-white/5 border-b">
-      {/* Patrón Hexagonal de Fondo */}
+      {/* Imagen de Fondo Premium */}
       <div 
-        className="absolute inset-0 z-0 opacity-10 pointer-events-none mix-blend-overlay"
+        className="absolute inset-0 z-0 opacity-40 mix-blend-luminosity"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='103.923' viewBox='0 0 60 103.923' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 103.923L0 86.6025V51.9615L30 34.641L60 51.9615V86.6025L30 103.923ZM30 102.768L59 86.025V52.5385L30 35.795L1 52.5385V86.025L30 102.768ZM30 51.9615L0 34.641V0L30 -17.3205L60 0V34.641L30 51.9615ZM30 50.806L59 34.064V0.577L30 -16.166L1 0.577V34.064L30 50.806Z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
-          backgroundSize: "60px",
+          backgroundImage: `url('https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&q=80')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       />
+      <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/80 to-transparent z-0" />
+      <div className="absolute inset-0 bg-gradient-to-r from-brand-pure via-transparent to-brand-pure z-0" />
 
       {/* Resplandor Central */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[200px] bg-brand-cyan/20 blur-[120px] pointer-events-none rounded-full mix-blend-screen" />

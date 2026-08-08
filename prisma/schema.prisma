@@ -15,6 +15,7 @@ model Service {
   priceSuv2   Int?
   priceSuv3   Int?
   category    String    @default("Detailing")
+  badges      String[]  @default([])
   bookings    Booking[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -44,9 +45,10 @@ model Settings {
   id             String   @id @default("global")
   workStartHour  Int      @default(9)
   workEndHour    Int      @default(18)
-  concurrentBays Int      @default(1)
-  slotInterval   Int      @default(30)
-  updatedAt      DateTime @updatedAt
+  concurrentBays      Int      @default(1)
+  slotInterval        Int      @default(30)
+  advanceBookingHours Int      @default(12)
+  updatedAt           DateTime @updatedAt
 }
 
 // ==========================================

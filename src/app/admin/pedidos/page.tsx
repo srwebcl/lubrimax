@@ -51,7 +51,7 @@ export default function PedidosPage() {
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8">
       <div className="border-b border-white/10 pb-6">
-        <h2 className="text-3xl font-bold text-white uppercase tracking-widest italic">Centro de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-purple-400">Pedidos</span></h2>
+        <h2 className="text-xl md:text-3xl font-bold text-white uppercase tracking-widest italic">Centro de <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-purple-400">Pedidos</span></h2>
         <p className="text-gray-400 text-sm mt-2">Gestiona el despacho y estado de las ventas e-commerce.</p>
       </div>
 

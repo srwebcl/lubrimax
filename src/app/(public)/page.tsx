@@ -17,9 +17,6 @@ export default function Home() {
       {/* Estadísticas de Alto Impacto (Confianza inmediata) */}
       <Stats />
 
-      {/* Servicios Dinámicos (Oferta lógica) */}
-      <Services />
-
       {/* Sección principal de Videos (Reels / Social Proof) */}
       <section id="resultados" className="py-24 max-w-7xl mx-auto px-4 w-full">
         <h2 className="text-3xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-12 text-center flex flex-col md:block">
@@ -27,6 +24,9 @@ export default function Home() {
         </h2>
         <ReelsGallery />
       </section>
+
+      {/* Servicios Dinámicos (Oferta lógica) */}
+      <Services />
 
       {/* Llamado a la acción estratégico */}
       <FinalCTA />

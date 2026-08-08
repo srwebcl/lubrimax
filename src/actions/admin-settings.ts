@@ -15,7 +15,8 @@ export async function getSettings() {
         workStartHour: 9,
         workEndHour: 18,
         concurrentBays: 1,
-        slotInterval: 30
+        slotInterval: 30,
+        advanceBookingHours: 12
       }
     });
   }
@@ -29,6 +30,7 @@ export async function updateSettings(formData: FormData) {
     const workEndHour = parseInt(formData.get("workEndHour") as string);
     const concurrentBays = parseInt(formData.get("concurrentBays") as string);
     const slotInterval = parseInt(formData.get("slotInterval") as string);
+    const advanceBookingHours = parseInt(formData.get("advanceBookingHours") as string) || 12;
 
     if (isNaN(workStartHour) || isNaN(workEndHour) || isNaN(concurrentBays) || isNaN(slotInterval)) {
       return { success: false, error: "Valores inválidos" };
@@ -45,6 +47,7 @@ export async function updateSettings(formData: FormData) {
         workEndHour,
         concurrentBays,
         slotInterval,
+        advanceBookingHours,
       },
       create: {
         id: "global",
@@ -52,6 +55,7 @@ export async function updateSettings(formData: FormData) {
         workEndHour,
         concurrentBays,
         slotInterval,
+        advanceBookingHours,
       }
     });
 
