@@ -6,6 +6,7 @@ const ReelsGallery = dynamic(() => import("@/components/dom/ReelsGallery"), {
 });
 import Services from "@/components/dom/Services";
 import Stats from "@/components/dom/Stats";
+import PromoTicker from "@/components/dom/PromoTicker";
 import FinalCTA from "@/components/dom/FinalCTA";
 import Footer from "@/components/dom/Footer";
 
@@ -30,6 +31,9 @@ export default function Home() {
 
       {/* Llamado a la acción estratégico */}
       <FinalCTA />
+
+      {/* Promoción Sorpresa antes del Footer */}
+      <PromoTicker />
 
       {/* Footer Corporativo */}
       <Footer />

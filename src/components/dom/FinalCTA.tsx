@@ -6,9 +6,9 @@ export default function FinalCTA() {
     <section className="relative py-24 bg-brand-pure overflow-hidden border-t border-white/5 border-b">
       {/* Imagen de Fondo Premium */}
       <div 
-        className="absolute inset-0 z-0 opacity-40 mix-blend-luminosity"
+        className="absolute inset-0 z-0 opacity-60"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?auto=format&fit=crop&q=80')`,
+          backgroundImage: `url('https://images.unsplash.com/photo-1611821064430-0d40221e4f03?auto=format&fit=crop&q=80&w=2000')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}

@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="bg-brand-pure text-brand-chrome antialiased overflow-x-hidden min-h-full flex flex-col relative">
+      <body suppressHydrationWarning className="bg-brand-pure text-brand-chrome antialiased overflow-x-hidden min-h-full flex flex-col relative selection:bg-brand-cyan/30 selection:text-white">
         {children}
         <FloatingWhatsApp />
       </body>

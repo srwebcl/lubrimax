@@ -1,5 +1,4 @@
 import React from "react";
-import PromoTicker from "@/components/dom/PromoTicker";
 import Navbar from "@/components/dom/Navbar";
 import CartDrawer from "@/components/dom/CartDrawer";
 import { CartProvider } from "@/components/providers/CartProvider";
@@ -12,7 +11,6 @@ export default function PublicLayout({
   return (
     <CartProvider>
       <header className="fixed top-0 w-full z-50 flex flex-col">
-        <PromoTicker />
         <Navbar />
       </header>
       <CartDrawer />
