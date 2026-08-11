@@ -4,23 +4,21 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 
-// Simulamos 10 videos (pueden repetir los mismos mp4 para el demo)
+// Simulamos 8 videos (pueden repetir los mismos mp4 para el demo)
 const ALL_VIDEOS = [
   "/videos/reel-1.mp4",
   "/videos/reel-2.mp4",
   "/videos/reel-3.mp4",
   "/videos/reel-4.mp4",
-  "/videos/reel-5.mp4",
   "/videos/reel-1.mp4", 
   "/videos/reel-2.mp4",
   "/videos/reel-3.mp4",
   "/videos/reel-4.mp4",
-  "/videos/reel-5.mp4",
 ];
 
 // Para el scroll infinito en Desktop (Ultrawide)
-const ROW_1_BASE = ALL_VIDEOS.slice(0, 5);
-const ROW_2_BASE = ALL_VIDEOS.slice(5, 10);
+const ROW_1_BASE = ALL_VIDEOS.slice(0, 4);
+const ROW_2_BASE = ALL_VIDEOS.slice(4, 8);
 
 const ROW_1_VIDEOS = [...ROW_1_BASE, ...ROW_1_BASE, ...ROW_1_BASE, ...ROW_1_BASE];
 const ROW_2_VIDEOS = [...ROW_2_BASE, ...ROW_2_BASE, ...ROW_2_BASE, ...ROW_2_BASE];
