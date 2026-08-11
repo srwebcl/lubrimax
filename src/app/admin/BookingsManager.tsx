@@ -17,10 +17,10 @@ type BookingWithService = {
   customerEmail: string | null;
   vehicleMake: string;
   vehicleModel: string;
-  service: {
+  services: {
     name: string;
     duration: number;
-  };
+  }[];
 };
 
 export default function BookingsManager({ initialBookings }: { initialBookings: BookingWithService[] }) {
@@ -86,8 +86,8 @@ export default function BookingsManager({ initialBookings }: { initialBookings: 
                     <div className="text-[10px] md:text-xs text-brand-cyan uppercase tracking-wider mt-1">{booking.vehicleModel}</div>
                   </td>
                   <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-gray-300 text-xs md:text-sm">{booking.service.name}</div>
-                    <div className="text-[10px] md:text-xs text-gray-500 mt-1">{booking.service.duration / 60} hrs</div>
+                    <div className="text-gray-300 text-xs md:text-sm">{booking.services.map(s => s.name).join(' + ')}</div>
+                    <div className="text-[10px] md:text-xs text-gray-500 mt-1">{booking.services.reduce((acc, s) => acc + s.duration, 0) / 60} hrs</div>
                   </td>
                   <td className="px-4 py-3 md:px-6 md:py-4">
                     <div className="text-white font-medium text-xs md:text-sm">

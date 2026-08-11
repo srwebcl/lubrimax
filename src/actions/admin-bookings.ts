@@ -24,7 +24,7 @@ export async function updateBookingStatus(id: string, formData: FormData) {
 
     const currentBooking = await prisma.booking.findUnique({
       where: { id },
-      include: { service: true }
+      include: { services: true }
     });
 
     if (!currentBooking) {
@@ -42,7 +42,7 @@ export async function updateBookingStatus(id: string, formData: FormData) {
       const [sHour, sMin] = newTime.split(":").map(Number);
       
       const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-      const end = addMinutes(start, currentBooking.service.duration);
+      const end = addMinutes(start, currentBooking.services.reduce((acc, s) => acc + s.duration, 0));
       const endTimeStr = format(end, 'HH:mm');
 
       updateData.date = new Date(newDate); // UTC format para Prisma

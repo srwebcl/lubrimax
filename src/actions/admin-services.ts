@@ -63,7 +63,7 @@ export async function deleteService(id: string) {
     await requireAdmin();
 
     // Verificar si hay reservas asociadas (opcional: o borrar en cascada)
-    const bookings = await prisma.booking.count({ where: { serviceId: id } });
+    const bookings = await prisma.booking.count({ where: { services: { some: { id } } } });
     if (bookings > 0) {
       return { success: false, error: "No se puede eliminar un servicio que tiene reservas activas." };
     }

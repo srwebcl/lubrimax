@@ -15,7 +15,7 @@ export default async function AdminDashboard() {
       { date: "desc" },
       { startTime: "desc" }
     ],
-    include: { service: true },
+    include: { services: true },
   });
 
   const totalBookings = bookings.length;
