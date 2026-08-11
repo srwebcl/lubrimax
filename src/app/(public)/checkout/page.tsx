@@ -18,13 +18,13 @@ export default function CheckoutPage() {
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       const searchParams = new URLSearchParams(window.location.search);
-      if (searchParams.get("success") === "true") {
+      if (searchParams.get("success") === "true" && !isSuccess) {
         setIsSuccess(true);
         setOrderId(searchParams.get("order"));
         clearCart();
       }
     }
-  }, [clearCart]);
+  }, [isSuccess]); // Removed clearCart to prevent infinite loop
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
