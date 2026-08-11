@@ -23,8 +23,12 @@ export default function CheckoutPage() {
         setOrderId(searchParams.get("order"));
         clearCart();
       }
+      const urlError = searchParams.get("error");
+      if (urlError && !error) {
+        setError(urlError);
+      }
     }
-  }, [isSuccess]); // Removed clearCart to prevent infinite loop
+  }, [isSuccess, error]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
