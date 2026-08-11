@@ -14,6 +14,8 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [isSuccess, setIsSuccess] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -29,8 +31,6 @@ export default function CheckoutPage() {
       }
     }
   }, [isSuccess, error]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Coupon State
   const [couponCode, setCouponCode] = useState("");
