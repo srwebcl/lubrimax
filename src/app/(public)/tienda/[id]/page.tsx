@@ -13,7 +13,7 @@ import { motion } from "framer-motion";
 export default function ProductDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { addToCart } = useCart();
+  const { addToCart, openCart } = useCart();
   
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -83,7 +83,7 @@ export default function ProductDetailPage() {
       image: product.image,
       category: product.category?.name || "Uncategorized"
     });
-    alert("Agregado al carrito");
+    openCart();
   };
 
   const handleReviewSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

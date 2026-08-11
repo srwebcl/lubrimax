@@ -11,53 +11,25 @@ const tx = new WebpayPlus.Transaction(
 
 async function cancelAbandoned(buyOrder: string | null) {
   if (!buyOrder) return;
-  // buyOrder es el booking.id (ver webpay/booking/create). Solo tocamos
-  // reservas que sigan PENDING: si ya se confirmó por otra vía, no la tocamos.
   await prisma.booking.updateMany({
     where: { id: buyOrder, status: "PENDING" },
     data: { status: "CANCELLED" }
   }).catch(() => {});
 }
 
-export async function GET(request: Request) {
-  // Transbank puede enviar por GET en caso de aborto (tbk_token_anulado)
-  const url = new URL(request.url);
-  const tbkToken = url.searchParams.get("TBK_TOKEN");
-  const tokenWs = url.searchParams.get("token_ws");
-  const abortBuyOrder = url.searchParams.get("TBK_ORDEN_COMPRA");
-
+async function processPayment(tokenWs: string | null, tbkToken: string | null, abortBuyOrder: string | null) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-  if (tbkToken && abortBuyOrder) {
+  if (tbkToken) {
     await cancelAbandoned(abortBuyOrder);
     return NextResponse.redirect(`${baseUrl}/agendar?error=Pago%20Cancelado`);
   }
 
   if (!tokenWs) {
-    return NextResponse.redirect(`${baseUrl}/agendar?error=Error%20en%20Transbank`);
+    return NextResponse.redirect(`${baseUrl}/agendar?error=Token%20inválido`);
   }
 
-  return NextResponse.redirect(`${baseUrl}/agendar?error=Operación%20inválida`);
-}
-
-export async function POST(request: Request) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
   try {
-    const formData = await request.formData();
-    const tokenWs = formData.get("token_ws") as string;
-    const tbkToken = formData.get("TBK_TOKEN") as string;
-    const abortBuyOrder = formData.get("TBK_ORDEN_COMPRA") as string;
-
-    if (tbkToken) {
-      await cancelAbandoned(abortBuyOrder || null);
-      return NextResponse.redirect(`${baseUrl}/agendar?error=Pago%20Cancelado`);
-    }
-
-    if (!tokenWs) {
-      return NextResponse.redirect(`${baseUrl}/agendar?error=Token%20inválido`);
-    }
-
     const commitResponse = await tx.commit(tokenWs);
     const bookingId = commitResponse.buy_order;
 
@@ -71,14 +43,13 @@ export async function POST(request: Request) {
     }
 
     if (commitResponse.status === "AUTHORIZED") {
-      // Idempotencia: si Transbank reintenta el callback o el usuario
-      // recarga la página de retorno, no reprocesamos ni reenviamos el mail.
       if (booking.status !== "CONFIRMED") {
         await prisma.booking.update({
           where: { id: booking.id },
           data: {
             status: "CONFIRMED",
             paymentStatus: booking.paymentType === "FULL" ? "PAID_FULL" : "PAID_RESERVATION",
+            paymentId: tokenWs
           }
         });
 
@@ -95,7 +66,7 @@ export async function POST(request: Request) {
                <p>Vehículo: ${booking.vehicleMake} ${booking.vehicleModel}</p>
                <p>Pagaste ${paidLabel}: $${booking.amount?.toLocaleString("es-CL")}</p>
                <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
-            ) as any // Cast temporal para evitar error tipográfico si no usamos @react-email yet
+            ) as any
           });
         }
       }
@@ -112,4 +83,22 @@ export async function POST(request: Request) {
     console.error("Webpay Booking Commit Error:", error);
     return NextResponse.redirect(`${baseUrl}/agendar?error=Error%20interno%20al%20confirmar%20el%20pago`);
   }
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  return processPayment(
+    url.searchParams.get("token_ws"),
+    url.searchParams.get("TBK_TOKEN"),
+    url.searchParams.get("TBK_ORDEN_COMPRA")
+  );
+}
+
+export async function POST(request: Request) {
+  const formData = await request.formData();
+  return processPayment(
+    formData.get("token_ws") as string | null,
+    formData.get("TBK_TOKEN") as string | null,
+    formData.get("TBK_ORDEN_COMPRA") as string | null
+  );
 }
