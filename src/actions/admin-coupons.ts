@@ -2,9 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/admin-session";
 
 export async function getCoupons() {
   try {
+    await requireAdmin();
+
     return await prisma.discountCode.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -16,6 +19,8 @@ export async function getCoupons() {
 
 export async function createCoupon(formData: FormData) {
   try {
+    await requireAdmin();
+
     const code = (formData.get("code") as string).toUpperCase();
     const discountPct = parseInt(formData.get("discountPct") as string);
     const usageLimitStr = formData.get("usageLimit") as string;
@@ -49,6 +54,8 @@ export async function createCoupon(formData: FormData) {
 
 export async function toggleCouponStatus(id: string, currentStatus: boolean) {
   try {
+    await requireAdmin();
+
     await prisma.discountCode.update({
       where: { id },
       data: { isActive: !currentStatus }
@@ -62,6 +69,8 @@ export async function toggleCouponStatus(id: string, currentStatus: boolean) {
 
 export async function deleteCoupon(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.discountCode.delete({
       where: { id }
     });

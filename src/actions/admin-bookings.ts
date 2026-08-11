@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/admin-session";
 
 import { addMinutes, format } from "date-fns";
 
@@ -10,6 +11,8 @@ import { addMinutes, format } from "date-fns";
  */
 export async function updateBookingStatus(id: string, formData: FormData) {
   try {
+    await requireAdmin();
+
     const status = formData.get("status") as string;
     const paymentStatus = formData.get("paymentStatus") as string;
     const newDate = formData.get("newDate") as string;

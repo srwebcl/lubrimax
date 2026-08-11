@@ -1,15 +1,13 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { addMinutes, parse, format, isBefore, isAfter, isEqual } from "date-fns";
+import { addMinutes, format, isBefore, isAfter, isEqual } from "date-fns";
+import { unstable_cache } from "next/cache";
 
 import { getSettings } from "./admin-settings";
-import { sendEmail } from "@/lib/email";
+import { PENDING_HOLD_MINUTES } from "@/lib/booking-constants";
 
-/**
- * Obtiene todos los servicios disponibles
- */
-export async function getServices() {
+async function fetchServices() {
   try {
     return await prisma.service.findMany({
       where: {
@@ -24,6 +22,16 @@ export async function getServices() {
     return [];
   }
 }
+
+/**
+ * Obtiene todos los servicios disponibles. Cacheada: la lista de servicios
+ * se lee en cada carga del widget de reservas y casi no cambia; se invalida
+ * al tiro en createService/updateService/deleteService.
+ */
+export const getServices = unstable_cache(fetchServices, ["services"], {
+  tags: ["services"],
+  revalidate: 300,
+});
 
 /**
  * Calcula los bloques horarios disponibles para una fecha y servicio específico
@@ -49,16 +57,22 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
     const CONCURRENT_BAYS = settings.concurrentBays || 1;
     const SLOT_INTERVAL = settings.slotInterval || 30;
 
-    // Obtener todas las reservas existentes para ese día
+    // Obtener todas las reservas existentes para ese día. Las CONFIRMED (ya
+    // pagadas) siempre bloquean el horario; las PENDING (esperando el
+    // retorno de Webpay) lo bloquean solo mientras están "frescas" — pasado
+    // PENDING_HOLD_MINUTES se asumen abandonadas y el slot se libera solo,
+    // sin necesidad de un job de limpieza aparte.
+    const pendingCutoff = new Date(Date.now() - PENDING_HOLD_MINUTES * 60 * 1000);
     const existingBookings = await prisma.booking.findMany({
       where: {
         date: {
           gte: queryStart,
           lte: queryEnd
         },
-        status: {
-          not: "CANCELLED"
-        }
+        OR: [
+          { status: "CONFIRMED" },
+          { status: "PENDING", createdAt: { gte: pendingCutoff } }
+        ]
       }
     });
 
@@ -122,74 +136,41 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
   }
 }
 
+// NOTA: la creación de reservas ya no vive aquí. El flujo real de pago
+// (crear reserva PENDING + iniciar transacción Webpay + confirmar) está en
+// src/app/api/webpay/booking/create y .../commit, porque requiere el
+// callback HTTP de Transbank (no puede ser un Server Action). Ver esos
+// archivos y src/lib/booking-constants.ts para el cálculo de precio.
+
 /**
- * Crea una nueva reserva
+ * Trae los datos mínimos de una reserva para la pantalla de confirmación
+ * post-pago (?booking=<id> en /agendar). No expone teléfono/email: el id
+ * es difícil de adivinar (cuid) pero no hay razón para filtrar más PII de
+ * la necesaria en una URL.
  */
-export async function createBooking(data: {
-  date: string;
-  startTime: string;
-  serviceId: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string;
-  vehicleMake: string;
-  vehicleModel: string;
-  paymentStatus?: string;
-}) {
+export async function getBookingById(id: string) {
   try {
-    const service = await prisma.service.findUnique({
-      where: { id: data.serviceId }
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { service: { select: { name: true } } }
     });
 
-    if (!service) throw new Error("Servicio no encontrado");
+    if (!booking) return null;
 
-    // Verificar disponibilidad nuevamente antes de insertar (Evitar double booking)
-    const availableSlots = await getAvailableSlots(data.date, data.serviceId);
-    if (!availableSlots.includes(data.startTime)) {
-      throw new Error("El horario seleccionado ya no está disponible.");
-    }
-
-    const [year, month, day] = data.date.split("-").map(Number);
-    const [sHour, sMin] = data.startTime.split(":").map(Number);
-    const localDate = new Date(year, month - 1, day);
-    const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-    const end = addMinutes(start, service.duration);
-    const endTimeStr = format(end, 'HH:mm');
-
-    const booking = await prisma.booking.create({
-      data: {
-        date: new Date(data.date), // UTC para la base de datos
-        startTime: data.startTime,
-        endTime: endTimeStr,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        customerEmail: data.customerEmail,
-        vehicleMake: data.vehicleMake,
-        vehicleModel: data.vehicleModel,
-        serviceId: data.serviceId,
-        status: "CONFIRMED",
-        paymentStatus: data.paymentStatus || "PENDING"
-      }
-    });
-
-    if (data.customerEmail) {
-      const friendlyDate = format(localDate, "dd/MM/yyyy");
-      await sendEmail({
-        to: data.customerEmail,
-        subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
-        react: (
-          `<h1>¡Hola ${data.customerName}!</h1>
-           <p>Tu reserva para <strong>${service.name}</strong> quedó confirmada.</p>
-           <p>Fecha: ${friendlyDate}<br/>Hora: ${data.startTime} - ${endTimeStr}</p>
-           <p>Vehículo: ${data.vehicleMake} ${data.vehicleModel}</p>
-           <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
-        ) as any // Cast temporal para evitar error tipográfico si no usamos @react-email yet
-      });
-    }
-
-    return { success: true, booking };
-  } catch (error: unknown) {
-    console.error("Error creating booking:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Error desconocido" };
+    return {
+      id: booking.id,
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      serviceName: booking.service.name,
+      vehicleMake: booking.vehicleMake,
+      vehicleModel: booking.vehicleModel,
+      amount: booking.amount,
+    };
+  } catch (error) {
+    console.error("Error fetching booking:", error);
+    return null;
   }
 }

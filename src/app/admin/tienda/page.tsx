@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
+import Image from "next/image";
+import {
   createProduct, updateProduct, deleteProduct, getProducts,
   getCategories, createCategory, deleteCategory, ProductPayload
 } from "@/actions/admin-store";
@@ -252,8 +253,8 @@ export default function TiendaPage() {
                     <div>
                       <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Thumbnail Principal</label>
                       {editingProduct?.image && (
-                        <div className="mb-4 w-24 h-24 rounded-lg overflow-hidden border border-white/10">
-                          <img src={editingProduct.image} alt="Main" className="w-full h-full object-cover" />
+                        <div className="relative mb-4 w-24 h-24 rounded-lg overflow-hidden border border-white/10">
+                          <Image src={editingProduct.image} alt="Main" fill sizes="96px" className="object-cover" />
                         </div>
                       )}
                       <input type="file" name="mainImage" accept="image/*" className="text-xs text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand-cyan file:text-black cursor-pointer" />
@@ -267,7 +268,7 @@ export default function TiendaPage() {
                         <div className="flex flex-wrap gap-2">
                           {existingImages.map((img, i) => (
                             <div key={i} className="relative w-16 h-16 rounded-md overflow-hidden group">
-                              <img src={img} alt="Gal" className="w-full h-full object-cover" />
+                              <Image src={img} alt="Gal" fill sizes="64px" className="object-cover" />
                               <button type="button" onClick={() => setExistingImages(prev => prev.filter((_, idx) => idx !== i))} className="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 text-xs">Borrar</button>
                             </div>
                           ))}
@@ -333,7 +334,7 @@ export default function TiendaPage() {
           {products.map((prod) => (
             <div key={prod.id} className={`bg-brand-surface/80 border ${prod.isActive ? 'border-white/10 hover:border-brand-cyan/50' : 'border-red-500/30 opacity-50'} rounded-2xl p-4 transition-colors group flex flex-col md:flex-row items-center gap-6`}>
               <div className="w-full md:w-32 h-32 rounded-xl overflow-hidden bg-black/50 flex-shrink-0 flex items-center justify-center border border-white/5 relative">
-                {prod.image ? <img src={prod.image} alt={prod.name} className="w-full h-full object-cover opacity-80" /> : <span className="text-xs text-gray-500 uppercase tracking-widest">Sin Img</span>}
+                {prod.image ? <Image src={prod.image} alt={prod.name} fill sizes="128px" className="object-cover opacity-80" /> : <span className="text-xs text-gray-500 uppercase tracking-widest">Sin Img</span>}
               </div>
               <div className="flex-grow text-center md:text-left">
                 <span className="text-[10px] text-brand-cyan uppercase font-bold tracking-widest px-3 py-1 rounded-full border border-brand-cyan/20 bg-brand-cyan/10 mb-2 inline-block">

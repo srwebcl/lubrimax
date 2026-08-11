@@ -4,6 +4,7 @@ import React from "react";
 import { useCart } from "@/components/providers/CartProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function CartDrawer() {
   const { isCartOpen, closeCart, items, total, removeFromCart, updateQuantity } = useCart();
@@ -58,9 +59,9 @@ export default function CartDrawer() {
               ) : (
                 items.map((item) => (
                   <div key={item.id} className="flex gap-4 bg-black/30 p-3 rounded-xl border border-white/5">
-                    <div className="w-20 h-20 bg-black/50 rounded-lg flex-shrink-0 flex items-center justify-center border border-white/5 overflow-hidden">
+                    <div className="relative w-20 h-20 bg-black/50 rounded-lg flex-shrink-0 flex items-center justify-center border border-white/5 overflow-hidden">
                       {item.image ? (
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover opacity-80" />
+                        <Image src={item.image} alt={item.name} fill sizes="80px" className="object-cover opacity-80" />
                       ) : (
                         <span className="text-[10px] text-gray-600 uppercase">Img</span>
                       )}

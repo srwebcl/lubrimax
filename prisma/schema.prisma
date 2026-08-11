@@ -28,6 +28,9 @@ model Booking {
   endTime       String   // Formato "HH:mm" (ej: "20:00")
   status        String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
   paymentStatus String   @default("PENDING") // PENDING, PAID_RESERVATION, PAID_FULL
+  paymentType   String?  // RESERVATION o FULL: lo que el cliente eligió pagar en Webpay
+  paymentId     String?  // Token de la transacción Webpay
+  amount        Int?     // Monto efectivamente cobrado (calculado en servidor, nunca confiar en el cliente)
   customerName  String
   customerPhone String
   customerEmail String?

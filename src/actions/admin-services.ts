@@ -1,10 +1,13 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { requireAdmin } from "@/lib/admin-session";
 
 export async function getAdminServices() {
   try {
+    await requireAdmin();
+
     return await prisma.service.findMany({
       orderBy: { category: 'asc' }
     });
@@ -16,6 +19,8 @@ export async function getAdminServices() {
 
 export async function createService(formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const category = formData.get("category") as string;
@@ -43,9 +48,10 @@ export async function createService(formData: FormData) {
       }
     });
 
+    updateTag("services");
     revalidatePath("/admin/servicios");
     revalidatePath("/");
-    
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -54,6 +60,8 @@ export async function createService(formData: FormData) {
 
 export async function deleteService(id: string) {
   try {
+    await requireAdmin();
+
     // Verificar si hay reservas asociadas (opcional: o borrar en cascada)
     const bookings = await prisma.booking.count({ where: { serviceId: id } });
     if (bookings > 0) {
@@ -64,6 +72,7 @@ export async function deleteService(id: string) {
       where: { id }
     });
 
+    updateTag("services");
     revalidatePath("/admin/servicios");
     revalidatePath("/");
     return { success: true };
@@ -74,6 +83,8 @@ export async function deleteService(id: string) {
 
 export async function updateService(id: string, formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const category = formData.get("category") as string;
@@ -102,9 +113,10 @@ export async function updateService(id: string, formData: FormData) {
       }
     });
 
+    updateTag("services");
     revalidatePath("/admin/servicios");
     revalidatePath("/agendar");
-    
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };

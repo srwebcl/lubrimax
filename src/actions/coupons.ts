@@ -1,11 +1,15 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { couponCodeSchema } from "@/lib/validation";
 
 export async function validateCoupon(code: string) {
   try {
+    const parsed = couponCodeSchema.safeParse(code);
+    if (!parsed.success) return { valid: false, error: "Código de cupón inválido." };
+
     const coupon = await prisma.discountCode.findUnique({
-      where: { code: code.toUpperCase() }
+      where: { code: parsed.data.toUpperCase() }
     });
 
     if (!coupon) return { valid: false, error: "Cupón no existe." };

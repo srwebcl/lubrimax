@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 
 type Service = {
   id: string;
@@ -128,10 +129,12 @@ export default function ServicesTabs({ services }: { services: Service[] }) {
 
               {/* Imagen Izquierda (o Superior en Móvil) */}
               <div className="w-full md:w-2/5 h-48 md:h-auto relative overflow-hidden">
-                <img 
+                <Image
                   src={getServiceImage(selectedService.category)}
                   alt={selectedService.name}
-                  className="w-full h-full object-cover"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 40vw"
+                  className="object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-surface via-transparent to-transparent md:bg-gradient-to-l md:from-brand-surface md:via-transparent md:to-transparent" />
               </div>

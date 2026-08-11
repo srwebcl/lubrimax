@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useCart } from "@/components/providers/CartProvider";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { validateCoupon } from "@/actions/coupons";
 import { validateClubRut } from "@/actions/club-public";
@@ -187,9 +188,9 @@ export default function CheckoutPage() {
             <h3 className="text-xl font-bold text-white mb-6 uppercase tracking-widest">Tus Productos</h3>
             {items.map((item) => (
               <div key={item.id} className="bg-brand-surface/50 border border-white/10 p-4 rounded-xl flex flex-wrap sm:flex-nowrap items-center gap-4">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-black/50 rounded-lg flex-shrink-0 flex items-center justify-center border border-white/5">
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-black/50 rounded-lg flex-shrink-0 flex items-center justify-center border border-white/5">
                   {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover rounded-lg opacity-80" />
+                    <Image src={item.image} alt={item.name} fill sizes="80px" className="object-cover rounded-lg opacity-80" />
                   ) : (
                     <span className="text-xs text-gray-600 uppercase">Img</span>
                   )}

@@ -1,9 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
+import { requireAdmin } from "@/lib/admin-session";
 
-export async function getSettings() {
+async function fetchSettings() {
   let settings = await prisma.settings.findUnique({
     where: { id: "global" }
   });
@@ -24,8 +25,19 @@ export async function getSettings() {
   return settings;
 }
 
+// getSettings NO lleva requireAdmin(): también la usa el flujo público de
+// agendamiento (actions/booking.ts) para calcular horarios disponibles.
+// Cacheada: son valores de configuración que casi no cambian, y se leen en
+// cada carga del widget de reservas. Se invalida al tiro en updateSettings.
+export const getSettings = unstable_cache(fetchSettings, ["settings"], {
+  tags: ["settings"],
+  revalidate: 300,
+});
+
 export async function updateSettings(formData: FormData) {
   try {
+    await requireAdmin();
+
     const workStartHour = parseInt(formData.get("workStartHour") as string);
     const workEndHour = parseInt(formData.get("workEndHour") as string);
     const concurrentBays = parseInt(formData.get("concurrentBays") as string);
@@ -59,9 +71,10 @@ export async function updateSettings(formData: FormData) {
       }
     });
 
+    updateTag("settings");
     revalidatePath("/admin/configuracion");
     revalidatePath("/agendar");
-    
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };

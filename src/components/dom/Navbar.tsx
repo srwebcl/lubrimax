@@ -53,7 +53,7 @@ export default function Navbar() {
                   {/* Lavados */}
                   <Link href="/servicios/lavados" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
-                      <img src="https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&q=80" className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500" alt="Lavados" />
+                      <Image src="https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&q=80" alt="Lavados" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
                     <div>
                       <h4 className="text-white font-bold uppercase tracking-wide text-sm group-hover/item:text-brand-cyan transition-colors">Lavados</h4>
@@ -64,7 +64,7 @@ export default function Navbar() {
                   {/* Detailing */}
                   <Link href="/servicios/detailing" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
-                      <img src="https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&q=80" className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500" alt="Detailing" />
+                      <Image src="https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&q=80" alt="Detailing" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
                     <div>
                       <h4 className="text-white font-bold uppercase tracking-wide text-sm group-hover/item:text-brand-cyan transition-colors">Detailing</h4>
@@ -75,7 +75,7 @@ export default function Navbar() {
                   {/* Extras */}
                   <Link href="/servicios/extras" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
-                      <img src="https://images.unsplash.com/photo-1518987048-93e29699e79a?auto=format&fit=crop&q=80" className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500" alt="Extras" />
+                      <Image src="https://images.unsplash.com/photo-1518987048-93e29699e79a?auto=format&fit=crop&q=80" alt="Extras" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
                     <div>
                       <h4 className="text-white font-bold uppercase tracking-wide text-sm group-hover/item:text-brand-cyan transition-colors">Extras</h4>
@@ -86,7 +86,7 @@ export default function Navbar() {
                   {/* Mecánica */}
                   <Link href="/servicios/mecanica" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
-                      <img src="https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&q=80" className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500" alt="Mecánica" />
+                      <Image src="https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&q=80" alt="Mecánica" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
                     <div>
                       <h4 className="text-white font-bold uppercase tracking-wide text-sm group-hover/item:text-brand-cyan transition-colors">Mecánica</h4>

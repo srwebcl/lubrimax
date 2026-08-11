@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { getMemberships, createMembership, updateMembership, deleteMembership, getPartners, createPartner, updatePartner, deletePartner } from "@/actions/admin-club";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -246,8 +247,8 @@ export default function ClubAdminPage() {
               {partners.filter(p => p.isActive).map(p => (
                 <div key={p.id} className="bg-brand-surface/80 border border-white/10 p-5 rounded-xl flex flex-col h-full">
                   {p.logo && (
-                    <div className="w-full h-24 mb-4 bg-white rounded-lg flex items-center justify-center p-2">
-                      <img src={p.logo} alt={p.name} className="max-h-full max-w-full object-contain" />
+                    <div className="relative w-full h-24 mb-4 bg-white rounded-lg flex items-center justify-center p-2">
+                      <Image src={p.logo} alt={p.name} fill sizes="200px" className="object-contain p-2" />
                     </div>
                   )}
                   <h4 className="text-lg font-bold text-white mt-auto">{p.name}</h4>

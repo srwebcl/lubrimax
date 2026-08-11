@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getMemberships, getPartners } from "@/actions/admin-club";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 
 type Membership = {
@@ -107,7 +108,7 @@ export default function ClubPage() {
 
           {/* PARTNERS NETWORK */}
           <section className="bg-brand-surface/50 border-t border-b border-white/5 py-24 relative overflow-hidden">
-            <div className="absolute inset-0 bg-[url('/mesh-bg.png')] opacity-10 mix-blend-overlay"></div>
+            <div className="absolute inset-0 bg-[url('/mesh-bg.svg')] opacity-10 mix-blend-overlay"></div>
             
             <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10">
               <div className="text-center mb-16">
@@ -133,8 +134,8 @@ export default function ClubPage() {
                       className="bg-black/50 border border-white/10 p-6 rounded-2xl hover:border-brand-cyan/30 transition-colors flex flex-col h-full"
                     >
                       {p.logo && (
-                        <div className="w-full h-24 mb-4 bg-white rounded-lg flex items-center justify-center p-2">
-                          <img src={p.logo} alt={p.name} className="max-h-full max-w-full object-contain" />
+                        <div className="relative w-full h-24 mb-4 bg-white rounded-lg flex items-center justify-center p-2">
+                          <Image src={p.logo} alt={p.name} fill sizes="200px" className="object-contain p-2" />
                         </div>
                       )}
                       <h4 className="text-lg font-bold text-white mb-2 mt-auto">{p.name}</h4>

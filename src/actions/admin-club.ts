@@ -1,12 +1,17 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
+import { requireAdmin } from "@/lib/admin-session";
 
 // ==============================
 // MEMBERSHIPS
 // ==============================
-export async function getMemberships() {
+// getMemberships/getPartners NO llevan requireAdmin(): también las usa la
+// página pública /club (ver src/app/(public)/club/page.tsx) para listar
+// planes y comercios asociados a cualquier visitante. Cacheadas: cambian
+// poco y se leen en cada visita a /club.
+async function fetchMemberships() {
   try {
     return await prisma.membershipTier.findMany({
       orderBy: { price: 'asc' }
@@ -17,13 +22,20 @@ export async function getMemberships() {
   }
 }
 
+export const getMemberships = unstable_cache(fetchMemberships, ["memberships"], {
+  tags: ["memberships"],
+  revalidate: 300,
+});
+
 export async function createMembership(formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     const price = parseInt(formData.get("price") as string);
     const discountPercent = parseInt(formData.get("discountPercent") as string);
     const featuresRaw = formData.get("features") as string;
-    
+
     if (!name || isNaN(price) || isNaN(discountPercent)) {
       return { success: false, error: "Datos inválidos." };
     }
@@ -40,6 +52,7 @@ export async function createMembership(formData: FormData) {
       }
     });
 
+    updateTag("memberships");
     revalidatePath("/admin/club");
     revalidatePath("/club");
     return { success: true };
@@ -50,6 +63,8 @@ export async function createMembership(formData: FormData) {
 
 export async function updateMembership(id: string, formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     const price = parseInt(formData.get("price") as string);
     const discountPercent = parseInt(formData.get("discountPercent") as string);
@@ -67,6 +82,7 @@ export async function updateMembership(id: string, formData: FormData) {
       }
     });
 
+    updateTag("memberships");
     revalidatePath("/admin/club");
     revalidatePath("/club");
     return { success: true };
@@ -77,11 +93,14 @@ export async function updateMembership(id: string, formData: FormData) {
 
 export async function deleteMembership(id: string) {
   try {
+    await requireAdmin();
+
     // Soft delete
     await prisma.membershipTier.update({
       where: { id },
       data: { isActive: false }
     });
+    updateTag("memberships");
     revalidatePath("/admin/club");
     revalidatePath("/club");
     return { success: true };
@@ -93,7 +112,7 @@ export async function deleteMembership(id: string) {
 // ==============================
 // PARTNERS (COMERCIOS)
 // ==============================
-export async function getPartners() {
+async function fetchPartners() {
   try {
     return await prisma.partner.findMany({
       orderBy: { name: 'asc' }
@@ -104,13 +123,20 @@ export async function getPartners() {
   }
 }
 
+export const getPartners = unstable_cache(fetchPartners, ["partners"], {
+  tags: ["partners"],
+  revalidate: 300,
+});
+
 export async function createPartner(formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const benefitsRaw = formData.get("benefits") as string;
     const logo = formData.get("logo") as string;
-    
+
     if (!name) {
       return { success: false, error: "Falta el nombre del comercio." };
     }
@@ -127,6 +153,7 @@ export async function createPartner(formData: FormData) {
       }
     });
 
+    updateTag("partners");
     revalidatePath("/admin/club");
     revalidatePath("/club");
     return { success: true };
@@ -137,11 +164,13 @@ export async function createPartner(formData: FormData) {
 
 export async function updatePartner(id: string, formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const benefitsRaw = formData.get("benefits") as string;
     const logo = formData.get("logo") as string;
-    
+
     if (!name) {
       return { success: false, error: "Falta el nombre del comercio." };
     }
@@ -163,6 +192,7 @@ export async function updatePartner(id: string, formData: FormData) {
       data
     });
 
+    updateTag("partners");
     revalidatePath("/admin/club");
     revalidatePath("/club");
     return { success: true };
@@ -173,10 +203,13 @@ export async function updatePartner(id: string, formData: FormData) {
 
 export async function deletePartner(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.partner.update({
       where: { id },
       data: { isActive: false }
     });
+    updateTag("partners");
     revalidatePath("/admin/club");
     revalidatePath("/club");
     return { success: true };

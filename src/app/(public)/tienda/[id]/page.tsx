@@ -2,8 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { getProductById } from "@/actions/store";
 import { submitReview } from "@/actions/reviews";
+import { getSessionCustomer } from "@/actions/customer-auth";
 import { useCart } from "@/components/providers/CartProvider";
 import { motion } from "framer-motion";
 
@@ -21,10 +24,11 @@ export default function ProductDetailPage() {
   const [currentImageIdx, setCurrentImageIdx] = useState(0);
 
   // Review State
-  const [reviewRut, setReviewRut] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewMsg, setReviewMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState<any>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -41,6 +45,11 @@ export default function ProductDetailPage() {
       setLoading(false);
     }
     load();
+
+    getSessionCustomer().then((session) => {
+      setCustomerInfo(session);
+      setSessionChecked(true);
+    });
   }, [id, router]);
 
   if (loading) {
@@ -113,7 +122,7 @@ export default function ProductDetailPage() {
           <div className="w-full md:w-1/2 space-y-4">
             <div className="aspect-square bg-brand-surface rounded-2xl overflow-hidden border border-white/10 relative shadow-[0_0_50px_rgba(56,189,248,0.1)]">
               {allImages.length > 0 ? (
-                <img src={allImages[currentImageIdx]} alt={product.name} className="w-full h-full object-cover" />
+                <Image src={allImages[currentImageIdx]} alt={product.name} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" priority />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-500 uppercase tracking-widest text-sm">Sin imagen</div>
               )}
@@ -122,12 +131,12 @@ export default function ProductDetailPage() {
             {allImages.length > 1 && (
               <div className="flex gap-4 overflow-x-auto pb-2">
                 {allImages.map((img, idx) => (
-                  <button 
+                  <button
                     key={idx}
                     onClick={() => setCurrentImageIdx(idx)}
-                    className={`w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${currentImageIdx === idx ? 'border-brand-cyan shadow-[0_0_15px_rgba(56,189,248,0.3)]' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                    className={`relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${currentImageIdx === idx ? 'border-brand-cyan shadow-[0_0_15px_rgba(56,189,248,0.3)]' : 'border-transparent opacity-50 hover:opacity-100'}`}
                   >
-                    <img src={img} alt="Thumbnail" className="w-full h-full object-cover" />
+                    <Image src={img} alt="Thumbnail" fill sizes="80px" className="object-cover" />
                   </button>
                 ))}
               </div>
@@ -234,40 +243,47 @@ export default function ProductDetailPage() {
             {/* Formulario de Reseñas */}
             <div className="bg-black/40 border border-white/10 rounded-2xl p-6 lg:p-8 h-fit">
               <h3 className="text-white font-bold uppercase tracking-widest text-sm mb-4">¿Compraste este producto?</h3>
-              <p className="text-gray-400 text-xs mb-6 leading-relaxed">Ingresa tu RUT para verificar tu compra (solo órdenes entregadas) y comparte tu experiencia.</p>
-              
-              <form onSubmit={handleReviewSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Tu RUT</label>
-                  <input type="text" name="rut" required placeholder="12345678-9" value={reviewRut} onChange={e => setReviewRut(e.target.value)} className="w-full bg-brand-surface border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-brand-cyan text-sm" />
-                </div>
-                
-                <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Calificación</label>
-                  <select name="rating" value={reviewRating} onChange={e => setReviewRating(Number(e.target.value))} className="w-full bg-brand-surface border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-brand-cyan text-sm">
-                    <option value={5}>⭐⭐⭐⭐⭐ (Excelente)</option>
-                    <option value={4}>⭐⭐⭐⭐ (Muy Bueno)</option>
-                    <option value={3}>⭐⭐⭐ (Bueno)</option>
-                    <option value={2}>⭐⭐ (Regular)</option>
-                    <option value={1}>⭐ (Malo)</option>
-                  </select>
-                </div>
 
-                <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Comentario</label>
-                  <textarea name="comment" rows={3} required placeholder="¿Qué te pareció el producto?" className="w-full bg-brand-surface border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-brand-cyan text-sm"></textarea>
+              {!sessionChecked ? null : !customerInfo ? (
+                <div className="text-center py-4">
+                  <p className="text-gray-400 text-xs mb-4 leading-relaxed">Inicia sesión con la cuenta que hizo la compra para dejar una reseña verificada.</p>
+                  <Link href="/login" className="inline-block bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs py-3 px-6 rounded-lg hover:bg-white transition-colors">
+                    Iniciar sesión
+                  </Link>
                 </div>
+              ) : (
+                <>
+                  <p className="text-gray-400 text-xs mb-6 leading-relaxed">Publicando como <strong className="text-brand-cyan">{customerInfo.name}</strong>. Solo se valida si tienes una orden entregada con este producto.</p>
 
-                {reviewMsg && (
-                  <div className={`p-3 rounded-lg text-xs font-bold text-center ${reviewMsg.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {reviewMsg.text}
-                  </div>
-                )}
+                  <form onSubmit={handleReviewSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Calificación</label>
+                      <select name="rating" value={reviewRating} onChange={e => setReviewRating(Number(e.target.value))} className="w-full bg-brand-surface border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-brand-cyan text-sm">
+                        <option value={5}>⭐⭐⭐⭐⭐ (Excelente)</option>
+                        <option value={4}>⭐⭐⭐⭐ (Muy Bueno)</option>
+                        <option value={3}>⭐⭐⭐ (Bueno)</option>
+                        <option value={2}>⭐⭐ (Regular)</option>
+                        <option value={1}>⭐ (Malo)</option>
+                      </select>
+                    </div>
 
-                <button disabled={isSubmittingReview} type="submit" className="w-full bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs py-3 rounded-lg hover:bg-white transition-colors disabled:opacity-50">
-                  {isSubmittingReview ? "Enviando..." : "Publicar Reseña"}
-                </button>
-              </form>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Comentario</label>
+                      <textarea name="comment" rows={3} required placeholder="¿Qué te pareció el producto?" className="w-full bg-brand-surface border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-brand-cyan text-sm"></textarea>
+                    </div>
+
+                    {reviewMsg && (
+                      <div className={`p-3 rounded-lg text-xs font-bold text-center ${reviewMsg.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {reviewMsg.text}
+                      </div>
+                    )}
+
+                    <button disabled={isSubmittingReview} type="submit" className="w-full bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs py-3 rounded-lg hover:bg-white transition-colors disabled:opacity-50">
+                      {isSubmittingReview ? "Enviando..." : "Publicar Reseña"}
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Simulamos 10 videos (pueden repetir los mismos mp4 para el demo)
@@ -47,11 +48,13 @@ export default function ReelsGallery() {
                 </svg>
               </div>
             </div>
-            <img
+            <Image
               src={videoSrc.replace('.mp4', '-thumbnail.webp')}
               alt="Reel thumbnail"
+              fill
+              sizes="90vw"
               loading="lazy"
-              className="object-cover w-full h-full pointer-events-none relative z-10"
+              className="object-cover pointer-events-none relative z-10"
             />
           </div>
         ))}
@@ -77,11 +80,13 @@ export default function ReelsGallery() {
                     </svg>
                   </div>
                 </div>
-                <img
+                <Image
                   src={videoSrc.replace('.mp4', '-thumbnail.webp')}
                   alt="Reel thumbnail"
+                  fill
+                  sizes="250px"
                   loading="lazy"
-                  className="object-cover w-full h-full pointer-events-none relative z-10"
+                  className="object-cover pointer-events-none relative z-10"
                 />
               </div>
             ))}
@@ -104,11 +109,13 @@ export default function ReelsGallery() {
                     </svg>
                   </div>
                 </div>
-                <img
+                <Image
                   src={videoSrc.replace('.mp4', '-thumbnail.webp')}
                   alt="Reel thumbnail"
+                  fill
+                  sizes="250px"
                   loading="lazy"
-                  className="object-cover w-full h-full pointer-events-none relative z-10"
+                  className="object-cover pointer-events-none relative z-10"
                 />
               </div>
             ))}

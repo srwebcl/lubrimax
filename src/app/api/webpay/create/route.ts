@@ -3,6 +3,9 @@ import { WebpayPlus } from "transbank-sdk";
 import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
+import { verifyCustomerSessionToken } from "@/lib/customer-session";
+import { storeCheckoutSchema, flattenZodError } from "@/lib/validation";
+import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
 
 // Configurar Webpay para modo Integración (Pruebas)
 const tx = new WebpayPlus.Transaction(
@@ -73,18 +76,24 @@ async function resolveDiscount(couponCode: string | undefined, subtotal: number)
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    let customerSession = cookieStore.get('lubrimax_customer_session')?.value;
-
-    const body = await request.json();
-    const { items, customerName, customerEmail, shippingType, address, city, couponCode } = body;
-
-    if (!items || items.length === 0) {
-      return NextResponse.json({ error: "Carrito vacío." }, { status: 400 });
+    const ip = getClientIpFromRequest(request);
+    const limit = checkRateLimit(`checkout-create:${ip}`, 15, 10 * 60 * 1000);
+    if (!limit.allowed) {
+      return NextResponse.json({ error: "Demasiados intentos de compra. Espera unos minutos." }, { status: 429 });
     }
 
-    // Si no hay sesión, usar los datos de invitado para crear o encontrar al cliente
-    if (!customerSession) {
+    const cookieStore = await cookies();
+    let customerId = await verifyCustomerSessionToken(cookieStore.get('lubrimax_customer_session')?.value);
+
+    const body = await request.json();
+    const parsed = storeCheckoutSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: flattenZodError(parsed.error) }, { status: 400 });
+    }
+    const { items, customerName, customerEmail, shippingType, address, city, couponCode } = parsed.data;
+
+    // Si no hay sesión válida, usar los datos de invitado para crear o encontrar al cliente
+    if (!customerId) {
       if (!customerName || !customerEmail) {
         return NextResponse.json({ error: "Faltan datos de cliente." }, { status: 400 });
       }
@@ -99,7 +108,7 @@ export async function POST(request: Request) {
           }
         });
       }
-      customerSession = guest.id;
+      customerId = guest.id;
     }
 
     let orderItems, subtotal;
@@ -120,7 +129,7 @@ export async function POST(request: Request) {
     const order = await prisma.order.create({
       data: {
         total: amount,
-        customerId: customerSession,
+        customerId: customerId,
         status: "PENDING",
         shippingType: shippingType || "PICKUP",
         address: address || null,
@@ -135,7 +144,7 @@ export async function POST(request: Request) {
 
     // Iniciar Transacción en Webpay
     const buyOrder = order.id;
-    const sessionId = customerSession;
+    const sessionId = customerId;
 
     // Configurar URL de retorno absoluto (importante para producción vs dev)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

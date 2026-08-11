@@ -1,0 +1,243 @@
+
+> lubrimax@0.1.0 lint
+> eslint
+
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-bookings.ts
+  34:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  63:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-club.ts
+   59:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   89:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  180:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  199:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  216:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-coupons.ts
+  47:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  65:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  79:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-orders.ts
+  57:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  63:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-services.ts
+   56:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  121:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-settings.ts
+  79:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/admin-store.ts
+   71:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  126:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  144:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  180:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  193:12  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  193:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/club-public.ts
+  35:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/coupons.ts
+  30:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/customer-auth.ts
+  113:15  warning  'password' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  117:12  warning  'error' is defined but never used              @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/actions/reviews.ts
+  79:12  warning  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  79:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/agendar/page.tsx
+  3:8  warning  'Navbar' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/checkout/page.tsx
+   14:9    warning  'router' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+   85:19   error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  169:100  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  169:110  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/club/page.tsx
+  35:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  36:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/contacto/page.tsx
+  3:8  warning  'Link' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/perfil/page.tsx
+  15:44  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/tienda/[id]/page.tsx
+   18:42  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+   22:58  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+   30:52  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+   67:34  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  109:9   warning  'avgRating' is assigned a value but never used                   @typescript-eslint/no-unused-vars
+  110:48  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  168:45  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  224:47  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  233:76  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  233:93  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/(public)/tienda/page.tsx
+    8:18  warning  'AnimatePresence' is defined but never used     @typescript-eslint/no-unused-vars
+   19:13  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+   25:11  warning  'itemCount' is assigned a value but never used  @typescript-eslint/no-unused-vars
+   36:27  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+  151:64  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/club/page.tsx
+  50:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/club/page.tsx:50:5
+  48 |
+  49 |   useEffect(() => {
+> 50 |     fetchData();
+     |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  51 |   }, []);
+  52 |
+  53 |   const handleMemSubmit = async (e: React.FormEvent<HTMLFormElement>) => {  react-hooks/set-state-in-effect
+  97:16  warning  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/cupones/page.tsx
+  32:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/cupones/page.tsx:32:5
+  30 |
+  31 |   useEffect(() => {
+> 32 |     fetchCoupons();
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  33 |   }, []);
+  34 |
+  35 |   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {  react-hooks/set-state-in-effect
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/pedidos/page.tsx
+    5:10  warning  'motion' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   10:40  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+   23:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/pedidos/page.tsx:23:5
+  21 |
+  22 |   useEffect(() => {
+> 23 |     fetchOrders();
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  24 |   }, []);
+  25 |
+  26 |   const handleStatusUpdate = async (e: React.FormEvent<HTMLFormElement>, orderId: string) => {  react-hooks/set-state-in-effect
+  109:45  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/perfil/page.tsx
+  7:10  warning  'loading' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  7:19  warning  'setLoading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/servicios/page.tsx
+  36:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/servicios/page.tsx:36:5
+  34 |
+  35 |   useEffect(() => {
+> 36 |     fetchServices();
+     |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  37 |   }, []);
+  38 |
+  39 |   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {  react-hooks/set-state-in-effect
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/tienda/page.tsx
+   58:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/admin/tienda/page.tsx:58:5
+  56 |
+  57 |   useEffect(() => {
+> 58 |     fetchData();
+     |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  59 |   }, []);
+  60 |
+  61 |   const openForm = (prod?: Product) => {  react-hooks/set-state-in-effect
+   98:9   error  'additionalImageUrls' is never reassigned. Use 'const' instead                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         prefer-const
+  149:19  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/api/upload/route.ts
+  42:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/api/webpay/booking/commit/route.ts
+   98:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  111:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/api/webpay/booking/create/route.ts
+  136:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/api/webpay/commit/route.ts
+  81:14  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  95:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/app/api/webpay/create/route.ts
+  117:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  166:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/components/booking/BookingWizard.tsx
+   61:52  error    Unexpected any. Specify a different type                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  193:19  error    Unexpected any. Specify a different type                                                                                                                                                                                                                            @typescript-eslint/no-explicit-any
+  232:26  warning  Do not use `window.location.href` to navigate to internal Next.js pages. Use `redirect()` in the render phase, or `useRouter().push()` in Client Components' event handlers instead. See: https://nextjs.org/docs/messages/no-location-assign-relative-destination  @next/next/no-location-assign-relative-destination
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/components/dom/ServiceCard.tsx
+   6:49  warning  'Check' is defined but never used       @typescript-eslint/no-unused-vars
+  24:56  warning  'isMechanic' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/components/providers/CartProvider.tsx
+  42:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/sebastianrodriguezmilla/proyectos-web/lubrimax/src/components/providers/CartProvider.tsx:42:9
+  40 |     if (saved) {
+  41 |       try {
+> 42 |         setItems(JSON.parse(saved));
+     |         ^^^^^^^^ Avoid calling setState() directly within an effect
+  43 |       } catch (e) {
+  44 |         console.error("Error parsing cart", e);
+  45 |       }  react-hooks/set-state-in-effect
+
+✖ 81 problems (62 errors, 19 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+

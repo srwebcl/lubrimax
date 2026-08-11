@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="60" height="34.64" viewBox="0 0 60 34.64">
+  <defs>
+    <pattern id="hexgrid" width="60" height="34.64" patternUnits="userSpaceOnUse">
+      <path d="M0,0 L10,-17.32 L30,-17.32 L40,0 L30,17.32 L10,17.32 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+      <path d="M60,0 L50,-17.32 L30,-17.32 L20,0 L30,17.32 L50,17.32 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+      <path d="M30,17.32 L40,0 L60,0 L70,17.32 L60,34.64 L40,34.64 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+      <path d="M0,34.64 L10,17.32 L30,17.32 L40,34.64 L30,51.96 L10,51.96 Z" fill="none" stroke="#ffffff" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#hexgrid)"/>
+</svg>

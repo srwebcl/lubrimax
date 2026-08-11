@@ -1,12 +1,15 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { requireAdmin } from "@/lib/admin-session";
 
 export async function getProducts() {
   try {
+    await requireAdmin();
+
     return await prisma.product.findMany({
-      include: { 
+      include: {
         category: true,
         images: true,
         variants: true
@@ -32,6 +35,8 @@ export type ProductPayload = {
 
 export async function createProduct(data: ProductPayload) {
   try {
+    await requireAdmin();
+
     if (!data.name || isNaN(data.price)) {
       return { success: false, error: "Faltan campos obligatorios o son inválidos." };
     }
@@ -58,9 +63,10 @@ export async function createProduct(data: ProductPayload) {
       }
     });
 
+    updateTag("products");
     revalidatePath("/admin/tienda");
     revalidatePath("/tienda");
-    
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -69,6 +75,8 @@ export async function createProduct(data: ProductPayload) {
 
 export async function updateProduct(id: string, data: ProductPayload) {
   try {
+    await requireAdmin();
+
     if (!data.name || isNaN(data.price)) {
       return { success: false, error: "Faltan campos obligatorios o son inválidos." };
     }
@@ -110,9 +118,10 @@ export async function updateProduct(id: string, data: ProductPayload) {
       }
     });
 
+    updateTag("products");
     revalidatePath("/admin/tienda");
     revalidatePath("/tienda");
-    
+
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -121,11 +130,14 @@ export async function updateProduct(id: string, data: ProductPayload) {
 
 export async function deleteProduct(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.product.update({
       where: { id },
       data: { isActive: false }
     });
 
+    updateTag("products");
     revalidatePath("/admin/tienda");
     revalidatePath("/tienda");
     return { success: true };
@@ -140,6 +152,8 @@ export async function deleteProduct(id: string) {
 
 export async function getCategories() {
   try {
+    await requireAdmin();
+
     return await prisma.productCategory.findMany({
       orderBy: { name: 'asc' }
     });
@@ -151,13 +165,16 @@ export async function getCategories() {
 
 export async function createCategory(formData: FormData) {
   try {
+    await requireAdmin();
+
     const name = formData.get("name") as string;
     if (!name) return { success: false, error: "Nombre requerido" };
 
     await prisma.productCategory.create({
       data: { name }
     });
-    
+
+    updateTag("products");
     revalidatePath("/admin/tienda");
     return { success: true };
   } catch (error: any) {
@@ -167,7 +184,10 @@ export async function createCategory(formData: FormData) {
 
 export async function deleteCategory(id: string) {
   try {
+    await requireAdmin();
+
     await prisma.productCategory.delete({ where: { id } });
+    updateTag("products");
     revalidatePath("/admin/tienda");
     return { success: true };
   } catch (error: any) {

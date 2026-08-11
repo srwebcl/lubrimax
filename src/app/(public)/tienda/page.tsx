@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { getPublicProducts } from "@/actions/store";
 import { useCart } from "@/components/providers/CartProvider";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Category = { id: string; name: string; };
@@ -61,7 +62,7 @@ export default function TiendaPage() {
       <div className="relative pt-32 pb-20 px-6 lg:px-8 border-b border-white/5 overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-cyan/10 via-brand-pure to-brand-pure pointer-events-none"></div>
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-[url('/mesh-bg.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-[url('/mesh-bg.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
         
         <div className="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-8">
           <motion.div 
@@ -217,9 +218,9 @@ export default function TiendaPage() {
 
                         {/* Product Image */}
                         <div className="aspect-[4/5] sm:aspect-square bg-[#0a0a0a] relative overflow-hidden flex items-center justify-center p-6">
-                          <div className="absolute inset-0 bg-[url('/mesh-bg.png')] opacity-10 mix-blend-overlay"></div>
+                          <div className="absolute inset-0 bg-[url('/mesh-bg.svg')] opacity-10 mix-blend-overlay"></div>
                           {prod.image ? (
-                            <img src={prod.image} alt={prod.name} className="w-full h-full object-contain filter drop-shadow-2xl transition-transform duration-700 group-hover:scale-110" />
+                            <Image src={prod.image} alt={prod.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" className="object-contain p-6 filter drop-shadow-2xl transition-transform duration-700 group-hover:scale-110" />
                           ) : (
                             <svg className="w-16 h-16 text-white/5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           )}

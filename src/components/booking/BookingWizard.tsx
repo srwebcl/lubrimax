@@ -6,27 +6,33 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { getServices, getAvailableSlots, createBooking } from "@/actions/booking";
+import { useSearchParams } from "next/navigation";
+import { getServices, getAvailableSlots, getBookingById } from "@/actions/booking";
 import { getSessionCustomer } from "@/actions/customer-auth";
+import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice, RESERVATION_PERCENT } from "@/lib/booking-constants";
 
-type Service = { 
-  id: string; 
-  name: string; 
-  duration: number; 
+type Service = {
+  id: string;
+  name: string;
+  duration: number;
   priceAuto: number | null;
   priceSuv2: number | null;
   priceSuv3: number | null;
   category: string;
 };
 
-const VEHICLE_TYPES = [
-  'Auto / Hatchback',
-  'SUV 2 Corridas',
-  'SUV 3 Corridas / Camioneta'
-] as const;
+type ConfirmedBooking = {
+  serviceName: string;
+  date: string;
+  startTime: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  amount: number | null;
+};
 
 export default function BookingWizard() {
   const wizardRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,14 +52,19 @@ export default function BookingWizard() {
 
   const [submitting, setSubmitting] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState("");
+  // Se inicializa leyendo ?error= directamente (sin efecto: evita el
+  // set-state-en-efecto que dispara un render en cascada innecesario para
+  // un valor que ya conocemos en el primer render).
+  const [paymentError, setPaymentError] = useState<string | null>(() => searchParams.get("error"));
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState<ConfirmedBooking | null>(null);
   const [customerInfo, setCustomerInfo] = useState<any>(null);
 
   useEffect(() => {
     async function loadServicesAndSession() {
       const data = await getServices();
       setServices(data as Service[]);
-      
+
       const session = await getSessionCustomer();
       if (session) {
         setCustomerInfo(session);
@@ -68,6 +79,32 @@ export default function BookingWizard() {
     }
     loadServicesAndSession();
   }, []);
+
+  // Al volver de Webpay, /agendar trae ?success=true&booking=<id> o
+  // ?error=<mensaje>. Como el pago implica una navegación completa fuera
+  // del SPA, el estado local del wizard se pierde: la confirmación se arma
+  // de nuevo con los datos reales que quedaron en la BD, no con lo que
+  // había en el formulario antes de salir.
+  useEffect(() => {
+    const bookingId = searchParams.get("booking");
+    const success = searchParams.get("success");
+
+    if (success && bookingId) {
+      getBookingById(bookingId).then((booking) => {
+        if (booking) {
+          setConfirmedBooking({
+            serviceName: booking.serviceName,
+            date: format(new Date(booking.date), "dd 'de' MMMM", { locale: es }),
+            startTime: booking.startTime,
+            vehicleMake: booking.vehicleMake,
+            vehicleModel: booking.vehicleModel,
+            amount: booking.amount,
+          });
+          setConfirmed(true);
+        }
+      });
+    }
+  }, [searchParams]);
 
   // Fetch slots when date is selected
   useEffect(() => {
@@ -92,57 +129,71 @@ export default function BookingWizard() {
     }
   }, [step]);
 
-  const getExactPrice = (service: Service): number => {
-    if (vehicleType === VEHICLE_TYPES[1]) return service.priceSuv2 || 0;
-    if (vehicleType === VEHICLE_TYPES[2]) return service.priceSuv3 || 0;
-    return service.priceAuto || 0;
-  };
-
+  // Precio "de vitrina" para que el usuario vea cuánto va a pagar; el monto
+  // que realmente se cobra se recalcula en el servidor (ver
+  // /api/webpay/booking/create) antes de crear la transacción Webpay.
   const selectedServiceData = services.find(s => s.id === selectedService);
-  let totalAmount = selectedServiceData ? getExactPrice(selectedServiceData) : 0;
-  
+  let totalAmount = selectedServiceData ? sharedGetExactPrice(selectedServiceData, vehicleType) : 0;
+
   // Aplicar descuento del club
   const discountPercent = customerInfo?.membership?.discountPercent || 0;
   if (discountPercent > 0) {
     totalAmount = totalAmount - (totalAmount * (discountPercent / 100));
   }
-  
-  const reservationAmount = totalAmount * 0.2;
+
+  const reservationAmount = Math.round(totalAmount * RESERVATION_PERCENT);
 
   const handlePayment = async (type: 'RESERVATION' | 'FULL') => {
-    // Validar form
     if (!formData.name || !formData.phone || !formData.plate) {
       alert("Por favor completa los datos de contacto y patente.");
       return;
     }
 
-    setSubmitting(true);
-    setPaymentStatus("Procesando Pago...");
-    
-    // Simulate payment gateway delay (2 seconds)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setPaymentStatus("Confirmando Reserva...");
-
     if (!selectedDate || !selectedSlot || !selectedService) return;
 
-    const res = await createBooking({
-      date: format(selectedDate!, "yyyy-MM-dd"),
-      startTime: selectedSlot,
-      serviceId: selectedService,
-      customerName: formData.name,
-      customerPhone: formData.phone,
-      customerEmail: formData.email,
-      vehicleMake: vehicleType,
-      vehicleModel: formData.plate,
-      paymentStatus: type === 'RESERVATION' ? 'PAID_RESERVATION' : 'PAID_FULL',
-    });
+    setSubmitting(true);
+    setPaymentError(null);
+    setPaymentStatus("Conectando con Webpay...");
 
-    if (res.success) {
-      setConfirmed(true);
-    } else {
-      alert("Error al confirmar la reserva: " + res.error);
+    try {
+      const response = await fetch("/api/webpay/booking/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: format(selectedDate, "yyyy-MM-dd"),
+          startTime: selectedSlot,
+          serviceId: selectedService,
+          vehicleType,
+          plate: formData.plate,
+          customerName: formData.name,
+          customerPhone: formData.phone,
+          customerEmail: formData.email,
+          paymentType: type,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.token && data.url) {
+        // Webpay exige un POST con el token como campo de formulario, no un
+        // simple redirect GET (ver documentación de Webpay Plus).
+        const form = document.createElement("form");
+        form.action = data.url;
+        form.method = "POST";
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "token_ws";
+        input.value = data.token;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        throw new Error(data.error || "No se pudo iniciar el pago.");
+      }
+    } catch (err: any) {
+      setPaymentError(err.message || "Error al conectar con Webpay.");
+      setSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const variants = {
@@ -169,10 +220,13 @@ export default function BookingWizard() {
         </div>
         <h2 className="text-3xl font-bold text-white mb-4 uppercase tracking-widest">Reserva Confirmada</h2>
         <p className="text-gray-400 mb-8">
-          Te esperamos el <strong className="text-brand-chrome">{selectedDate && format(selectedDate, "dd 'de' MMMM", { locale: es })}</strong> a las <strong className="text-brand-chrome">{selectedSlot} hrs</strong>.
+          Te esperamos el <strong className="text-brand-chrome">{confirmedBooking?.date}</strong> a las <strong className="text-brand-chrome">{confirmedBooking?.startTime} hrs</strong> para <strong className="text-brand-chrome">{confirmedBooking?.serviceName}</strong>.
         </p>
         <div className="bg-brand-pure p-4 rounded mb-8 text-sm text-brand-chrome border border-white/5">
-          Vehículo: {vehicleType} | Patente: {formData.plate}
+          Vehículo: {confirmedBooking?.vehicleMake} | Patente: {confirmedBooking?.vehicleModel}
+          {confirmedBooking?.amount != null && (
+            <> | Pagado: ${confirmedBooking.amount.toLocaleString('es-CL')}</>
+          )}
         </div>
         <button 
           onClick={() => window.location.href = '/'}
@@ -186,6 +240,12 @@ export default function BookingWizard() {
 
   return (
     <div ref={wizardRef} className="max-w-4xl mx-auto bg-brand-surface/60 backdrop-blur-xl border border-white/10 rounded-xl p-6 md:p-10 relative overflow-hidden">
+      {paymentError && (
+        <div className="mb-8 p-4 rounded border border-red-900/50 bg-red-900/10 text-red-400 text-sm text-center">
+          {decodeURIComponent(paymentError)}. Tu horario no quedó bloqueado, puedes intentar de nuevo.
+        </div>
+      )}
+
       {/* Progreso */}
       <div className="flex justify-between mb-8 relative z-10 border-b border-white/5 pb-8">
         {[1, 2, 3, 4].map((num) => (
@@ -247,7 +307,7 @@ export default function BookingWizard() {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
               {services.map(s => {
-                const exactPrice = getExactPrice(s);
+                const exactPrice = sharedGetExactPrice(s, vehicleType);
                 return (
                   <button
                     key={s.id}

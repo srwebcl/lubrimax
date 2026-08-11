@@ -3,9 +3,12 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
+import { requireAdmin } from "@/lib/admin-session";
 
 export async function getOrders() {
   try {
+    await requireAdmin();
+
     return await prisma.order.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -29,9 +32,11 @@ export async function getOrders() {
 
 export async function updateOrderStatus(id: string, formData: FormData) {
   try {
+    await requireAdmin();
+
     const status = formData.get("status") as string;
     const trackingCode = formData.get("trackingCode") as string;
-    
+
     const order = await prisma.order.update({
       where: { id },
       data: {

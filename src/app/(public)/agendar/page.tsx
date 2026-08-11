@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import BookingWizard from "@/components/booking/BookingWizard";
 import Navbar from "@/components/dom/Navbar";
 
@@ -30,7 +30,9 @@ export default function AgendarPage() {
           </p>
         </div>
 
-        <BookingWizard />
+        <Suspense fallback={<div className="text-brand-chrome text-center py-20">Cargando sistema...</div>}>
+          <BookingWizard />
+        </Suspense>
       </main>
     </div>
   );

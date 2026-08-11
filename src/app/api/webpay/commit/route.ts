@@ -3,6 +3,7 @@ import { WebpayPlus } from "transbank-sdk";
 import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
+import { revalidateTag } from "next/cache";
 
 const tx = new WebpayPlus.Transaction(
   new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
           data: { stock: { decrement: item.quantity } }
         });
       }
+      revalidateTag("products", "max");
 
       // Enviar correo de confirmación (Mock o Real)
       await sendEmail({

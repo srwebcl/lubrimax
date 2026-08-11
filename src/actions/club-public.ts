@@ -1,11 +1,15 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { rutSchema } from "@/lib/validation";
 
 export async function validateClubRut(rut: string) {
   try {
+    const parsed = rutSchema.safeParse(rut);
+    if (!parsed.success) return { valid: false, error: "RUT inválido." };
+
     const customer = await prisma.customer.findUnique({
-      where: { rut },
+      where: { rut: parsed.data },
       include: { membership: true }
     });
 

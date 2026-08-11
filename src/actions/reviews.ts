@@ -1,26 +1,36 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+import { getSessionCustomer } from "./customer-auth";
+import { reviewSchema, flattenZodError } from "@/lib/validation";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function submitReview(formData: FormData) {
   try {
-    const productId = formData.get("productId") as string;
-    const rut = formData.get("rut") as string;
-    const rating = parseInt(formData.get("rating") as string);
-    const comment = formData.get("comment") as string;
-
-    if (!productId || !rut || isNaN(rating) || rating < 1 || rating > 5) {
-      return { success: false, error: "Datos inválidos para la reseña." };
+    const ip = await getClientIp();
+    const limit = checkRateLimit(`submit-review:${ip}`, 10, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      return { success: false, error: "Demasiadas reseñas enviadas. Intenta más tarde." };
     }
 
-    // 1. Validar que el cliente exista
-    const customer = await prisma.customer.findUnique({
-      where: { rut }
+    const parsed = reviewSchema.safeParse({
+      productId: formData.get("productId"),
+      rating: formData.get("rating"),
+      comment: formData.get("comment") || undefined,
     });
+    if (!parsed.success) {
+      return { success: false, error: flattenZodError(parsed.error) };
+    }
+    const { productId, rating, comment } = parsed.data;
+
+    // La identidad viene de la sesión firmada, no de un campo del formulario:
+    // antes cualquiera podía escribir el RUT de otra persona y dejar una
+    // reseña "verificada" a su nombre sin haber iniciado sesión.
+    const customer = await getSessionCustomer();
 
     if (!customer) {
-      return { success: false, error: "RUT no registrado en compras." };
+      return { success: false, error: "Debes iniciar sesión para dejar una reseña." };
     }
 
     // 2. Validar que el cliente tenga una orden DELIVERED que contenga este producto
@@ -63,6 +73,7 @@ export async function submitReview(formData: FormData) {
       }
     });
 
+    updateTag("products");
     revalidatePath(`/tienda/${productId}`);
     return { success: true };
   } catch (error: any) {
