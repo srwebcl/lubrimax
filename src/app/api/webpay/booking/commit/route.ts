@@ -22,7 +22,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
 
   if (tbkToken) {
     await cancelAbandoned(abortBuyOrder);
-    return NextResponse.redirect(`${baseUrl}/agendar?error=Pago%20Cancelado`);
+    return NextResponse.redirect(`${baseUrl}/agendar?error=Pago%20Cancelado&token_ws=${tbkToken || ""}`);
   }
 
   if (!tokenWs) {
@@ -71,13 +71,13 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
         }
       }
 
-      return NextResponse.redirect(`${baseUrl}/agendar?success=true&booking=${booking.id}`);
+      return NextResponse.redirect(`${baseUrl}/agendar?success=true&booking=${booking.id}&token_ws=${tokenWs}`);
     } else {
       await prisma.booking.update({
         where: { id: booking.id },
         data: { status: "CANCELLED" }
       });
-      return NextResponse.redirect(`${baseUrl}/agendar?error=Pago%20Rechazado`);
+      return NextResponse.redirect(`${baseUrl}/agendar?error=Pago%20Rechazado&token_ws=${tokenWs}`);
     }
   } catch (error: any) {
     console.error("Webpay Booking Commit Error:", error);

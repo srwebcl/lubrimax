@@ -13,7 +13,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
   if (tbkToken || abortToken) {
-    return NextResponse.redirect(`${baseUrl}/checkout?error=Pago%20Cancelado`);
+    return NextResponse.redirect(`${baseUrl}/checkout?error=Pago%20Cancelado&token_ws=${tbkToken || ""}`);
   }
 
   if (!tokenWs) {
@@ -50,13 +50,13 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
         ) as any
       });
 
-      return NextResponse.redirect(`${baseUrl}/checkout?success=true&order=${order.id}`);
+      return NextResponse.redirect(`${baseUrl}/checkout?success=true&order=${order.id}&token_ws=${tokenWs}`);
     } else {
       await prisma.order.updateMany({
         where: { paymentId: tokenWs },
         data: { status: "FAILED" }
       });
-      return NextResponse.redirect(`${baseUrl}/checkout?error=Pago%20Rechazado`);
+      return NextResponse.redirect(`${baseUrl}/checkout?error=Pago%20Rechazado&token_ws=${tokenWs}`);
     }
   } catch (error: any) {
     console.error("Webpay Commit Error:", error);
