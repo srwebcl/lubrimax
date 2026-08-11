@@ -22,6 +22,7 @@ function r2RemotePattern() {
 
 const nextConfig: NextConfig = {
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
