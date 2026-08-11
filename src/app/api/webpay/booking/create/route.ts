@@ -66,14 +66,15 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: flattenZodError(parsed.error) }, { status: 400 });
     }
-    const { date, startTime, serviceId, vehicleType, plate, customerName, customerPhone, customerEmail, paymentType } = parsed.data;
+    const { date, startTime, serviceIds, vehicleType, plate, customerName, customerPhone, customerEmail, paymentType } = parsed.data;
 
-    const service = await prisma.service.findUnique({ where: { id: serviceId } });
-    if (!service) {
-      return NextResponse.json({ error: "Servicio no encontrado." }, { status: 404 });
+    const services = await prisma.service.findMany({ where: { id: { in: serviceIds } } });
+    if (services.length === 0) {
+      return NextResponse.json({ error: "Servicios no encontrados." }, { status: 404 });
     }
 
-    const stillAvailable = await isSlotStillAvailable(date, startTime, service.duration);
+    const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
+    const stillAvailable = await isSlotStillAvailable(date, startTime, totalDuration);
     if (!stillAvailable) {
       return NextResponse.json({ error: "El horario seleccionado ya no está disponible." }, { status: 409 });
     }
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
     // Precio calculado 100% en servidor: nunca confiar en el monto que
     // pudiera mandar el cliente. Descuento de Club Lubrimax leído desde la
     // sesión de cookie (no desde el body).
-    let totalAmount = getExactPrice(service, vehicleType);
+    let totalAmount = services.reduce((sum, s) => sum + getExactPrice(s, vehicleType), 0);
     const customer = await getSessionCustomer();
     const discountPercent = customer?.membership?.discountPercent || 0;
     if (discountPercent > 0) {
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
     const [year, month, day] = date.split("-").map(Number);
     const [sHour, sMin] = startTime.split(":").map(Number);
     const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-    const end = addMinutes(start, service.duration);
+    const end = addMinutes(start, totalDuration);
     const endTimeStr = format(end, "HH:mm");
 
     // Reservamos el horario como PENDING antes de ir a Webpay para evitar
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
         customerEmail: customerEmail || null,
         vehicleMake: vehicleType,
         vehicleModel: plate,
-        serviceId,
+        services: { connect: serviceIds.map(id => ({ id })) },
         status: "PENDING",
         paymentStatus: "PENDING",
         paymentType,

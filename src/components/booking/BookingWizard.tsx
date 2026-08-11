@@ -39,7 +39,7 @@ export default function BookingWizard() {
 
   // Form State
   const [vehicleType, setVehicleType] = useState<string>("");
-  const [selectedService, setSelectedService] = useState<string>("");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
@@ -108,15 +108,15 @@ export default function BookingWizard() {
 
   // Fetch slots when date is selected
   useEffect(() => {
-    if (selectedDate && selectedService) {
+    if (selectedDate && selectedServices.length > 0) {
       async function fetchSlots() {
-        const slots = await getAvailableSlots(format(selectedDate!, "yyyy-MM-dd"), selectedService);
+        const slots = await getAvailableSlots(format(selectedDate!, "yyyy-MM-dd"), selectedServices);
         setAvailableSlots(slots);
         setSelectedSlot("");
       }
       fetchSlots();
     }
-  }, [selectedDate, selectedService]);
+  }, [selectedDate, selectedServices]);
 
   const handleNext = () => setStep((s) => s + 1);
   const handlePrev = () => setStep((s) => s - 1);
@@ -132,8 +132,8 @@ export default function BookingWizard() {
   // Precio "de vitrina" para que el usuario vea cuánto va a pagar; el monto
   // que realmente se cobra se recalcula en el servidor (ver
   // /api/webpay/booking/create) antes de crear la transacción Webpay.
-  const selectedServiceData = services.find(s => s.id === selectedService);
-  let totalAmount = selectedServiceData ? sharedGetExactPrice(selectedServiceData, vehicleType) : 0;
+  const selectedServicesData = services.filter(s => selectedServices.includes(s.id));
+  let totalAmount = selectedServicesData.reduce((sum, s) => sum + sharedGetExactPrice(s, vehicleType), 0);
 
   // Aplicar descuento del club
   const discountPercent = customerInfo?.membership?.discountPercent || 0;
@@ -149,7 +149,7 @@ export default function BookingWizard() {
       return;
     }
 
-    if (!selectedDate || !selectedSlot || !selectedService) return;
+    if (!selectedDate || !selectedSlot || selectedServices.length === 0) return;
 
     setSubmitting(true);
     setPaymentError(null);
@@ -162,7 +162,7 @@ export default function BookingWizard() {
         body: JSON.stringify({
           date: format(selectedDate, "yyyy-MM-dd"),
           startTime: selectedSlot,
-          serviceId: selectedService,
+          serviceIds: selectedServices,
           vehicleType,
           plate: formData.plate,
           customerName: formData.name,
@@ -305,21 +305,29 @@ export default function BookingWizard() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-              {services.map(s => {
-                const exactPrice = sharedGetExactPrice(s, vehicleType);
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelectedService(s.id)}
-                    className={`p-6 text-left border rounded transition-all duration-300 flex flex-col ${selectedService === s.id ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50'}`}
-                  >
-                    <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">{s.category}</div>
-                    <div className="font-bold text-lg text-white mb-1">{s.name}</div>
-                    <div className="text-brand-cyan text-xl font-black mt-auto pt-4">${exactPrice.toLocaleString('es-CL')}</div>
-                  </button>
-                );
-              })}
+            <div className="space-y-8 mb-8 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+              {Array.from(new Set(services.map(s => s.category))).map(category => (
+                <div key={category}>
+                  <h4 className="text-sm font-bold text-brand-cyan uppercase tracking-widest mb-4 border-b border-brand-cyan/20 pb-2">
+                    {category}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {services.filter(s => s.category === category).map(s => {
+                      const exactPrice = sharedGetExactPrice(s, vehicleType);
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setSelectedServices(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])}
+                          className={`p-4 text-left border rounded-lg transition-all duration-300 flex flex-col ${selectedServices.includes(s.id) ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'border-white/10 bg-black/20 hover:border-brand-cyan/50 hover:bg-white/5'}`}
+                        >
+                          <div className="font-bold text-sm md:text-base text-white mb-1 leading-tight">{s.name}</div>
+                          <div className="text-brand-cyan text-base md:text-lg font-black mt-auto pt-2">${exactPrice.toLocaleString('es-CL')}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="flex flex-col-reverse sm:flex-row justify-between gap-4">
@@ -330,7 +338,7 @@ export default function BookingWizard() {
                 Volver
               </button>
               <button 
-                disabled={!selectedService}
+                disabled={selectedServices.length === 0}
                 onClick={handleNext}
                 className="w-full sm:w-auto bg-brand-chrome text-brand-pure px-4 md:px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
               >
@@ -435,9 +443,9 @@ export default function BookingWizard() {
                   <h4 className="text-white text-sm uppercase tracking-widest font-bold mb-6 border-b border-white/10 pb-4">Resumen de Compra</h4>
                   
                   <div className="space-y-4 mb-6">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Servicio</span>
-                      <span className="text-white font-bold">{selectedServiceData?.name}</span>
+                    <div className="flex justify-between text-sm gap-4">
+                      <span className="text-gray-400">Servicios</span>
+                      <span className="text-white font-bold text-right">{selectedServicesData.map(s => s.name).join(" + ")}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Vehículo</span>

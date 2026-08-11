@@ -36,7 +36,7 @@ export const rutSchema = z
 export const bookingPaymentSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida."),
-  serviceId: z.string().min(1),
+  serviceIds: z.array(z.string()).min(1, "Debe seleccionar al menos un servicio."),
   vehicleType: z.enum(VEHICLE_TYPES, { error: "Tipo de vehículo inválido." }),
   plate: z.string().trim().min(1, "Falta la patente.").max(20),
   customerName: z.string().trim().min(2, "Falta el nombre.").max(200),

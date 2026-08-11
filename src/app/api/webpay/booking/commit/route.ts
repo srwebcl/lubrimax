@@ -35,7 +35,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { service: { select: { name: true, duration: true } } }
+      include: { services: { select: { name: true, duration: true } } }
     });
 
     if (!booking) {
@@ -61,7 +61,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
             subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
             react: (
               `<h1>¡Hola ${booking.customerName}!</h1>
-               <p>Tu reserva para <strong>${booking.service.name}</strong> quedó confirmada.</p>
+               <p>Tu reserva para <strong>${booking.services.map(s => s.name).join(' + ')}</strong> quedó confirmada.</p>
                <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
                <p>Vehículo: ${booking.vehicleMake} ${booking.vehicleModel}</p>
                <p>Pagaste ${paidLabel}: $${booking.amount?.toLocaleString("es-CL")}</p>

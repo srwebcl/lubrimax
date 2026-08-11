@@ -36,13 +36,14 @@ export const getServices = unstable_cache(fetchServices, ["services"], {
 /**
  * Calcula los bloques horarios disponibles para una fecha y servicio específico
  */
-export async function getAvailableSlots(dateString: string, serviceId: string) {
+export async function getAvailableSlots(dateString: string, serviceIds: string[]) {
   try {
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId }
+    const services = await prisma.service.findMany({
+      where: { id: { in: serviceIds } }
     });
 
-    if (!service) throw new Error("Servicio no encontrado");
+    if (services.length === 0) throw new Error("Servicios no encontrados");
+    const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
 
     // Fecha consultada (asumimos formato YYYY-MM-DD)
     const [year, month, day] = dateString.split("-").map(Number);
@@ -85,7 +86,7 @@ export async function getAvailableSlots(dateString: string, serviceId: string) {
 
     while (isBefore(currentSlotTime, endOfDayTime)) {
       // Calcular a qué hora terminaría el servicio si empieza en este slot
-      const slotEndTime = addMinutes(currentSlotTime, service.duration);
+      const slotEndTime = addMinutes(currentSlotTime, totalDuration);
 
       // Regla 1: El servicio NO puede terminar después del horario de cierre
       if (isAfter(slotEndTime, endOfDayTime)) {
@@ -152,7 +153,7 @@ export async function getBookingById(id: string) {
   try {
     const booking = await prisma.booking.findUnique({
       where: { id },
-      include: { service: { select: { name: true } } }
+      include: { services: { select: { name: true } } }
     });
 
     if (!booking) return null;
@@ -164,7 +165,7 @@ export async function getBookingById(id: string) {
       endTime: booking.endTime,
       status: booking.status,
       paymentStatus: booking.paymentStatus,
-      serviceName: booking.service.name,
+      serviceName: booking.services.map(s => s.name).join(" + "),
       vehicleMake: booking.vehicleMake,
       vehicleModel: booking.vehicleModel,
       amount: booking.amount,
