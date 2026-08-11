@@ -19,7 +19,6 @@ export default function Footer() {
                 alt="Lubrimax" 
                 width={200} 
                 height={60} 
-                style={{ width: 'auto', height: 'auto' }}
                 className="h-12 w-auto object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
               />
             </Link>

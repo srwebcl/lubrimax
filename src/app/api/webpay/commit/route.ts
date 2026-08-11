@@ -50,7 +50,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
         ) as any
       });
 
-      return NextResponse.redirect(`${baseUrl}/perfil?success=true&order=${order.id}`);
+      return NextResponse.redirect(`${baseUrl}/checkout?success=true&order=${order.id}`);
     } else {
       await prisma.order.updateMany({
         where: { paymentId: tokenWs },

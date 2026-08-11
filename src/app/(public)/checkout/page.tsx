@@ -10,8 +10,21 @@ import { validateCoupon } from "@/actions/coupons";
 import { validateClubRut } from "@/actions/club-public";
 
 export default function CheckoutPage() {
-  const { items, total, removeFromCart, updateQuantity } = useCart();
+  const { items, total, removeFromCart, updateQuantity, clearCart } = useCart();
   const router = useRouter();
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("success") === "true") {
+        setIsSuccess(true);
+        setOrderId(searchParams.get("order"));
+        clearCart();
+      }
+    }
+  }, [clearCart]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,6 +101,36 @@ export default function CheckoutPage() {
       setLoading(false);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen pt-32 pb-20 flex flex-col items-center justify-center px-4">
+        <div className="w-24 h-24 bg-green-500/20 border border-green-500 rounded-full flex items-center justify-center mb-6">
+          <svg className="w-12 h-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 className="text-3xl font-bold text-white mb-2 uppercase tracking-widest text-center">¡Gracias por tu compra!</h2>
+        <p className="text-gray-400 mb-8 text-center max-w-md">
+          Tu pago ha sido procesado exitosamente mediante Webpay Plus.
+        </p>
+        {orderId && (
+          <p className="text-gray-300 mb-8 font-mono bg-black/50 px-6 py-3 rounded-lg border border-white/10 flex flex-col items-center text-sm gap-1">
+            <span className="text-gray-500 uppercase text-[10px]">Número de Orden</span>
+            <span className="text-brand-cyan">{orderId.toUpperCase()}</span>
+          </p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Link href="/tienda" className="bg-brand-surface border border-white/10 text-white font-bold px-8 py-3 rounded-lg uppercase tracking-widest text-sm hover:bg-white/5 transition-colors text-center">
+            Volver a la Tienda
+          </Link>
+          <Link href="/login" className="bg-brand-cyan text-brand-pure font-bold px-8 py-3 rounded-lg uppercase tracking-widest text-sm hover:bg-white transition-colors text-center">
+            Ver mi Perfil
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
