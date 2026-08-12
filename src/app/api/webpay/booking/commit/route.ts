@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import { WebpayPlus } from "transbank-sdk";
-import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { format } from "date-fns";
+import { getWebpayTransaction } from "@/lib/webpay";
 
-const tx = new WebpayPlus.Transaction(
-  new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
-);
+const tx = getWebpayTransaction();
 
 async function cancelAbandoned(buyOrder: string | null) {
   if (!buyOrder) return;

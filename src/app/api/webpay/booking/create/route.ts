@@ -8,11 +8,9 @@ import { getSessionCustomer } from "@/actions/customer-auth";
 import { bookingPaymentSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
 
-// Configurar Webpay para modo Integración (Pruebas) — mismo patrón que
-// src/app/api/webpay/create/route.ts (checkout de la tienda).
-const tx = new WebpayPlus.Transaction(
-  new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
-);
+import { getWebpayTransaction } from "@/lib/webpay";
+
+const tx = getWebpayTransaction();
 
 // Recalcula la disponibilidad del horario contra la BD (misma regla que
 // getAvailableSlots en actions/booking.ts, inline aquí para no importar un

@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import { WebpayPlus } from "transbank-sdk";
-import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
 import { revalidateTag } from "next/cache";
+import { getWebpayTransaction } from "@/lib/webpay";
 
-const tx = new WebpayPlus.Transaction(
-  new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
-);
+const tx = getWebpayTransaction();
 
 async function processPayment(tokenWs: string | null, tbkToken: string | null, abortToken: string | null) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";

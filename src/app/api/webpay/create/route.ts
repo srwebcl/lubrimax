@@ -7,10 +7,9 @@ import { verifyCustomerSessionToken } from "@/lib/customer-session";
 import { storeCheckoutSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
 
-// Configurar Webpay para modo Integración (Pruebas)
-const tx = new WebpayPlus.Transaction(
-  new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
-);
+import { getWebpayTransaction } from "@/lib/webpay";
+
+const tx = getWebpayTransaction();
 
 // Recalcula el total desde los precios reales en la BD. Nunca confiar en el
 // monto/precio que envía el cliente: viene de localStorage y es manipulable.
