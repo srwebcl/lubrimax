@@ -140,7 +140,7 @@ export async function POST(request: Request) {
         vehicleMake: `${vehicleType} - ${make}`,
         vehicleModel: `${model} (Patente: ${plate})`,
         services: { connect: serviceIds.map(id => ({ id })) },
-        selectedOptions: selectedVariants || null,
+        selectedOptions: selectedVariants ?? undefined,
         status: "PENDING",
         paymentStatus: "PENDING",
         paymentType,
