@@ -13,6 +13,10 @@ export default function ConfigPage() {
   const [concurrentBays, setConcurrentBays] = useState(1);
   const [slotInterval, setSlotInterval] = useState(30);
   const [advanceBookingHours, setAdvanceBookingHours] = useState(12);
+  const [homeVideos, setHomeVideos] = useState<string[]>([]);
+  const [storeBanners, setStoreBanners] = useState<string[]>([]);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   useEffect(() => {
     getSettings().then((settings) => {
@@ -21,9 +25,23 @@ export default function ConfigPage() {
       setConcurrentBays(settings.concurrentBays || 1);
       setSlotInterval(settings.slotInterval || 30);
       setAdvanceBookingHours(settings.advanceBookingHours || 12);
+      setHomeVideos(settings.homeVideos || []);
+      setStoreBanners(settings.storeBanners || []);
       setLoading(false);
     });
   }, []);
+
+  const uploadFileToR2 = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al subir video");
+    return data.publicUrl;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +54,8 @@ export default function ConfigPage() {
     formData.append("concurrentBays", concurrentBays.toString());
     formData.append("slotInterval", slotInterval.toString());
     formData.append("advanceBookingHours", advanceBookingHours.toString());
+    homeVideos.forEach(video => formData.append("homeVideos", video));
+    storeBanners.forEach(banner => formData.append("storeBanners", banner));
 
     const result = await updateSettings(formData);
     
@@ -46,6 +66,67 @@ export default function ConfigPage() {
     }
     
     setSaving(false);
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    // Validar tipo de archivo
+    if (!file.type.startsWith('video/')) {
+      setMessage({ type: "error", text: "Por favor sube un archivo de video válido (.mp4, .webm, etc)" });
+      return;
+    }
+    
+    if (homeVideos.length >= 6) {
+      setMessage({ type: "error", text: "Límite máximo de 6 videos alcanzado." });
+      return;
+    }
+
+    try {
+      setIsUploadingVideo(true);
+      setMessage(null);
+      const url = await uploadFileToR2(file);
+      setHomeVideos([...homeVideos, url]);
+      setMessage({ type: "success", text: "Video subido correctamente. Recuerda guardar los cambios." });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Error al subir el video" });
+    } finally {
+      setIsUploadingVideo(false);
+      // Limpiar el input
+      e.target.value = '';
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: "error", text: "Por favor sube una imagen válida (.jpg, .png, etc)" });
+      return;
+    }
+
+    try {
+      setIsUploadingBanner(true);
+      setMessage(null);
+      const url = await uploadFileToR2(file);
+      setStoreBanners([...storeBanners, url]);
+      setMessage({ type: "success", text: "Banner subido correctamente. Recuerda guardar los cambios." });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Error al subir la imagen" });
+    } finally {
+      setIsUploadingBanner(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveBanner = (index: number) => {
+    setStoreBanners(storeBanners.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveVideo = (index: number) => {
+    setHomeVideos(homeVideos.filter((_, i) => i !== index));
   };
 
   if (loading) {
@@ -201,6 +282,145 @@ export default function ConfigPage() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* GALERÍA DE VIDEOS FRONTEND */}
+      <div className="max-w-2xl mt-8 bg-brand-surface/50 border border-white/5 rounded-xl p-6 backdrop-blur-md">
+        <h3 className="text-brand-cyan text-sm uppercase tracking-widest font-bold mb-6">Galería de Videos (Inicio)</h3>
+        <p className="text-gray-400 text-sm mb-6">Sube hasta 6 videos cortos (ej. Reels) que se reproducirán nativamente en la página principal. Recomendamos formato vertical (9:16) en .mp4 optimizado.</p>
+        
+        <div className="space-y-4 mb-6">
+          {homeVideos.map((url, idx) => (
+            <div key={idx} className="flex items-center gap-4 bg-black/30 border border-white/5 rounded-lg p-3">
+              <div className="w-16 h-24 bg-black rounded overflow-hidden flex-shrink-0 relative">
+                <video src={url} className="w-full h-full object-cover" muted playsInline />
+              </div>
+              <div className="flex-1 text-white text-xs font-mono truncate">
+                {url}
+              </div>
+              <button 
+                type="button" 
+                onClick={() => handleRemoveVideo(idx)}
+                className="text-red-400 hover:text-red-300 p-2"
+                title="Eliminar"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </div>
+          ))}
+
+          {homeVideos.length === 0 && (
+            <div className="text-center p-8 border border-dashed border-white/10 rounded-lg text-gray-500">
+              No hay videos configurados.
+            </div>
+          )}
+        </div>
+
+        {homeVideos.length < 6 && (
+          <div className="mb-6">
+            <label className={`cursor-pointer flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all ${isUploadingVideo ? 'border-brand-cyan/50 bg-brand-cyan/5' : 'border-white/20 hover:border-brand-cyan hover:bg-brand-cyan/5'}`}>
+              {isUploadingVideo ? (
+                <div className="flex flex-col items-center text-brand-cyan">
+                  <svg className="animate-spin mb-2 h-6 w-6 text-brand-cyan" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-sm font-bold uppercase tracking-widest">Subiendo video a la nube...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center text-gray-400">
+                  <svg className="w-8 h-8 mb-2 text-brand-cyan/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span className="text-sm font-bold uppercase tracking-widest text-white">Haz clic para subir un video</span>
+                  <span className="text-xs mt-1">.mp4, .webm (Max {6 - homeVideos.length} restantes)</span>
+                </div>
+              )}
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="video/*" 
+                onChange={handleVideoUpload}
+                disabled={isUploadingVideo}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* BANNER PROMOCIONAL TIENDA FRONTEND */}
+      <div className="max-w-2xl mt-8 bg-brand-surface/50 border border-white/5 rounded-xl p-6 backdrop-blur-md">
+        <h3 className="text-brand-cyan text-sm uppercase tracking-widest font-bold mb-6">Banners Promocionales (Tienda)</h3>
+        <p className="text-gray-400 text-sm mb-6">Sube imágenes anchas (ej. 21:9) que aparecerán destacadas en la parte superior del catálogo de la tienda. Si subes más de una, funcionarán como carrusel (Máx. 5).</p>
+        
+        <div className="space-y-4 mb-6">
+          {storeBanners.map((url, idx) => (
+            <div key={idx} className="flex items-center gap-4 bg-black/30 border border-white/5 rounded-lg p-3">
+              <div className="w-24 h-12 bg-black rounded overflow-hidden flex-shrink-0 relative">
+                <img src={url} className="w-full h-full object-cover" alt="Banner" />
+              </div>
+              <div className="flex-1 text-white text-xs font-mono truncate">
+                {url}
+              </div>
+              <button 
+                type="button" 
+                onClick={() => handleRemoveBanner(idx)}
+                className="text-red-400 hover:text-red-300 p-2"
+                title="Eliminar"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            </div>
+          ))}
+
+          {storeBanners.length === 0 && (
+            <div className="text-center p-8 border border-dashed border-white/10 rounded-lg text-gray-500">
+              No hay banners configurados. Se mostrará el título por defecto.
+            </div>
+          )}
+        </div>
+
+        {storeBanners.length < 5 && (
+          <div className="mb-6">
+            <label className={`cursor-pointer flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl transition-all ${isUploadingBanner ? 'border-brand-cyan/50 bg-brand-cyan/5' : 'border-white/20 hover:border-brand-cyan hover:bg-brand-cyan/5'}`}>
+              {isUploadingBanner ? (
+                <div className="flex flex-col items-center text-brand-cyan">
+                  <svg className="animate-spin mb-2 h-6 w-6 text-brand-cyan" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-sm font-bold uppercase tracking-widest">Subiendo imagen...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center text-gray-400">
+                  <svg className="w-8 h-8 mb-2 text-brand-cyan/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="text-sm font-bold uppercase tracking-widest text-white">Haz clic para subir un banner</span>
+                  <span className="text-xs mt-1">.jpg, .png, .webp (Max {5 - storeBanners.length} restantes)</span>
+                </div>
+              )}
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleBannerUpload}
+                disabled={isUploadingBanner}
+              />
+            </label>
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end pt-4 border-t border-white/5">
+          <button 
+            type="button" 
+            onClick={handleSubmit} 
+            disabled={saving || isUploadingVideo}
+            className="w-full md:w-auto bg-brand-cyan text-brand-pure font-bold px-8 py-3 rounded-lg hover:bg-white transition-all flex items-center justify-center uppercase tracking-widest text-xs disabled:opacity-50"
+          >
+            {saving ? "Guardando..." : "Guardar Cambios"}
+          </button>
+        </div>
       </div>
     </div>
   );

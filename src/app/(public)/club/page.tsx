@@ -42,20 +42,27 @@ export default function ClubPage() {
   return (
     <div className="min-h-screen pt-32 pb-20">
       
-      {/* HERO CLUB */}
-      <section className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto mb-20 text-center">
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.8 }}>
-          <div className="inline-block text-[10px] uppercase tracking-widest font-bold text-amber-500 border border-amber-500/30 bg-amber-500/10 px-4 py-2 rounded-full mb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* HERO CLUB */}
+        <section className="relative w-full mb-16 text-center py-24 rounded-[3rem] overflow-hidden border border-amber-500/10 shadow-[0_0_50px_rgba(245,158,11,0.05)]">
+          {/* Background Image & Overlays */}
+        <div className="absolute inset-0 bg-[url('/images/lavados/detailing-premium.jpeg_202608151447.jpeg')] bg-cover bg-center bg-no-repeat opacity-20 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/50 to-transparent pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_var(--tw-colors-brand-pure)_100%)] pointer-events-none"></div>
+
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.8 }} className="relative z-10">
+          <div className="inline-block text-[10px] uppercase tracking-widest font-bold border px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm text-amber-500 border-amber-500/30 bg-amber-500/10">
             Membresía Exclusiva
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold text-white uppercase tracking-widest italic mb-6">
+          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-widest italic mb-4 drop-shadow-xl text-white">
             Club <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-600">VIP</span>
           </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg">
+          <p className="text-gray-300 max-w-2xl mx-auto text-lg drop-shadow-md">
             Sube al siguiente nivel. Únete al Club LUBRIMAX y obtén descuentos de por vida en nuestros servicios, acceso prioritario y convenios exclusivos con las mejores marcas del rubro automotriz.
           </p>
         </motion.div>
-      </section>
+        </section>
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">

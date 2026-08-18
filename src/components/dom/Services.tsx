@@ -2,44 +2,23 @@ import React from "react";
 import Link from "next/link";
 import { Droplet, Sparkles, PlusCircle, Wrench } from "lucide-react";
 
-const categories = [
-  {
-    name: "Lavados",
-    slug: "lavados",
-    description: "Limpieza exterior e interior con técnicas de bajo impacto y máxima eficiencia.",
-    icon: Droplet,
-    color: "from-blue-500 to-brand-cyan",
-    image: "https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&q=80&w=800"
-  },
-  {
-    name: "Detailing",
-    slug: "detailing",
-    description: "Tratamientos de pintura, pulido extremo y protección cerámica o nanotecnología.",
-    icon: Sparkles,
-    color: "from-purple-500 to-pink-500",
-    image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=800"
-  },
-  {
-    name: "Extras",
-    slug: "extras",
-    description: "Servicios adicionales como lavado de tapiz, techo, motor y chasis.",
-    icon: PlusCircle,
-    color: "from-amber-500 to-orange-500",
-    image: "https://images.unsplash.com/photo-1626668893632-6f3a4466d22f?auto=format&fit=crop&q=80&w=800"
-  },
-  {
-    name: "Mecánica",
-    slug: "mecanica",
-    description: "Mantenimiento preventivo, frenos, aceites y filtros. Previa evaluación.",
-    icon: Wrench,
-    color: "from-gray-500 to-gray-300",
-    image: "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=800"
-  }
-];
+import { prisma } from "@/lib/prisma";
 
-export default function Services() {
+const ICONS: Record<string, any> = {
+  lavados: Droplet,
+  detailing: Sparkles,
+  extras: PlusCircle,
+  mecanica: Wrench
+};
+
+export default async function Services() {
+  const dbCategories = await prisma.serviceCategory.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" }
+  });
+
   return (
-    <section id="servicios" className="py-24 relative overflow-hidden bg-brand-pure">
+    <section id="servicios" className="scroll-mt-24 pt-8 pb-24 md:pt-12 md:pb-24 relative overflow-hidden bg-brand-pure">
       {/* Patrón Hexagonal Decorativo (Fondo) */}
       <div 
         className="absolute inset-0 z-0 opacity-10 pointer-events-none mix-blend-overlay"
@@ -60,22 +39,24 @@ export default function Services() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((cat) => (
+          {dbCategories.map((cat) => {
+            const Icon = ICONS[cat.slug] || Sparkles;
+            return (
             <Link href={`/servicios/${cat.slug}`} key={cat.slug} className="group">
               <div className="bg-[#0f1115] border border-white/5 rounded-2xl p-6 transition-all duration-500 hover:border-brand-cyan/50 hover:-translate-y-2 h-full flex flex-col items-center text-center relative overflow-hidden min-h-[320px] justify-end group-hover:shadow-[0_0_30px_rgba(0,180,216,0.15)]">
                 {/* Imagen de fondo */}
                 <div 
-                  className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 opacity-40 group-hover:opacity-50"
-                  style={{ backgroundImage: `url(${cat.image})` }}
+                  className="absolute inset-0 z-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110 opacity-60 group-hover:opacity-100"
+                  style={{ backgroundImage: `url(${cat.image || '/images/lavado-espuma.png'})` }}
                 />
                 
                 {/* Degradados de oscurecimiento */}
-                <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0f1115]/80 via-[#0f1115]/90 to-[#0f1115] transition-opacity duration-500 group-hover:opacity-80" />
-                <div className={`absolute top-0 right-0 w-full h-full bg-gradient-to-br ${cat.color} blur-[100px] opacity-10 group-hover:opacity-20 transition-opacity duration-500`} />
+                <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0f1115]/60 via-[#0f1115]/80 to-[#0f1115] transition-opacity duration-500 group-hover:opacity-60" />
+                <div className={`absolute top-0 right-0 w-full h-full bg-gradient-to-br ${cat.color || 'from-brand-cyan to-brand-blue'} blur-[100px] opacity-20 group-hover:opacity-40 transition-opacity duration-500`} />
                 
                 {/* Ícono superior (mezclado con la imagen) */}
                 <div className="absolute top-6 right-6 z-10 opacity-30 group-hover:opacity-100 transition-all duration-500 group-hover:rotate-12 group-hover:scale-110">
-                  <cat.icon className="w-10 h-10 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+                  <Icon className="w-10 h-10 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
                 </div>
                 <h3 className="text-2xl font-black uppercase tracking-wider mb-2 relative z-10 text-white drop-shadow-md">{cat.name}</h3>
                 
@@ -88,7 +69,7 @@ export default function Services() {
                 </div>
               </div>
             </Link>
-          ))}
+          )})}
         </div>
       </div>
     </section>

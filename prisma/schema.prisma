@@ -14,9 +14,29 @@ model Service {
   priceAuto   Int?
   priceSuv2   Int?
   priceSuv3   Int?
-  category    String    @default("Detailing")
+  category    String    @default("Detailing") // Mantener temporalmente para evitar que se rompa la DB al migrar
+  categoryId  String?
+  serviceCategory ServiceCategory? @relation(fields: [categoryId], references: [id])
   badges      String[]  @default([])
+  variants    Json?     // Ej: [{ name: "Opción 1", priceAuto: 1000, duration: 30 }]
+  image       String?   // Imagen miniatura específica del servicio (Mantenido por retrocompatibilidad)
+  images      String[]  @default([]) // Galería de imágenes del servicio
   bookings    Booking[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique // Ej: "Lavados", "Detailing"
+  slug        String    @unique
+  description String?
+  image       String?
+  color       String?   // Degradado de la tarjeta. Ej: "from-blue-500 to-brand-cyan"
+  isActive    Boolean   @default(true)
+  
+  services    Service[]
+  
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -38,6 +58,7 @@ model Booking {
   vehicleModel  String
   
   services      Service[]
+  selectedOptions Json?    // Almacena la variante elegida por servicio. Ej: { "serviceId": "Opción 1" }
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -50,6 +71,9 @@ model Settings {
   concurrentBays      Int      @default(1)
   slotInterval        Int      @default(30)
   advanceBookingHours Int      @default(12)
+  homeVideos          String[] @default([])
+  storeBanners        String[] @default([])
+  storeBanner         String?
   updatedAt           DateTime @updatedAt
 }
 

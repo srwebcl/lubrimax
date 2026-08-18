@@ -17,7 +17,9 @@ async function fetchSettings() {
         workEndHour: 18,
         concurrentBays: 1,
         slotInterval: 30,
-        advanceBookingHours: 12
+        advanceBookingHours: 12,
+        homeVideos: [],
+        storeBanners: []
       }
     });
   }
@@ -43,6 +45,8 @@ export async function updateSettings(formData: FormData) {
     const concurrentBays = parseInt(formData.get("concurrentBays") as string);
     const slotInterval = parseInt(formData.get("slotInterval") as string);
     const advanceBookingHours = parseInt(formData.get("advanceBookingHours") as string) || 12;
+    const homeVideos = formData.getAll("homeVideos").map(String).slice(0, 6);
+    const storeBanners = formData.getAll("storeBanners").map(String).slice(0, 5); // limit to 5 banners
 
     if (isNaN(workStartHour) || isNaN(workEndHour) || isNaN(concurrentBays) || isNaN(slotInterval)) {
       return { success: false, error: "Valores inválidos" };
@@ -60,6 +64,8 @@ export async function updateSettings(formData: FormData) {
         concurrentBays,
         slotInterval,
         advanceBookingHours,
+        homeVideos,
+        storeBanners,
       },
       create: {
         id: "global",
@@ -68,6 +74,8 @@ export async function updateSettings(formData: FormData) {
         concurrentBays,
         slotInterval,
         advanceBookingHours,
+        homeVideos,
+        storeBanners,
       }
     });
 

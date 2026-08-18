@@ -11,29 +11,24 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-brand-pure text-white relative overflow-hidden">
       
-      {/* Hero Background */}
-      <div className="absolute top-0 left-0 w-full h-[40vh] z-0">
-        <div 
-          className="absolute inset-0 opacity-40 mix-blend-luminosity"
-          style={{
-            backgroundImage: "url('https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&q=80')",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-pure via-brand-pure/60 to-brand-pure z-10" />
-      </div>
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-32 pb-24">
         
-        <header className="mb-16 text-center">
-          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-widest italic mb-4 drop-shadow-md">
-            Ponte en <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-blue-500">Contacto</span>
-          </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto text-lg">
-            ¿Tienes alguna duda o quieres cotizar un servicio especial? Escríbenos o visítanos directamente en nuestra clínica estética.
-          </p>
-        </header>
+        {/* HERO CONTACTO */}
+        <section className="relative w-full mb-16 text-center py-24 rounded-[3rem] overflow-hidden border border-brand-cyan/10 shadow-[0_0_50px_rgba(56,189,248,0.05)]">
+          {/* Background Image & Overlays */}
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&q=80')] bg-cover bg-center bg-no-repeat opacity-20 pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/50 to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_var(--tw-colors-brand-pure)_100%)] pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-widest italic mb-4 drop-shadow-xl">
+              Ponte en <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-blue-500">Contacto</span>
+            </h1>
+            <p className="text-gray-300 max-w-2xl mx-auto text-lg drop-shadow-md">
+              ¿Tienes alguna duda o quieres cotizar un servicio especial? Escríbenos o visítanos directamente en nuestra clínica estética.
+            </p>
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24">
           
@@ -100,8 +95,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg uppercase tracking-wider mb-1">Horarios</h3>
-                  <p className="text-gray-400">Lunes a Viernes: 09:00 - 18:00</p>
-                  <p className="text-gray-400">Sábados: 09:00 - 14:00 (Solo agendados)</p>
+                  <p className="text-gray-400">Lunes a Sábado: 09:00 - 18:00</p>
                 </div>
               </div>
             </div>

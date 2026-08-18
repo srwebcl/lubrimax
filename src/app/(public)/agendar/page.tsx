@@ -20,15 +20,24 @@ export default function AgendarPage() {
         }}
       />
 
-      <main className="flex-1 container mx-auto px-4 py-32 relative z-10 flex flex-col justify-center">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-4">
-            Reserva tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Cita</span>
-          </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto">
-            Configura el tratamiento ideal para tu vehículo. Sistema de agenda en tiempo real.
-          </p>
-        </div>
+      <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 relative z-10 flex flex-col justify-center max-w-7xl">
+        
+        {/* HERO AGENDAR */}
+        <section className="relative w-full mb-16 text-center py-24 rounded-[3rem] overflow-hidden border border-brand-cyan/10 shadow-[0_0_50px_rgba(56,189,248,0.05)]">
+          {/* Background Image & Overlays */}
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&q=80')] bg-cover bg-center bg-no-repeat opacity-20 pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/50 to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_var(--tw-colors-brand-pure)_100%)] pointer-events-none"></div>
+
+          <div className="relative z-10">
+            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-widest italic mb-4 drop-shadow-xl text-white">
+              Reserva tu <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Cita</span>
+            </h1>
+            <p className="text-gray-300 max-w-2xl mx-auto drop-shadow-md text-lg">
+              Configura el tratamiento ideal para tu vehículo. Sistema de agenda en tiempo real.
+            </p>
+          </div>
+        </section>
 
         <Suspense fallback={<div className="text-brand-chrome text-center py-20">Cargando sistema...</div>}>
           <BookingWizard />

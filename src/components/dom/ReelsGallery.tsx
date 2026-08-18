@@ -1,164 +1,101 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
-import { AnimatePresence, motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Simulamos 8 videos (pueden repetir los mismos mp4 para el demo)
-const ALL_VIDEOS = [
-  "/videos/reel-1.mp4",
-  "/videos/reel-2.mp4",
-  "/videos/reel-3.mp4",
-  "/videos/reel-4.mp4",
-  "/videos/reel-1.mp4", 
-  "/videos/reel-2.mp4",
-  "/videos/reel-3.mp4",
-  "/videos/reel-4.mp4",
-];
+interface Props {
+  reels: string[];
+}
 
-// Para el scroll infinito en Desktop (Ultrawide)
-const ROW_1_BASE = ALL_VIDEOS.slice(0, 4);
-const ROW_2_BASE = ALL_VIDEOS.slice(4, 8);
+export default function ReelsGallery({ reels }: Props) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
 
-const ROW_1_VIDEOS = [...ROW_1_BASE, ...ROW_1_BASE, ...ROW_1_BASE, ...ROW_1_BASE];
-const ROW_2_VIDEOS = [...ROW_2_BASE, ...ROW_2_BASE, ...ROW_2_BASE, ...ROW_2_BASE];
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
-export default function ReelsGallery() {
-  const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const handleNext = () => {
+    setActiveIndex((prev) => prev + 1);
+  };
+
+  const handlePrev = () => {
+    setActiveIndex((prev) => prev - 1);
+  };
+
+  const handleDragEnd = (e: any, { offset, velocity }: any) => {
+    const swipe = Math.abs(offset.x) * velocity.x;
+    if (swipe < -1000 || offset.x < -50) {
+      handleNext();
+    } else if (swipe > 1000 || offset.x > 50) {
+      handlePrev();
+    }
+  };
+
+  if (!isMounted || !reels || reels.length === 0) return null;
+
+  // Calculamos la ventana de 5 slides basados en el índice virtual infinito
+  const slides = [];
+  for (let i = -2; i <= 2; i++) {
+    const virtualIndex = activeIndex + i;
+    // Mapear el índice virtual al índice real del array (manejando números negativos)
+    const actualIndex = ((virtualIndex % reels.length) + reels.length) % reels.length;
+    const reelId = reels[actualIndex];
+    const offset = i;
+    const isActive = offset === 0;
+
+    slides.push(
+      <motion.div
+        key={virtualIndex}
+        initial={{ opacity: 0, x: offset * (typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 320) + (offset > 0 ? 100 : -100), scale: 0.8 }}
+        animate={{ 
+          opacity: isActive ? 1 : 0.4, 
+          x: offset * (typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 320),
+          scale: isActive ? 1 : 0.85,
+          zIndex: isActive ? 50 : 40 - Math.abs(offset)
+        }}
+        exit={{ opacity: 0, scale: 0.8, x: offset * (typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 320) + (offset > 0 ? 100 : -100) }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className={`absolute w-[280px] md:w-[320px] h-[500px] md:h-[580px] rounded-2xl overflow-hidden shadow-2xl border ${isActive ? 'border-brand-cyan/50 shadow-[0_0_40px_rgba(56,189,248,0.2)]' : 'border-white/10'}`}
+        onClick={() => !isActive && setActiveIndex(virtualIndex)}
+        style={{ cursor: isActive ? "default" : "pointer" }}
+      >
+        {/* Overlay transparente para interceptar clicks en slides inactivos */}
+        {!isActive && (
+          <div className="absolute inset-0 z-20 bg-black/50 hover:bg-black/30 transition-colors backdrop-blur-[2px]" />
+        )}
+
+        <div className="w-full h-full flex items-center justify-center overflow-hidden bg-black">
+          <video
+            src={reelId}
+            className="w-full h-full object-cover"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
-    <>
-      {/* ======================= */}
-      {/* VERSIÓN MOBILE (TikTok) */}
-      {/* ======================= */}
-      <div className="grid grid-cols-2 gap-3 w-full md:hidden relative z-10">
-        {ALL_VIDEOS.map((videoSrc, index) => (
-          <div 
-            key={`mobile-${index}`}
-            onClick={() => setActiveVideo(videoSrc)}
-            className="w-full aspect-[9/16] shrink-0 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface relative cursor-pointer active:scale-[0.98] transition-transform"
-          >
-            {/* Overlay con icono de Play */}
-            <div className="absolute inset-0 bg-black/20 opacity-0 active:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
-              <div className="w-12 h-12 bg-brand-cyan/40 backdrop-blur-md rounded-full flex items-center justify-center border border-brand-cyan/80">
-                <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-            <Image
-              src={videoSrc.replace('.mp4', '-thumbnail.webp')}
-              alt="Reel thumbnail"
-              fill
-              sizes="90vw"
-              loading="lazy"
-              className="object-cover pointer-events-none relative z-10"
-            />
-          </div>
-        ))}
+    <div className="w-full relative z-10 flex flex-col items-center">
+      <div className="relative w-full max-w-6xl flex justify-center items-center h-[600px] md:h-[650px]">
+        
+        {/* Carrusel Dinámico 3D con soporte para Swipe */}
+        <motion.div 
+          className="relative w-full h-full flex justify-center items-center touch-pan-y"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={handleDragEnd}
+        >
+          <AnimatePresence initial={false}>
+            {slides}
+          </AnimatePresence>
+        </motion.div>
       </div>
-
-      {/* ======================= */}
-      {/* VERSIÓN DESKTOP (Marquee) */}
-      {/* ======================= */}
-      <div className="hidden md:flex w-full overflow-x-clip overflow-y-visible flex-col gap-6 py-12 relative z-10">
-        {/* Fila 1: Marquee a la izquierda */}
-        <div className="relative flex w-full">
-          <div className="flex w-max gap-4 animate-marquee-left">
-            {ROW_1_VIDEOS.map((videoSrc, index) => (
-              <div 
-                key={`row1-${index}`}
-                onClick={() => setActiveVideo(videoSrc)}
-                className="w-[250px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:border-brand-cyan/50 hover:z-10 relative cursor-pointer group/card"
-              >
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
-                  <div className="w-16 h-16 bg-brand-cyan/20 backdrop-blur-md rounded-full flex items-center justify-center border border-brand-cyan/50 shadow-[0_0_20px_rgba(56,189,248,0.5)]">
-                    <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                </div>
-                <Image
-                  src={videoSrc.replace('.mp4', '-thumbnail.webp')}
-                  alt="Reel thumbnail"
-                  fill
-                  sizes="250px"
-                  loading="lazy"
-                  className="object-cover pointer-events-none relative z-10"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Fila 2: Marquee a la derecha */}
-        <div className="relative flex w-full">
-          <div className="flex w-max gap-4 animate-marquee-right">
-            {ROW_2_VIDEOS.map((videoSrc, index) => (
-              <div 
-                key={`row2-${index}`}
-                onClick={() => setActiveVideo(videoSrc)}
-                className="w-[250px] h-[450px] shrink-0 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5 bg-brand-surface transition-all duration-500 hover:scale-[1.03] hover:shadow-[0_0_30px_rgba(56,189,248,0.3)] hover:border-brand-cyan/50 hover:z-10 relative cursor-pointer group/card"
-              >
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex items-center justify-center z-20">
-                  <div className="w-16 h-16 bg-brand-cyan/20 backdrop-blur-md rounded-full flex items-center justify-center border border-brand-cyan/50 shadow-[0_0_20px_rgba(56,189,248,0.5)]">
-                    <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </div>
-                </div>
-                <Image
-                  src={videoSrc.replace('.mp4', '-thumbnail.webp')}
-                  alt="Reel thumbnail"
-                  fill
-                  sizes="250px"
-                  loading="lazy"
-                  className="object-cover pointer-events-none relative z-10"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Modal para ver el video completo */}
-      <AnimatePresence>
-        {activeVideo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setActiveVideo(null)}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-pure/90 backdrop-blur-xl p-4"
-          >
-            {/* Botón de cerrar */}
-            <button 
-              onClick={() => setActiveVideo(null)}
-              className="absolute top-6 right-6 w-12 h-12 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors border border-white/20 z-50 text-white"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-[400px] aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(56,189,248,0.3)] border border-brand-cyan/30"
-            >
-              <video
-                src={activeVideo}
-                autoPlay
-                controls
-                playsInline
-                className="w-full h-full object-cover"
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+    </div>
   );
 }

@@ -154,11 +154,11 @@ export default function ServicesTabs({ services }: { services: Service[] }) {
                     <span className="text-white font-bold">${selectedService.priceAuto?.toLocaleString('es-CL')}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 uppercase tracking-widest">SUV 2 Corr</span>
+                    <span className="text-gray-500 uppercase tracking-widest">SUV Medianos</span>
                     <span className="text-white font-bold">${selectedService.priceSuv2?.toLocaleString('es-CL')}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500 uppercase tracking-widest">SUV 3 Corr</span>
+                    <span className="text-gray-500 uppercase tracking-widest">SUV Grandes</span>
                     <span className="text-white font-bold">${selectedService.priceSuv3?.toLocaleString('es-CL')}</span>
                   </div>
                   <div className="border-t border-white/10 pt-3 mt-3 flex justify-between items-center text-sm">

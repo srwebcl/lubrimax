@@ -88,9 +88,15 @@ export async function getAvailableSlots(dateString: string, serviceIds: string[]
       // Calcular a qué hora terminaría el servicio si empieza en este slot
       const slotEndTime = addMinutes(currentSlotTime, totalDuration);
 
-      // Regla 1: El servicio NO puede terminar después del horario de cierre
+      let effectiveSlotEnd = slotEndTime;
+      // Regla 1: Si el servicio termina después del horario de cierre, permitimos agendarlo
+      // SOLAMENTE si queda al menos 1 hora de trabajo hoy para recibirlo y empezar.
       if (isAfter(slotEndTime, endOfDayTime)) {
-        break; // Si este no entra, los siguientes tampoco
+        effectiveSlotEnd = endOfDayTime;
+        if (endOfDayTime.getTime() - currentSlotTime.getTime() < 60 * 60 * 1000) {
+          currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
+          continue; // Pasamos al siguiente slot, no hay tiempo para empezar hoy
+        }
       }
 
       // Regla 2: Descartar horarios que no cumplen con la anticipación mínima
@@ -113,9 +119,9 @@ export async function getAvailableSlots(dateString: string, serviceIds: string[]
 
         if (
           (isBefore(currentSlotTime, bookingEnd) || isEqual(currentSlotTime, bookingEnd)) &&
-          (isAfter(slotEndTime, bookingStart) || isEqual(slotEndTime, bookingStart)) &&
+          (isAfter(effectiveSlotEnd, bookingStart) || isEqual(effectiveSlotEnd, bookingStart)) &&
           !isEqual(currentSlotTime, bookingEnd) && 
-          !isEqual(slotEndTime, bookingStart)
+          !isEqual(effectiveSlotEnd, bookingStart)
         ) {
           overlappingCount++;
         }

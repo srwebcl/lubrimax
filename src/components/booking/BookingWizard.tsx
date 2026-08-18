@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
@@ -19,6 +19,7 @@ type Service = {
   priceSuv2: number | null;
   priceSuv3: number | null;
   category: string;
+  variants?: any;
 };
 
 type ConfirmedBooking = {
@@ -40,14 +41,34 @@ export default function BookingWizard() {
   // Form State
   const [vehicleType, setVehicleType] = useState<string>("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  const selectedServicesData = services.filter(s => selectedServices.includes(s.id));
+
+  const totalDurationMinutes = useMemo(() => {
+    return selectedServicesData.reduce((sum, s) => {
+      let duration = s.duration;
+      const variantName = selectedVariants[s.id];
+      if (s.variants && variantName) {
+        const vObj = s.variants.find((v: any) => v.name === variantName);
+        if (vObj && vObj.duration) duration = vObj.duration;
+      }
+      return sum + duration;
+    }, 0);
+  }, [selectedServicesData, selectedVariants]);
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     email: "",
     plate: "",
+    vehicleMake: "",
+    vehicleModel: "",
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +85,12 @@ export default function BookingWizard() {
     async function loadServicesAndSession() {
       const data = await getServices();
       setServices(data as Service[]);
+
+      // Auto-seleccionar servicio si viene en la URL
+      const urlServiceId = searchParams.get("service");
+      if (urlServiceId && data.some((s: any) => s.id === urlServiceId)) {
+        setSelectedServices([urlServiceId]);
+      }
 
       const session = await getSessionCustomer();
       if (session) {
@@ -110,9 +137,11 @@ export default function BookingWizard() {
   useEffect(() => {
     if (selectedDate && selectedServices.length > 0) {
       async function fetchSlots() {
+        setIsLoadingSlots(true);
         const slots = await getAvailableSlots(format(selectedDate!, "yyyy-MM-dd"), selectedServices);
         setAvailableSlots(slots);
         setSelectedSlot("");
+        setIsLoadingSlots(false);
       }
       fetchSlots();
     }
@@ -132,8 +161,15 @@ export default function BookingWizard() {
   // Precio "de vitrina" para que el usuario vea cuánto va a pagar; el monto
   // que realmente se cobra se recalcula en el servidor (ver
   // /api/webpay/booking/create) antes de crear la transacción Webpay.
-  const selectedServicesData = services.filter(s => selectedServices.includes(s.id));
-  let totalAmount = selectedServicesData.reduce((sum, s) => sum + sharedGetExactPrice(s, vehicleType), 0);
+
+  let totalAmount = selectedServicesData.reduce((sum, s) => {
+    let source = s;
+    if (s.variants && s.variants.length > 0 && selectedVariants[s.id]) {
+      const selectedVariant = s.variants.find((v: any) => v.name === selectedVariants[s.id]);
+      if (selectedVariant) source = selectedVariant;
+    }
+    return sum + sharedGetExactPrice(source as any, vehicleType);
+  }, 0);
 
   // Aplicar descuento del club
   const discountPercent = customerInfo?.membership?.discountPercent || 0;
@@ -144,8 +180,8 @@ export default function BookingWizard() {
   const reservationAmount = Math.round(totalAmount * RESERVATION_PERCENT);
 
   const handlePayment = async (type: 'RESERVATION' | 'FULL') => {
-    if (!formData.name || !formData.phone || !formData.plate) {
-      alert("Por favor completa los datos de contacto y patente.");
+    if (!formData.name || !formData.phone || !formData.plate || !formData.vehicleMake || !formData.vehicleModel) {
+      alert("Por favor completa todos los datos obligatorios (Contacto y Vehículo).");
       return;
     }
 
@@ -163,8 +199,11 @@ export default function BookingWizard() {
           date: format(selectedDate, "yyyy-MM-dd"),
           startTime: selectedSlot,
           serviceIds: selectedServices,
+          selectedVariants: selectedVariants,
           vehicleType,
           plate: formData.plate,
+          make: formData.vehicleMake,
+          model: formData.vehicleModel,
           customerName: formData.name,
           customerPhone: formData.phone,
           customerEmail: formData.email,
@@ -301,28 +340,117 @@ export default function BookingWizard() {
             <div className="flex justify-between items-end mb-8">
               <div>
                 <h3 className="text-2xl font-bold text-white mb-2 uppercase tracking-wider">2. Selecciona tu Servicio</h3>
-                <p className="text-gray-400">Precios exactos para: <strong className="text-brand-cyan">{vehicleType}</strong></p>
+                <p className="text-gray-400 mb-1">Precios exactos para: <strong className="text-brand-cyan">{vehicleType}</strong></p>
+                <p className="text-brand-cyan text-sm font-medium bg-brand-cyan/10 inline-block px-3 py-1 rounded border border-brand-cyan/20">Puedes seleccionar uno o más servicios</p>
               </div>
             </div>
             
-            <div className="space-y-8 mb-8 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-8 mb-8">
               {Array.from(new Set(services.map(s => s.category))).map(category => (
                 <div key={category}>
                   <h4 className="text-sm font-bold text-brand-cyan uppercase tracking-widest mb-4 border-b border-brand-cyan/20 pb-2">
                     {category}
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-2.5">
                     {services.filter(s => s.category === category).map(s => {
-                      const exactPrice = sharedGetExactPrice(s, vehicleType);
+                      const isSelected = selectedServices.includes(s.id);
+                      
+                      let exactPrice = sharedGetExactPrice(s as any, vehicleType);
+                      const hasVariants = s.variants && s.variants.length > 0;
+                      let selectedVariantName = selectedVariants[s.id];
+                      
+                      if (hasVariants) {
+                        if (selectedVariantName) {
+                          const variant = s.variants.find((v: any) => v.name === selectedVariantName);
+                          if (variant) exactPrice = sharedGetExactPrice(variant, vehicleType);
+                        } else if (s.variants[0]) {
+                          exactPrice = sharedGetExactPrice(s.variants[0], vehicleType); // Mostrar "Desde" con la primera
+                        }
+                      }
+
                       return (
-                        <button
-                          key={s.id}
-                          onClick={() => setSelectedServices(prev => prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id])}
-                          className={`p-4 text-left border rounded-lg transition-all duration-300 flex flex-col ${selectedServices.includes(s.id) ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'border-white/10 bg-black/20 hover:border-brand-cyan/50 hover:bg-white/5'}`}
-                        >
-                          <div className="font-bold text-sm md:text-base text-white mb-1 leading-tight">{s.name}</div>
-                          <div className="text-brand-cyan text-base md:text-lg font-black mt-auto pt-2">${exactPrice.toLocaleString('es-CL')}</div>
-                        </button>
+                        <div key={s.id} className={`border rounded-lg transition-all duration-300 flex flex-col ${isSelected ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_15px_rgba(56,189,248,0.2)]' : 'border-white/10 bg-black/20 hover:border-brand-cyan/50 hover:bg-white/5'}`}>
+                          <button
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedServices(prev => prev.filter(id => id !== s.id));
+                                const newVars = { ...selectedVariants };
+                                delete newVars[s.id];
+                                setSelectedVariants(newVars);
+                              } else {
+                                setSelectedServices(prev => [...prev, s.id]);
+                                if (hasVariants && !selectedVariants[s.id]) {
+                                  setSelectedVariants(prev => ({ ...prev, [s.id]: s.variants[0].name }));
+                                }
+                              }
+                            }}
+                            className="p-4 text-left w-full flex items-center justify-between gap-4"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`w-5 h-5 rounded-[4px] border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'border-brand-cyan bg-brand-cyan' : 'border-white/20 bg-black/20'}`}>
+                                {isSelected && (
+                                  <svg className="w-3.5 h-3.5 text-brand-pure" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="font-bold text-sm md:text-base text-white leading-tight">{s.name}</div>
+                            </div>
+                            <div className="text-brand-cyan text-sm md:text-base font-black whitespace-nowrap">
+                              {hasVariants && !isSelected ? "Desde " : ""}${exactPrice.toLocaleString('es-CL')}
+                            </div>
+                          </button>
+                          
+                          {isSelected && hasVariants && (
+                            <div className="px-4 pb-4 border-t border-brand-cyan/20 pt-3 mt-auto relative z-10">
+                              <label className="block text-gray-400 text-[10px] uppercase tracking-widest font-bold mb-2">Selecciona Opción</label>
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={() => setOpenDropdown(openDropdown === s.id ? null : s.id)}
+                                  className="w-full bg-black/50 border border-brand-cyan/30 hover:border-brand-cyan/60 transition-colors rounded px-3 py-2.5 text-white text-xs flex justify-between items-center"
+                                >
+                                  <span>{selectedVariants[s.id] || "Seleccionar..."}</span>
+                                  <svg className={`w-4 h-4 text-brand-cyan transition-transform ${openDropdown === s.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </button>
+                                
+                                <AnimatePresence>
+                                  {openDropdown === s.id && (
+                                    <>
+                                      <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)} />
+                                      <motion.div 
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -10 }}
+                                        className="relative w-full mt-1 bg-[#1a1f2e] border border-brand-cyan/30 rounded-lg overflow-hidden z-50"
+                                      >
+                                        {s.variants.map((v: any, idx: number) => {
+                                          const isVarSelected = selectedVariants[s.id] === v.name;
+                                          return (
+                                            <button
+                                              key={idx}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedVariants(prev => ({ ...prev, [s.id]: v.name }));
+                                                setOpenDropdown(null);
+                                              }}
+                                              className={`w-full text-left px-4 py-3 text-xs flex justify-between items-center transition-colors ${isVarSelected ? 'bg-brand-cyan/20 text-brand-cyan font-bold' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                            >
+                                              <span>{v.name}</span>
+                                              <span className="opacity-70 font-mono">${sharedGetExactPrice(v, vehicleType).toLocaleString('es-CL')}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </motion.div>
+                                    </>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -330,20 +458,22 @@ export default function BookingWizard() {
               ))}
             </div>
 
-            <div className="flex flex-col-reverse sm:flex-row justify-between gap-4">
-              <button 
-                onClick={handlePrev}
-                className="w-full sm:w-auto bg-transparent border border-white/10 text-white px-4 md:px-8 py-3 rounded hover:bg-white/5 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
-              >
-                Volver
-              </button>
-              <button 
-                disabled={selectedServices.length === 0}
-                onClick={handleNext}
-                className="w-full sm:w-auto bg-brand-chrome text-brand-pure px-4 md:px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
-              >
-                Continuar al Calendario
-              </button>
+            <div className="sticky bottom-0 bg-[#0f1115]/95 backdrop-blur-md pt-4 pb-2 border-t border-white/10 z-20 mt-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-between gap-4">
+                <button 
+                  onClick={handlePrev}
+                  className="w-full sm:w-auto bg-transparent border border-white/10 text-white px-4 md:px-8 py-3 rounded hover:bg-white/5 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap"
+                >
+                  Volver
+                </button>
+                <button 
+                  disabled={selectedServices.length === 0}
+                  onClick={handleNext}
+                  className="w-full sm:w-auto bg-brand-chrome text-brand-pure px-4 md:px-8 py-3 rounded hover:bg-brand-cyan disabled:opacity-50 transition-colors uppercase tracking-wider md:tracking-widest font-bold text-xs md:text-sm whitespace-nowrap shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                >
+                  Continuar al Calendario
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -352,6 +482,15 @@ export default function BookingWizard() {
           <motion.div key="step3" variants={variants} initial="initial" animate="animate" exit="exit">
             <h3 className="text-2xl font-bold text-white mb-6 uppercase tracking-wider">3. Selecciona Fecha y Hora</h3>
             
+            {totalDurationMinutes >= 300 && (
+              <div className="mb-6 bg-brand-cyan/10 border border-brand-cyan/30 p-4 rounded-lg flex items-start gap-3">
+                <svg className="w-5 h-5 text-brand-cyan flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="text-sm text-brand-cyan/90 leading-relaxed">
+                  <strong>Servicio Extenso:</strong> Has seleccionado servicios de larga duración. El sistema agendará la fecha y hora de <strong>ingreso</strong> del vehículo, pero la entrega final podría realizarse al día siguiente (se coordinará directamente en el taller).
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
               <div className="bg-brand-pure p-4 rounded-xl border border-white/5 flex justify-center h-fit">
                 <style>{`
@@ -374,7 +513,12 @@ export default function BookingWizard() {
               <div>
                 <label className="block text-gray-400 text-sm uppercase tracking-widest mb-4">Horarios Disponibles</label>
                 {!selectedDate ? (
-                  <p className="text-gray-500 text-sm bg-black/20 p-4 rounded">Selecciona un día en el calendario para calcular disponibilidad técnica.</p>
+                  <p className="text-gray-500 text-sm bg-black/20 p-4 rounded border border-white/5">Selecciona un día en el calendario para calcular disponibilidad técnica.</p>
+                ) : isLoadingSlots ? (
+                  <div className="bg-black/20 p-8 rounded border border-white/5 flex flex-col items-center justify-center gap-3">
+                    <div className="w-8 h-8 border-4 border-brand-cyan/20 border-t-brand-cyan rounded-full animate-spin"></div>
+                    <p className="text-brand-cyan text-sm animate-pulse">Buscando horarios...</p>
+                  </div>
                 ) : availableSlots.length === 0 ? (
                   <p className="text-red-400 text-sm bg-red-900/10 p-4 rounded border border-red-900/50">Agenda completa o sin tiempo suficiente para este servicio.</p>
                 ) : (
@@ -416,25 +560,45 @@ export default function BookingWizard() {
             <h3 className="text-2xl font-bold text-white mb-6 uppercase tracking-wider">4. Checkout y Confirmación</h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-              <div className="lg:col-span-3 space-y-4">
-                <h4 className="text-brand-cyan text-sm uppercase tracking-widest font-bold mb-4">Tus Datos</h4>
-                <div>
-                  <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2">Nombre Completo</label>
-                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-brand-pure border border-white/10 rounded p-3 text-white focus:outline-none focus:border-brand-cyan" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+              <div className="lg:col-span-3 space-y-6 pr-0 lg:pr-6">
+                <h4 className="text-brand-cyan text-sm uppercase tracking-widest font-bold mb-6 border-b border-white/10 pb-4">Tus Datos de Contacto y Vehículo</h4>
+                
+                <div className="space-y-5">
+                  {/* Fila 1: Nombre */}
                   <div>
-                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2">Teléfono</label>
-                    <input required type="text" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-brand-pure border border-white/10 rounded p-3 text-white focus:outline-none focus:border-brand-cyan" />
+                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Nombre Completo</label>
+                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600" placeholder="Ej: Juan Pérez" />
                   </div>
+
+                  {/* Fila 2: Email */}
                   <div>
-                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2">Patente</label>
-                    <input required type="text" value={formData.plate} onChange={e => setFormData({...formData, plate: e.target.value})} className="w-full bg-brand-pure border border-white/10 rounded p-3 text-white focus:outline-none focus:border-brand-cyan" />
+                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Email</label>
+                    <input required type="email" placeholder="Ej: correo@gmail.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600" />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2">Email</label>
-                  <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-brand-pure border border-white/10 rounded p-3 text-white focus:outline-none focus:border-brand-cyan" />
+
+                  {/* Fila 3: Teléfono */}
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Teléfono</label>
+                    <input required type="text" placeholder="Ej: +56912345678" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600" />
+                  </div>
+
+                  {/* Fila 4: Marca del Vehículo */}
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Marca del Vehículo</label>
+                    <input required type="text" placeholder="Ej: Toyota" value={formData.vehicleMake} onChange={e => setFormData({...formData, vehicleMake: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600" />
+                  </div>
+
+                  {/* Fila 5: Modelo */}
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Modelo</label>
+                    <input required type="text" placeholder="Ej: Yaris" value={formData.vehicleModel} onChange={e => setFormData({...formData, vehicleModel: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600" />
+                  </div>
+
+                  {/* Fila 6: Patente */}
+                  <div>
+                    <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Patente</label>
+                    <input required type="text" placeholder="Ej: XXYY12" value={formData.plate} onChange={e => setFormData({...formData, plate: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600 uppercase" />
+                  </div>
                 </div>
               </div>
 
@@ -445,7 +609,12 @@ export default function BookingWizard() {
                   <div className="space-y-4 mb-6">
                     <div className="flex justify-between text-sm gap-4">
                       <span className="text-gray-400">Servicios</span>
-                      <span className="text-white font-bold text-right">{selectedServicesData.map(s => s.name).join(" + ")}</span>
+                      <span className="text-white font-bold text-right">
+                        {selectedServicesData.map(s => {
+                          const variant = selectedVariants[s.id];
+                          return variant ? `${s.name} (${variant})` : s.name;
+                        }).join(" + ")}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Vehículo</span>

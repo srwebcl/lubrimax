@@ -5,8 +5,8 @@
 
 export const VEHICLE_TYPES = [
   'Auto / Hatchback',
-  'SUV 2 Corridas',
-  'SUV 3 Corridas / Camioneta',
+  'SUV Medianos',
+  'SUV Grandes',
 ] as const;
 
 export type VehicleType = (typeof VEHICLE_TYPES)[number];

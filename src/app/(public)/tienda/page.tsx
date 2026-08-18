@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getPublicProducts } from "@/actions/store";
+import { getSettings } from "@/actions/admin-settings";
 import { useCart } from "@/components/providers/CartProvider";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,6 +22,8 @@ type Product = {
 
 export default function TiendaPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [storeBanners, setStoreBanners] = useState<string[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(true);
   const { itemCount } = useCart();
   
@@ -32,12 +35,25 @@ export default function TiendaPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const data = await getPublicProducts();
+      const [data, settings] = await Promise.all([
+        getPublicProducts(),
+        getSettings()
+      ]);
       setProducts(data as any[]);
+      setStoreBanners(settings.storeBanners || []);
       setLoading(false);
     }
     load();
   }, []);
+
+  // Auto-slide carousel
+  useEffect(() => {
+    if (storeBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % storeBanners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [storeBanners]);
 
   const categories = Array.from(new Set(products.map(p => p.category?.name))).filter(Boolean) as string[];
 
@@ -58,29 +74,67 @@ export default function TiendaPage() {
   return (
     <div className="min-h-screen bg-brand-pure font-sans">
       
-      {/* 🌟 E-COMMERCE HERO BANNER */}
-      <div className="relative pt-32 pb-20 px-6 lg:px-8 border-b border-white/5 overflow-hidden">
-        {/* Background Effects */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-cyan/10 via-brand-pure to-brand-pure pointer-events-none"></div>
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-[url('/mesh-bg.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
-        
-        <div className="max-w-7xl mx-auto relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-8">
-          <motion.div 
-            initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}
-            className="max-w-2xl"
-          >
-            <div className="inline-block px-4 py-1.5 rounded-full border border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan text-[10px] font-bold uppercase tracking-[0.2em] mb-6">
-              Catálogo Oficial
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-32 pb-4">
+        {/* 🌟 E-COMMERCE HERO BANNER */}
+        {storeBanners.length > 0 ? (
+          <section className="relative w-full mb-16 text-center rounded-[3rem] overflow-hidden border border-brand-cyan/10 shadow-[0_0_50px_rgba(56,189,248,0.05)] bg-black">
+            <div className="relative w-full aspect-video md:aspect-[21/9] lg:aspect-[24/9] max-h-[500px]">
+              <AnimatePresence mode="wait">
+                <motion.img 
+                  key={currentSlide}
+                  src={storeBanners[currentSlide]}
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ duration: 0.5 }}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  alt={`LUBRIMAX Store Banner ${currentSlide + 1}`}
+                />
+              </AnimatePresence>
+              
+              {/* Carousel Dots */}
+              {storeBanners.length > 1 && (
+                <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3 z-20">
+                  {storeBanners.map((_, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => setCurrentSlide(idx)}
+                      className={`w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-md ${currentSlide === idx ? 'bg-brand-cyan scale-125' : 'bg-white/50 hover:bg-white/80'}`}
+                      aria-label={`Ir al banner ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              )}
+              {/* Inner shadows for premium feel */}
+              <div className="absolute inset-0 shadow-[inset_0_0_100px_rgba(0,0,0,0.5)] pointer-events-none"></div>
             </div>
-            <h1 className="text-5xl md:text-7xl font-bold text-white uppercase tracking-tighter mb-6 leading-none">
-              LUBRIMAX <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-brand-blue italic font-light tracking-widest">Store</span>
-            </h1>
-            <p className="text-gray-400 text-lg md:text-xl font-light leading-relaxed max-w-xl">
-              Equipamiento premium, accesorios de detailing y aromas exclusivos. Eleva la estética de tu vehículo al estándar <span className="text-white font-bold">LUBRIMAX</span>.
-            </p>
-          </motion.div>
-        </div>
+          </section>
+        ) : (
+          <section className="relative w-full mb-16 text-center py-24 rounded-[3rem] overflow-hidden border border-brand-cyan/10 shadow-[0_0_50px_rgba(56,189,248,0.05)]">
+            {/* Default Background Image */}
+            <div className="absolute inset-0 bg-[url('https://pub-d1c3e2214af141ec8ef9a12538f88a3d.r2.dev/1787073616064-detailing-inteior-1.jpeg_202608171512.jpeg')] bg-cover bg-center bg-no-repeat opacity-20"></div>
+            {/* Gradient Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/50 to-transparent pointer-events-none"></div>
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_var(--tw-colors-brand-pure)_100%)] pointer-events-none"></div>
+            
+            <div className="relative z-10 flex flex-col items-center text-center">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut" }}
+                className="flex flex-col items-center"
+              >
+                <div className="inline-block text-[10px] uppercase tracking-widest font-bold border px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm text-brand-cyan border-brand-cyan/30 bg-brand-cyan/10">
+                  Catálogo Oficial
+                </div>
+                <h1 className="text-4xl md:text-5xl font-black uppercase tracking-widest italic mb-4 drop-shadow-xl text-white">
+                  LUBRIMAX <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-cyan to-brand-blue font-light">Store</span>
+                </h1>
+                <p className="text-gray-300 max-w-2xl mx-auto text-lg drop-shadow-md">
+                  Equipamiento premium, accesorios de detailing y aromas exclusivos. Eleva la estética de tu vehículo al estándar <span className="text-white font-bold">LUBRIMAX</span>.
+                </p>
+              </motion.div>
+            </div>
+          </section>
+        )}
       </div>
 
       {/* 🛍 E-COMMERCE MAIN LAYOUT */}

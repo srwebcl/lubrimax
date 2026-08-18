@@ -40,7 +40,7 @@ export default function Navbar() {
             </Link>
             
             <div className="relative group">
-              <Link href="/#servicios" className={`${pathname.includes("/servicios") ? "text-brand-cyan font-bold" : "text-gray-300 hover:text-white"} transition-colors duration-300 font-medium py-4 flex items-center gap-1 text-sm uppercase tracking-wider`}>
+              <Link href="/#servicios" prefetch={false} className={`${pathname.includes("/servicios") ? "text-brand-cyan font-bold" : "text-gray-300 hover:text-white"} transition-colors duration-300 font-medium py-4 flex items-center gap-1 text-sm uppercase tracking-wider`}>
                 Servicios
                 <svg className="w-4 h-4 opacity-70 group-hover:rotate-180 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </Link>
@@ -50,7 +50,7 @@ export default function Navbar() {
                   <div className="absolute inset-0 bg-gradient-to-br from-brand-cyan/5 to-transparent pointer-events-none" />
                   
                   {/* Lavados */}
-                  <Link href="/servicios/lavados" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
+                  <Link href="/servicios/lavados" prefetch={false} className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
                       <Image src="https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&q=80" alt="Lavados" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
@@ -61,7 +61,7 @@ export default function Navbar() {
                   </Link>
 
                   {/* Detailing */}
-                  <Link href="/servicios/detailing" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
+                  <Link href="/servicios/detailing" prefetch={false} className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
                       <Image src="https://images.unsplash.com/photo-1601362840469-51e4d8d58785?auto=format&fit=crop&q=80" alt="Detailing" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
@@ -72,7 +72,7 @@ export default function Navbar() {
                   </Link>
 
                   {/* Extras */}
-                  <Link href="/servicios/extras" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
+                  <Link href="/servicios/extras" prefetch={false} className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
                       <Image src="https://images.unsplash.com/photo-1518987048-93e29699e79a?auto=format&fit=crop&q=80" alt="Extras" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>
@@ -83,7 +83,7 @@ export default function Navbar() {
                   </Link>
 
                   {/* Mecánica */}
-                  <Link href="/servicios/mecanica" className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
+                  <Link href="/servicios/mecanica" prefetch={false} className="group/item flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all border border-transparent hover:border-white/5 relative z-10">
                     <div className="w-16 h-16 rounded-lg overflow-hidden relative shadow-lg">
                       <Image src="https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&q=80" alt="Mecánica" fill sizes="64px" className="object-cover group-hover/item:scale-110 transition-transform duration-500" />
                     </div>

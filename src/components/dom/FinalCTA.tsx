@@ -4,16 +4,16 @@ import Link from "next/link";
 export default function FinalCTA() {
   return (
     <section className="relative py-24 bg-brand-pure overflow-hidden border-t border-white/5 border-b">
-      {/* Imagen de Fondo Premium */}
+      {/* Imagen de Fondo Premium con Parallax CSS */}
       <div 
-        className="absolute inset-0 z-0 opacity-60"
+        className="absolute inset-0 z-0 opacity-80 bg-fixed"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1611821064430-0d40221e4f03?auto=format&fit=crop&q=80&w=2000')`,
+          backgroundImage: `url('/images/lavados/detailing-premium.jpeg_202608151447.jpeg')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/80 to-transparent z-0" />
+      <div className="absolute inset-0 bg-gradient-to-t from-brand-pure via-brand-pure/60 to-brand-pure/20 z-0" />
       <div className="absolute inset-0 bg-gradient-to-r from-brand-pure via-transparent to-brand-pure z-0" />
 
       {/* Resplandor Central */}

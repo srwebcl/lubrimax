@@ -23,7 +23,11 @@ async function isSlotStillAvailable(dateString: string, startTime: string, servi
 
   const [sHour, sMin] = startTime.split(":").map(Number);
   const slotStart = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-  const slotEnd = addMinutes(slotStart, serviceDuration);
+  let slotEnd = addMinutes(slotStart, serviceDuration);
+  const endOfDay = new Date(year, month - 1, day, 18, 0, 0, 0); // Asumimos cierre 18:00
+  if (slotEnd > endOfDay) {
+    slotEnd = endOfDay;
+  }
 
   // Chequeo de colisión contra todas las reservas activas del día.
   const existing = await prisma.booking.findMany({
@@ -64,14 +68,24 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: flattenZodError(parsed.error) }, { status: 400 });
     }
-    const { date, startTime, serviceIds, vehicleType, plate, customerName, customerPhone, customerEmail, paymentType } = parsed.data;
+    const { date, startTime, serviceIds, selectedVariants, vehicleType, plate, make, model, customerName, customerPhone, customerEmail, paymentType } = parsed.data;
 
     const services = await prisma.service.findMany({ where: { id: { in: serviceIds } } });
     if (services.length === 0) {
       return NextResponse.json({ error: "Servicios no encontrados." }, { status: 404 });
     }
 
-    const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
+    const totalDuration = services.reduce((sum, s) => {
+      let duration = s.duration;
+      if (s.variants && selectedVariants && selectedVariants[s.id]) {
+        const variantsArr = Array.isArray(s.variants) ? s.variants : typeof s.variants === 'string' ? JSON.parse(s.variants) : [];
+        const selectedVariant = variantsArr.find((v: any) => v.name === selectedVariants[s.id]);
+        if (selectedVariant && selectedVariant.duration) {
+          duration = selectedVariant.duration;
+        }
+      }
+      return sum + duration;
+    }, 0);
     const stillAvailable = await isSlotStillAvailable(date, startTime, totalDuration);
     if (!stillAvailable) {
       return NextResponse.json({ error: "El horario seleccionado ya no está disponible." }, { status: 409 });
@@ -80,7 +94,15 @@ export async function POST(request: Request) {
     // Precio calculado 100% en servidor: nunca confiar en el monto que
     // pudiera mandar el cliente. Descuento de Club Lubrimax leído desde la
     // sesión de cookie (no desde el body).
-    let totalAmount = services.reduce((sum, s) => sum + getExactPrice(s, vehicleType), 0);
+    let totalAmount = services.reduce((sum, s) => {
+      let source = s;
+      if (s.variants && selectedVariants && selectedVariants[s.id]) {
+        const variantsArr = Array.isArray(s.variants) ? s.variants : typeof s.variants === 'string' ? JSON.parse(s.variants) : [];
+        const selectedVariant = variantsArr.find((v: any) => v.name === selectedVariants[s.id]);
+        if (selectedVariant) source = selectedVariant as any;
+      }
+      return sum + getExactPrice(source as any, vehicleType);
+    }, 0);
     const customer = await getSessionCustomer();
     const discountPercent = customer?.membership?.discountPercent || 0;
     if (discountPercent > 0) {
@@ -96,7 +118,12 @@ export async function POST(request: Request) {
     const [year, month, day] = date.split("-").map(Number);
     const [sHour, sMin] = startTime.split(":").map(Number);
     const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-    const end = addMinutes(start, totalDuration);
+    const endOfDay = new Date(year, month - 1, day, 18, 0, 0, 0);
+    
+    let end = addMinutes(start, totalDuration);
+    if (end > endOfDay) {
+      end = endOfDay; // Tope al final del día para evitar wrap-arounds de Date
+    }
     const endTimeStr = format(end, "HH:mm");
 
     // Reservamos el horario como PENDING antes de ir a Webpay para evitar
@@ -110,9 +137,10 @@ export async function POST(request: Request) {
         customerName,
         customerPhone,
         customerEmail: customerEmail || null,
-        vehicleMake: vehicleType,
-        vehicleModel: plate,
+        vehicleMake: `${vehicleType} - ${make}`,
+        vehicleModel: `${model} (Patente: ${plate})`,
         services: { connect: serviceIds.map(id => ({ id })) },
+        selectedOptions: selectedVariants || null,
         status: "PENDING",
         paymentStatus: "PENDING",
         paymentType,

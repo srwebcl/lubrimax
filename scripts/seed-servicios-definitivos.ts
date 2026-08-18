@@ -42,7 +42,7 @@ const services = [
   // --- DETAILING ---
   {
     name: 'Detailing Interior',
-    description: 'Tratamiento con alta tecnología y productos biodegradables: aspirado profundo, limpieza de tapiz de asientos, cabecera, alfombra, techo interior, puertas, panel central, sanitización de ductos y cabina, limpieza completa de porta maletas + regalo lavado exterior.',
+    description: 'Tratamiento con alta tecnología y productos biodegradables: aspirado profundo, limpieza de tapiz de asientos, cabecera, alfombra, techo interior, puertas, panel central, sanitización de ductos de ventilación y cabina (elimina ácaros, hongos y bacterias), limpieza completa de porta maletas + de regalo lavado exterior.',
     duration: 480,
     priceAuto: 150000,
     priceSuv2: 170000,
@@ -51,7 +51,7 @@ const services = [
   },
   {
     name: 'Detailing Exterior - Nanotecnología (7 meses)',
-    description: 'Lavado exterior, lavado de motor, desengrasantes y descontaminado de llantas, acondicionamiento de neumáticos, pulido en 3 pasos (corte grueso, intermedio y espejo) y sellado de pintura con Nanotecnología.',
+    description: 'Tratamiento con alta tecnología y productos profesionales: lavado exterior, lavado de motor, desengrasantes y descontaminado de llantas, acondicionamiento de neumáticos, pulido de corte grueso (elimina/atenúa rayas profundas), pulido de corte intermedio (rayas suaves y swirl), pulido de corte ultra fino (efecto espejo) y sellado de pintura con nanotecnología o cerámico.',
     duration: 480,
     priceAuto: 200000,
     priceSuv2: 250000,
@@ -60,7 +60,7 @@ const services = [
   },
   {
     name: 'Detailing Exterior - Cerámico (2 años)',
-    description: 'Lavado exterior, lavado de motor, descontaminado de llantas, pulido en 3 pasos y sellado de pintura con Cerámico 2 años.',
+    description: 'Tratamiento con alta tecnología y productos profesionales: lavado exterior, lavado de motor, desengrasantes y descontaminado de llantas, acondicionamiento de neumáticos, pulido de corte grueso (elimina/atenúa rayas profundas), pulido de corte intermedio (rayas suaves y swirl), pulido de corte ultra fino (efecto espejo) y sellado de pintura con nanotecnología o cerámico.',
     duration: 480,
     priceAuto: 260000,
     priceSuv2: 310000,
@@ -69,7 +69,7 @@ const services = [
   },
   {
     name: 'Detailing Exterior - Cerámico (3 años)',
-    description: 'Lavado exterior, lavado de motor, descontaminado de llantas, pulido en 3 pasos y sellado de pintura con Cerámico 3 años.',
+    description: 'Tratamiento con alta tecnología y productos profesionales: lavado exterior, lavado de motor, desengrasantes y descontaminado de llantas, acondicionamiento de neumáticos, pulido de corte grueso (elimina/atenúa rayas profundas), pulido de corte intermedio (rayas suaves y swirl), pulido de corte ultra fino (efecto espejo) y sellado de pintura con nanotecnología o cerámico.',
     duration: 480,
     priceAuto: 320000,
     priceSuv2: 370000,
@@ -78,7 +78,7 @@ const services = [
   },
   {
     name: 'Detailing Premium - Nanotecnología (7 meses)',
-    description: 'Combina el detailing exterior completo (lavado, pulido 3 pasos, sellado Nanotecnología) con el tratamiento interior completo.',
+    description: 'Combina el detailing exterior completo (lavado, pulido en 3 pasos, sellado nanotecnología/cerámico) con el tratamiento interior completo (aspirado profundo, tapiz, cabecera, alfombra, techo, puertas, panel central, sanitización de ductos y cabina).',
     duration: 480,
     priceAuto: 300000,
     priceSuv2: 370000,
@@ -87,7 +87,7 @@ const services = [
   },
   {
     name: 'Detailing Premium - Cerámico (2 años)',
-    description: 'Combina el detailing exterior completo (sellado Cerámico 2 años) con el tratamiento interior completo.',
+    description: 'Combina el detailing exterior completo (lavado, pulido en 3 pasos, sellado nanotecnología/cerámico) con el tratamiento interior completo (aspirado profundo, tapiz, cabecera, alfombra, techo, puertas, panel central, sanitización de ductos y cabina).',
     duration: 480,
     priceAuto: 360000,
     priceSuv2: 430000,
@@ -96,7 +96,7 @@ const services = [
   },
   {
     name: 'Detailing Premium - Cerámico (3 años)',
-    description: 'Combina el detailing exterior completo (sellado Cerámico 3 años) con el tratamiento interior completo.',
+    description: 'Combina el detailing exterior completo (lavado, pulido en 3 pasos, sellado nanotecnología/cerámico) con el tratamiento interior completo (aspirado profundo, tapiz, cabecera, alfombra, techo, puertas, panel central, sanitización de ductos y cabina).',
     duration: 480,
     priceAuto: 420000,
     priceSuv2: 490000,
@@ -205,14 +205,25 @@ const services = [
     category: 'Extras'
   },
 
-  // Grabados de Patente
-  { name: 'Grabado de Patentes - Solo patente', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 25000, priceSuv2: 25000, priceSuv3: 25000, category: 'Extras' },
-  { name: 'Grabado de Patentes - Solo la marca', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 25000, priceSuv2: 25000, priceSuv3: 25000, category: 'Extras' },
-  { name: 'Grabado de Patentes - Solo número VIN', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 25000, priceSuv2: 25000, priceSuv3: 25000, category: 'Extras' },
-  { name: 'Grabado de Patentes - Marca + N° VIN', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 30000, priceSuv2: 30000, priceSuv3: 30000, category: 'Extras' },
-  { name: 'Grabado de Patentes - Marca + Patente', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 30000, priceSuv2: 30000, priceSuv3: 30000, category: 'Extras' },
-  { name: 'Grabado de Patentes - N° VIN + Patente', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 30000, priceSuv2: 30000, priceSuv3: 30000, category: 'Extras' },
-  { name: 'Grabado de Patentes - Logo + Patente + N° VIN', description: 'Válido hasta 10 vidrios.', duration: 35, priceAuto: 35000, priceSuv2: 35000, priceSuv3: 35000, category: 'Extras' },
+  // Grabados
+  { 
+    name: 'Grabado de Patentes', 
+    description: 'Grabado de seguridad válido hasta 10 vidrios.', 
+    duration: 35, 
+    priceAuto: 25000, 
+    priceSuv2: 25000, 
+    priceSuv3: 25000, 
+    category: 'Extras',
+    variants: [
+      { name: 'Solo patente', duration: 35, priceAuto: 25000, priceSuv2: 25000, priceSuv3: 25000 },
+      { name: 'Solo la marca', duration: 35, priceAuto: 25000, priceSuv2: 25000, priceSuv3: 25000 },
+      { name: 'Solo número VIN', duration: 35, priceAuto: 25000, priceSuv2: 25000, priceSuv3: 25000 },
+      { name: 'Marca + N° VIN', duration: 35, priceAuto: 30000, priceSuv2: 30000, priceSuv3: 30000 },
+      { name: 'Marca + Patente', duration: 35, priceAuto: 30000, priceSuv2: 30000, priceSuv3: 30000 },
+      { name: 'N° VIN + Patente', duration: 35, priceAuto: 30000, priceSuv2: 30000, priceSuv3: 30000 },
+      { name: 'Logo + Patente + N° VIN', duration: 35, priceAuto: 35000, priceSuv2: 35000, priceSuv3: 35000 }
+    ]
+  },
 
   // --- MECÁNICA (Consultar por interno, price: null) ---
   { name: 'Mecánica - Cambio de pastillas de frenos', description: 'Consultar valor vía WhatsApp.', duration: 60, priceAuto: null, priceSuv2: null, priceSuv3: null, category: 'Mecánica' },

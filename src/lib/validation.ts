@@ -39,9 +39,12 @@ export const bookingPaymentSchema = z.object({
   serviceIds: z.array(z.string()).min(1, "Debe seleccionar al menos un servicio."),
   vehicleType: z.enum(VEHICLE_TYPES, { error: "Tipo de vehículo inválido." }),
   plate: z.string().trim().min(1, "Falta la patente.").max(20),
+  make: z.string().trim().min(1, "Falta la marca.").max(50),
+  model: z.string().trim().min(1, "Falta el modelo.").max(50),
   customerName: z.string().trim().min(2, "Falta el nombre.").max(200),
   customerPhone: z.string().trim().min(5, "Teléfono inválido.").max(30),
   customerEmail: z.union([z.email(), z.literal("")]).optional(),
+  selectedVariants: z.record(z.string(), z.string()).optional(),
   paymentType: z.enum(["RESERVATION", "FULL"], { error: "Tipo de pago inválido." }),
 });
 

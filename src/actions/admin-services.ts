@@ -9,6 +9,7 @@ export async function getAdminServices() {
     await requireAdmin();
 
     return await prisma.service.findMany({
+      include: { serviceCategory: true },
       orderBy: { category: 'asc' }
     });
   } catch (error) {
@@ -24,12 +25,34 @@ export async function createService(formData: FormData) {
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const category = formData.get("category") as string;
+    const categoryId = formData.get("categoryId") as string;
+    const image = formData.get("image") as string;
     const duration = parseInt(formData.get("duration") as string);
     const priceAuto = formData.get("priceAuto") ? parseInt(formData.get("priceAuto") as string) : null;
     const priceSuv2 = formData.get("priceSuv2") ? parseInt(formData.get("priceSuv2") as string) : null;
     const priceSuv3 = formData.get("priceSuv3") ? parseInt(formData.get("priceSuv3") as string) : null;
     const badgesStr = formData.get("badges") as string;
     const badges = badgesStr ? badgesStr.split(",").map(b => b.trim()).filter(b => b) : [];
+    
+    let variants = null;
+    const variantsStr = formData.get("variants") as string;
+    if (variantsStr) {
+      try {
+        variants = JSON.parse(variantsStr);
+      } catch (e) {
+        console.error("Invalid variants JSON");
+      }
+    }
+
+    let images: string[] = [];
+    const imagesStr = formData.get("images") as string;
+    if (imagesStr) {
+      try {
+        images = JSON.parse(imagesStr);
+      } catch (e) {
+        console.error("Invalid images JSON");
+      }
+    }
 
     if (!name || isNaN(duration)) {
       return { success: false, error: "Faltan campos obligatorios o son inválidos." };
@@ -40,11 +63,15 @@ export async function createService(formData: FormData) {
         name,
         description,
         category,
+        categoryId: categoryId || null,
+        image: image || null,
         duration,
         priceAuto,
         priceSuv2,
         priceSuv3,
         badges,
+        variants,
+        images,
       }
     });
 
@@ -88,12 +115,34 @@ export async function updateService(id: string, formData: FormData) {
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const category = formData.get("category") as string;
+    const categoryId = formData.get("categoryId") as string;
+    const image = formData.get("image") as string;
     const duration = parseInt(formData.get("duration") as string);
     const priceAuto = formData.get("priceAuto") ? parseInt(formData.get("priceAuto") as string) : null;
     const priceSuv2 = formData.get("priceSuv2") ? parseInt(formData.get("priceSuv2") as string) : null;
     const priceSuv3 = formData.get("priceSuv3") ? parseInt(formData.get("priceSuv3") as string) : null;
     const badgesStr = formData.get("badges") as string;
     const badges = badgesStr ? badgesStr.split(",").map(b => b.trim()).filter(b => b) : [];
+
+    let variants = null;
+    const variantsStr = formData.get("variants") as string;
+    if (variantsStr) {
+      try {
+        variants = JSON.parse(variantsStr);
+      } catch (e) {
+        console.error("Invalid variants JSON");
+      }
+    }
+
+    let images: string[] = [];
+    const imagesStr = formData.get("images") as string;
+    if (imagesStr) {
+      try {
+        images = JSON.parse(imagesStr);
+      } catch (e) {
+        console.error("Invalid images JSON");
+      }
+    }
 
     if (!name || isNaN(duration)) {
       return { success: false, error: "Faltan campos obligatorios o son inválidos." };
@@ -105,11 +154,15 @@ export async function updateService(id: string, formData: FormData) {
         name,
         description,
         category,
+        categoryId: categoryId || null,
+        image: image || null,
         duration,
         priceAuto,
         priceSuv2,
         priceSuv3,
         badges,
+        variants,
+        images,
       }
     });
 
