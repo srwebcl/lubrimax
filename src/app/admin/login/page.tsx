@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { login } from "@/actions/auth";
+import InstallCard from "@/components/pwa/InstallCard";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,10 @@ export default function LoginPage() {
             {loading ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
+
+        <div className="mt-6">
+          <InstallCard />
+        </div>
 
         <p className="text-center text-gray-600 text-xs mt-8">LUBRIMAX · La Serena</p>
       </div>
