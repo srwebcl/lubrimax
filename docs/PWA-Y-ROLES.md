@@ -57,39 +57,130 @@ para dejarlo en producción.
   autorización en sus mutaciones.
 - Rate limit de login por **IP y por correo**.
 
-## Pasos para producción
+## Pasos para producción (en este orden)
 
-1. **Variables de entorno** (local en `.env`, y en Vercel → Project Settings
-   → Environment Variables):
-   ```
-   STAFF_SESSION_SECRET=<openssl rand -base64 32>
-   ```
-   (Local ya quedó seteada. En Vercel hay que agregarla.)
+Todos los comandos se ejecutan **desde la raíz del proyecto**
+(`/Users/sebastianrodriguezmilla/proyectos-web/lubrimax`) y en la rama
+`feat/pwa-roles` (`git checkout feat/pwa-roles`).
 
-2. **Aplicar el schema a la BD** (aditivo, no borra datos):
-   ```
-   npx prisma db push
-   ```
-   > Requiere `DIRECT_URL`. Si prefieres migraciones versionadas:
-   > `npx prisma migrate dev --name staff_roles_pwa`.
+---
 
-3. **Crear el primer administrador**:
-   ```
-   SEED_ADMIN_EMAIL="dueno@lubrimax.cl" \
-   SEED_ADMIN_PASSWORD="una-clave-larga-y-unica" \
-   SEED_ADMIN_NAME="Nombre Apellido" \
-   npm run seed:admin
-   ```
-   Idempotente: se puede volver a correr para resetear esa cuenta.
+### Paso 1 — Generar el secreto de sesión del panel
 
-4. **Desde el panel** (`/admin/usuarios`): crear las cuentas de los
-   trabajadores con rol `Trabajador`.
+```bash
+openssl rand -base64 32
+```
 
-5. **Desplegar** la rama. Verificar que Vercel tiene `STAFF_SESSION_SECRET`
-   antes del deploy o el login fallará (a propósito, sin fallback inseguro).
+Copia la línea que imprime (ej. `k7Qh2v...=`, 44 caracteres). Es el valor de
+`STAFF_SESSION_SECRET`. Guárdalo, lo usas en los pasos 2 y 4.
 
-6. (Opcional) Quitar `ADMIN_USER` / `ADMIN_PASSWORD` de Vercel una vez creado
-   el primer admin.
+> En tu `.env` local ya hay un `STAFF_SESSION_SECRET` (lo generó el plan). Ese
+> sirve para desarrollo. Para producción usa **uno nuevo** de este paso.
+
+---
+
+### Paso 2 — Cargar las variables de entorno en Vercel
+
+En **vercel.com → proyecto `lubrimax` → Settings → Environment Variables**,
+agrega (marca los 3 entornos: Production, Preview, Development):
+
+| Name | Value |
+|---|---|
+| `STAFF_SESSION_SECRET` | el secreto del Paso 1 |
+
+Verifica que ya existan (deberían estar): `DATABASE_URL`, `DIRECT_URL`,
+`CUSTOMER_SESSION_SECRET`, `R2_*`, `RESEND_API_KEY`, `NEXT_PUBLIC_SITE_URL`.
+
+> Si `STAFF_SESSION_SECRET` no está en Vercel al desplegar, el login del panel
+> devuelve error 500 **a propósito** (no hay fallback inseguro).
+
+---
+
+### Paso 3 — Aplicar el schema a la base de datos
+
+Cambios **aditivos** (una tabla nueva `StaffUser`, un enum `StaffRole`, la
+columna `Booking.workStatus` con default, la tabla `BookingActivityLog`). No
+borra ni modifica datos existentes; el código actual en producción sigue
+funcionando aunque todavía no esté desplegada la rama.
+
+```bash
+npx prisma db push
+```
+
+Salida esperada: `🚀  Your database is now in sync with your Prisma schema.`
+Usa `DIRECT_URL` automáticamente.
+
+- Si pide `--accept-data-loss`: **DETENTE** y avisa — no debería pasar con
+  estos cambios.
+- Alternativa con migración versionada:
+  `npx prisma migrate dev --name staff_roles_pwa`.
+
+---
+
+### Paso 4 — Crear el primer administrador
+
+Reemplaza los 3 valores por los reales (correo con el que entrarás al panel y
+una contraseña de **mínimo 10 caracteres**):
+
+```bash
+SEED_ADMIN_EMAIL="tucorreo@ejemplo.com" \
+SEED_ADMIN_PASSWORD="una-clave-larga-y-unica" \
+SEED_ADMIN_NAME="Tu Nombre" \
+npm run seed:admin
+```
+
+Salida esperada: `✅ Usuario ADMIN creado: tucorreo@ejemplo.com`.
+Es idempotente: si lo vuelves a correr con el mismo correo, actualiza esa
+cuenta (sirve para resetear tu propia clave si te quedas afuera).
+
+> Este comando corre localmente pero escribe en la BD de producción (la de
+> `DATABASE_URL`). Es la misma que usará el sitio desplegado.
+
+---
+
+### Paso 5 — Desplegar la rama
+
+**Opción A (recomendada): merge a `main`**
+
+```bash
+git checkout main
+git merge feat/pwa-roles
+git push origin main
+```
+
+Vercel despliega solo. Espera a que el build termine en verde.
+
+**Opción B: preview primero**
+
+```bash
+git push origin feat/pwa-roles
+```
+
+Vercel crea una URL de Preview. Pruébala (Paso 7) y luego haz el merge de la
+Opción A.
+
+---
+
+### Paso 6 — Crear las cuentas de los trabajadores
+
+Entra al panel ya desplegado: `https://<tu-dominio>/admin/login` con el correo
+y clave del Paso 4.
+
+Ve a **Usuarios** (menú lateral) → **➕ Nuevo usuario**:
+- Nombre y apellido
+- Correo (con ese correo inicia sesión el trabajador)
+- Contraseña temporal (mín. 10 caracteres) — dásela al trabajador; él la
+  cambia después en **Mi perfil**
+- Rol: **Trabajador**
+
+Repite por cada trabajador.
+
+---
+
+### Paso 7 — Limpieza (opcional)
+
+Una vez que entras bien con tu cuenta nueva, en Vercel puedes **eliminar**
+`ADMIN_USER` y `ADMIN_PASSWORD` (ya no se usan para iniciar sesión).
 
 ## Checklist de pruebas (post-deploy)
 
