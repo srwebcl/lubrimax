@@ -9,6 +9,7 @@ import {
   forceLogoutStaff,
   deleteStaffUser,
 } from "@/actions/admin-staff";
+import { AddBtn, Sheet, Field, INPUT as KIT_INPUT, Msg, CARD } from "@/components/admin/kit";
 
 type StaffUser = {
   id: string;
@@ -20,8 +21,7 @@ type StaffUser = {
   createdAt: string;
 };
 
-const inputCls =
-  "w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan text-sm";
+const inputCls = KIT_INPUT;
 
 export default function UsersManager({
   initialUsers,
@@ -54,70 +54,50 @@ export default function UsersManager({
   }
 
   return (
-    <div className="space-y-6">
-      {msg && (
-        <div
-          className={`p-3 rounded-lg text-xs font-bold border ${
-            msg.type === "ok"
-              ? "bg-green-500/10 text-green-400 border-green-500/20"
-              : "bg-red-500/10 text-red-400 border-red-500/20"
-          }`}
-        >
-          {msg.text}
-        </div>
-      )}
+    <div className="space-y-4">
+      {msg && <Msg kind={msg.type}>{msg.text}</Msg>}
 
       <div className="flex justify-end">
-        <button
-          onClick={() => setShowCreate((v) => !v)}
-          className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors"
-        >
-          {showCreate ? "✕ Cancelar" : "➕ Nuevo usuario"}
-        </button>
+        <AddBtn label="Usuario" onClick={() => { setMsg(null); setShowCreate(true); }} />
       </div>
 
-      {showCreate && (
+      <Sheet open={showCreate} onClose={() => setShowCreate(false)} title="Nuevo usuario">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
             run(() => createStaffUser(fd), "Usuario creado.");
           }}
-          className="bg-brand-surface/80 border border-brand-cyan/30 rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 gap-4"
+          className="space-y-4"
         >
-          <input name="name" required placeholder="Nombre y apellido" className={inputCls} />
-          <input name="email" type="email" required placeholder="correo@lubrimax.cl" className={inputCls} />
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={10}
-            autoComplete="new-password"
-            placeholder="Contraseña temporal (mín. 10)"
-            className={inputCls}
-          />
-          <select name="role" defaultValue="WORKER" className={inputCls}>
-            <option value="WORKER">Trabajador</option>
-            <option value="ADMIN">Administrador</option>
-          </select>
-          <div className="md:col-span-2">
-            <button
-              type="submit"
-              disabled={pending}
-              className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors disabled:opacity-50"
-            >
-              Crear cuenta
-            </button>
-          </div>
+          <Field label="Nombre y apellido">
+            <input name="name" required placeholder="Juan Pérez" className={KIT_INPUT} />
+          </Field>
+          <Field label="Correo">
+            <input name="email" type="email" required placeholder="correo@lubrimax.cl" className={KIT_INPUT} />
+          </Field>
+          <Field label="Contraseña temporal" hint="Mínimo 10 caracteres">
+            <input name="password" type="password" required minLength={10} autoComplete="new-password" className={KIT_INPUT} />
+          </Field>
+          <Field label="Rol">
+            <select name="role" defaultValue="WORKER" className={KIT_INPUT}>
+              <option value="WORKER">Trabajador</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
+          </Field>
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-full h-11 rounded-xl bg-brand-cyan text-brand-pure text-sm font-bold disabled:opacity-50"
+          >
+            Crear cuenta
+          </button>
         </form>
-      )}
+      </Sheet>
 
       <div className="space-y-3">
         {initialUsers.map((u) => (
-          <div
-            key={u.id}
-            className="bg-brand-surface/80 border border-white/10 rounded-xl p-4 md:p-5"
-          >
+          <div key={u.id} className={CARD}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">

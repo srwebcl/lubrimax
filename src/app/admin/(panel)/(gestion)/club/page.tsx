@@ -2,71 +2,47 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { getMemberships, createMembership, updateMembership, deleteMembership, getPartners, createPartner, updatePartner, deletePartner } from "@/actions/admin-club";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  getMemberships, createMembership, updateMembership, deleteMembership,
+  getPartners, createPartner, updatePartner, deletePartner,
+} from "@/actions/admin-club";
+import { Screen, PageHead, AddBtn, Sheet, Field, INPUT, CARD, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
 
-type Membership = {
-  id: string;
-  name: string;
-  price: number;
-  discountPercent: number;
-  features: string[];
-  isActive: boolean;
-};
-
-type Partner = {
-  id: string;
-  name: string;
-  description: string | null;
-  benefits: string[];
-  logo: string | null;
-  isActive: boolean;
-};
+type Membership = { id: string; name: string; price: number; discountPercent: number; features: string[]; isActive: boolean };
+type Partner = { id: string; name: string; description: string | null; benefits: string[]; logo: string | null; isActive: boolean };
 
 export default function ClubAdminPage() {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Membership Form State
+
   const [showMemForm, setShowMemForm] = useState(false);
   const [editingMem, setEditingMem] = useState<Membership | null>(null);
-  
-  // Partner Form State
+
   const [showPartForm, setShowPartForm] = useState(false);
   const [editingPart, setEditingPart] = useState<Partner | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
-    const m = await getMemberships();
-    const p = await getPartners();
-    setMemberships(m);
-    setPartners(p);
+    setMemberships(await getMemberships());
+    setPartners(await getPartners());
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleMemSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    let res;
-    if (editingMem) {
-      res = await updateMembership(editingMem.id, formData);
-    } else {
-      res = await createMembership(formData);
-    }
-    
+    const res = editingMem
+      ? await updateMembership(editingMem.id, formData)
+      : await createMembership(formData);
     if (res.success) {
       setShowMemForm(false);
       setEditingMem(null);
       fetchData();
-    } else {
-      alert(res.error);
-    }
+    } else alert(res.error);
   };
 
   const handlePartSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -74,198 +50,145 @@ export default function ClubAdminPage() {
     setUploadingLogo(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
-    
-    // Check if there is a file selected
     const fileInput = form.querySelector('input[name="logoFile"]') as HTMLInputElement;
-    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    if (fileInput?.files?.length) {
       const uploadData = new FormData();
-      uploadData.append('file', fileInput.files[0]);
-      
+      uploadData.append("file", fileInput.files[0]);
       try {
-        const upRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: uploadData,
-        });
+        const upRes = await fetch("/api/upload", { method: "POST", body: uploadData });
         const upJson = await upRes.json();
-        if (upJson.publicUrl) {
-          formData.set('logo', upJson.publicUrl);
-        } else {
-          alert("Error al subir logo: " + (upJson.error || "Desconocido"));
-          setUploadingLogo(false);
-          return;
-        }
-      } catch (err) {
+        if (upJson.publicUrl) formData.set("logo", upJson.publicUrl);
+        else { alert("Error al subir logo: " + (upJson.error || "Desconocido")); setUploadingLogo(false); return; }
+      } catch {
         alert("Error de red al subir logo");
         setUploadingLogo(false);
         return;
       }
-    } else if (editingPart && editingPart.logo) {
-      // Mantener logo existente si no se sube uno nuevo
-      formData.set('logo', editingPart.logo);
+    } else if (editingPart?.logo) {
+      formData.set("logo", editingPart.logo);
     }
-
-    let res;
-    if (editingPart) {
-      res = await updatePartner(editingPart.id, formData);
-    } else {
-      res = await createPartner(formData);
-    }
-    
+    const res = editingPart
+      ? await updatePartner(editingPart.id, formData)
+      : await createPartner(formData);
     if (res.success) {
       setShowPartForm(false);
       setEditingPart(null);
       fetchData();
-    } else {
-      alert(res.error);
-    }
+    } else alert(res.error);
     setUploadingLogo(false);
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-12">
-      {/* HEADER */}
-      <div className="border-b border-white/10 pb-6">
-        <h2 className="text-xl md:text-3xl font-bold text-white uppercase tracking-widest italic">Club <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-600">LUBRIMAX</span></h2>
-        <p className="text-gray-400 text-sm mt-2">Configura los niveles de fidelización y los comercios asociados.</p>
-      </div>
+    <Screen>
+      <PageHead title="Club Lubrimax" subtitle="Niveles de membresía y comercios asociados." />
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-        </div>
+        <Spinner />
       ) : (
         <>
-          {/* SECTION: MEMBERSHIPS */}
-          <section>
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <h3 className="text-xl font-bold text-white uppercase tracking-widest">Niveles de Membresía</h3>
-              <button onClick={() => { setShowMemForm(!showMemForm); setEditingMem(null); }} className="w-full sm:w-auto bg-amber-500 text-black font-bold text-xs px-4 py-2 rounded hover:bg-white transition-colors">
-                {showMemForm ? "Cancelar" : "➕ Nuevo Nivel"}
-              </button>
+          {/* Membresías */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">Niveles de membresía</h2>
+              <AddBtn label="Nivel" onClick={() => { setEditingMem(null); setShowMemForm(true); }} />
             </div>
-
-            <AnimatePresence>
-              {showMemForm && (
-                <motion.form 
-                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                  onSubmit={handleMemSubmit} 
-                  className="bg-brand-surface/50 border border-amber-500/30 rounded-xl p-6 mb-8 space-y-4 overflow-hidden"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-gray-400 text-xs mb-1">Nombre (Ej: Titanium)</label>
-                      <input type="text" name="name" required defaultValue={editingMem?.name} className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm" />
+            {memberships.filter((m) => m.isActive).length === 0 ? (
+              <Empty>Sin niveles configurados.</Empty>
+            ) : (
+              <ul className="space-y-3">
+                {memberships.filter((m) => m.isActive).map((m) => (
+                  <li key={m.id} className={CARD}>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-lg font-bold text-amber-400">{m.name}</div>
+                        <div className="text-white font-bold">${m.price}<span className="text-xs text-gray-500 font-normal">/mes</span></div>
+                      </div>
+                      <span className="text-xs font-bold bg-green-500/15 text-green-400 border border-green-500/25 rounded-full px-2 py-1">
+                        {m.discountPercent}% OFF
+                      </span>
                     </div>
-                    <div>
-                      <label className="block text-gray-400 text-xs mb-1">Precio Mensual ($)</label>
-                      <input type="number" name="price" required defaultValue={editingMem?.price} className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm" />
+                    {m.features.length > 0 && (
+                      <ul className="mt-2 text-sm text-gray-400 space-y-0.5">
+                        {m.features.map((f, i) => <li key={i}>✓ {f}</li>)}
+                      </ul>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={() => { setEditingMem(m); setShowMemForm(true); }} className="flex-1 text-xs font-bold py-2 rounded-lg border border-white/12 text-white">Editar</button>
+                      <button onClick={() => deleteMembership(m.id).then(fetchData)} className="flex-1 text-xs font-bold py-2 rounded-lg border border-red-500/25 text-red-400">Dar de baja</button>
                     </div>
-                    <div>
-                      <label className="block text-gray-400 text-xs mb-1">Descuento en Servicios (%)</label>
-                      <input type="number" name="discountPercent" required defaultValue={editingMem?.discountPercent} className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 text-xs mb-1">Beneficios Adicionales (Uno por línea)</label>
-                    <textarea name="features" rows={3} defaultValue={editingMem?.features.join('\n')} placeholder="Lavado Express Gratis..." className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm"></textarea>
-                  </div>
-                  <div className="flex justify-end">
-                    <button type="submit" className="bg-amber-500 text-black px-6 py-2 rounded font-bold text-sm">Guardar Nivel</button>
-                  </div>
-                </motion.form>
-              )}
-            </AnimatePresence>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {memberships.filter(m => m.isActive).map(m => (
-                <div key={m.id} className="bg-gradient-to-b from-black to-brand-surface border border-white/10 p-6 rounded-xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">★</div>
-                  <h4 className="text-xl font-bold text-amber-500 uppercase tracking-widest">{m.name}</h4>
-                  <div className="text-2xl text-white font-bold my-2">${m.price} <span className="text-sm text-gray-500 font-normal">/mes</span></div>
-                  <div className="inline-block bg-green-500/20 text-green-400 border border-green-500/30 rounded px-2 py-1 text-xs font-bold mb-4">
-                    {m.discountPercent}% OFF Clínico
-                  </div>
-                  <ul className="text-sm text-gray-400 space-y-2 mb-6">
-                    {m.features.map((f, i) => <li key={i}>✓ {f}</li>)}
-                  </ul>
-                  <div className="flex gap-2">
-                    <button onClick={() => { setEditingMem(m); setShowMemForm(true); }} className="flex-1 border border-white/20 text-white py-1 rounded text-xs hover:bg-white/10">Editar</button>
-                    <button onClick={() => deleteMembership(m.id)} className="flex-1 border border-red-500/30 text-red-400 py-1 rounded text-xs hover:bg-red-500/10">Bajar</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
-          {/* SECTION: PARTNERS */}
-          <section className="pt-8 border-t border-white/10">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-              <h3 className="text-xl font-bold text-white uppercase tracking-widest">Comercios Asociados</h3>
-              <button onClick={() => { setShowPartForm(!showPartForm); setEditingPart(null); }} className="w-full sm:w-auto border border-brand-cyan text-brand-cyan font-bold text-xs px-4 py-2 rounded hover:bg-brand-cyan/10 transition-colors">
-                {showPartForm ? "Cancelar" : "➕ Nuevo Socio"}
-              </button>
+          {/* Comercios asociados */}
+          <section className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-white">Comercios asociados</h2>
+              <AddBtn label="Socio" onClick={() => { setEditingPart(null); setShowPartForm(true); }} />
             </div>
-
-            <AnimatePresence>
-              {showPartForm && (
-                <motion.form 
-                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                  onSubmit={handlePartSubmit} 
-                  className="bg-brand-surface/50 border border-brand-cyan/30 rounded-xl p-6 mb-8 space-y-4 overflow-hidden"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-gray-400 text-xs mb-1">Nombre Empresa</label>
-                      <input type="text" name="name" required defaultValue={editingPart?.name} className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm" />
-                    </div>
-                    <div>
-                      <label className="block text-gray-400 text-xs mb-1">Rubro / Descripción Corta</label>
-                      <input type="text" name="description" defaultValue={editingPart?.description || ""} className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 text-xs mb-1">Beneficios para Socios del Club (Uno por línea)</label>
-                    <textarea name="benefits" rows={2} required defaultValue={editingPart?.benefits.join('\n')} placeholder="20% Dcto en Neumáticos Michelin..." className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm"></textarea>
-                  </div>
-                  <div>
-                    <label className="block text-gray-400 text-xs mb-1">Subir Logo (Opcional)</label>
-                    <input type="file" accept="image/*" name="logoFile" className="w-full bg-black/50 border border-white/10 rounded p-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-brand-cyan file:text-black hover:file:bg-brand-blue" />
-                    {editingPart?.logo && (
-                      <p className="text-[10px] text-gray-500 mt-2">Ya existe un logo. Sube uno nuevo para reemplazarlo.</p>
+            {partners.filter((p) => p.isActive).length === 0 ? (
+              <Empty>Sin comercios asociados.</Empty>
+            ) : (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {partners.filter((p) => p.isActive).map((p) => (
+                  <li key={p.id} className={CARD}>
+                    {p.logo && (
+                      <div className="relative w-full h-20 mb-3 bg-white rounded-lg">
+                        <Image src={p.logo} alt={p.name} fill sizes="200px" className="object-contain p-2" />
+                      </div>
                     )}
-                  </div>
-                  <div className="flex justify-end pt-2">
-                    <button type="submit" disabled={uploadingLogo} className="bg-brand-cyan text-black px-6 py-2 rounded font-bold text-sm disabled:opacity-50">
-                      {uploadingLogo ? "Guardando..." : "Guardar Socio"}
-                    </button>
-                  </div>
-                </motion.form>
-              )}
-            </AnimatePresence>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {partners.filter(p => p.isActive).map(p => (
-                <div key={p.id} className="bg-brand-surface/80 border border-white/10 p-5 rounded-xl flex flex-col h-full">
-                  {p.logo && (
-                    <div className="relative w-full h-24 mb-4 bg-white rounded-lg flex items-center justify-center p-2">
-                      <Image src={p.logo} alt={p.name} fill sizes="200px" className="object-contain p-2" />
+                    <div className="font-bold text-white">{p.name}</div>
+                    <p className="text-xs text-gray-500">{p.description}</p>
+                    {p.benefits.length > 0 && (
+                      <ul className="mt-2 text-xs text-brand-cyan font-semibold space-y-0.5">
+                        {p.benefits.map((b, i) => <li key={i}>🎁 {b}</li>)}
+                      </ul>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={() => { setEditingPart(p); setShowPartForm(true); }} className="flex-1 text-xs font-bold py-2 rounded-lg border border-white/12 text-white">Editar</button>
+                      <button onClick={() => deletePartner(p.id).then(fetchData)} className="flex-1 text-xs font-bold py-2 rounded-lg border border-red-500/25 text-red-400">Eliminar</button>
                     </div>
-                  )}
-                  <h4 className="text-lg font-bold text-white mt-auto">{p.name}</h4>
-                  <p className="text-gray-500 text-xs mb-3">{p.description}</p>
-                  <ul className="text-xs text-brand-cyan font-bold space-y-1 mb-4 flex-1">
-                    {p.benefits.map((b, i) => <li key={i}>🎁 {b}</li>)}
-                  </ul>
-                  <div className="flex gap-2 mt-4">
-                    <button onClick={() => { setEditingPart(p); setShowPartForm(true); }} className="flex-1 border border-white/20 text-white py-1 rounded text-[10px] hover:bg-white/10">Editar</button>
-                    <button onClick={() => deletePartner(p.id)} className="flex-1 border border-red-500/30 text-red-400 py-1 rounded text-[10px] hover:bg-red-500/10">Eliminar</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </>
       )}
-    </div>
+
+      {/* Sheet: membresía */}
+      <Sheet open={showMemForm} onClose={() => { setShowMemForm(false); setEditingMem(null); }} title={editingMem ? `Editar: ${editingMem.name}` : "Nuevo nivel"}>
+        <form key={editingMem?.id ?? "new-mem"} onSubmit={handleMemSubmit} className="space-y-4">
+          <Field label="Nombre"><input type="text" name="name" required defaultValue={editingMem?.name} placeholder="Titanium" className={INPUT} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Precio mensual ($)"><input type="number" name="price" required defaultValue={editingMem?.price} className={INPUT} /></Field>
+            <Field label="Descuento (%)"><input type="number" name="discountPercent" required defaultValue={editingMem?.discountPercent} className={INPUT} /></Field>
+          </div>
+          <Field label="Beneficios" hint="Uno por línea">
+            <textarea name="features" rows={3} defaultValue={editingMem?.features.join("\n")} placeholder="Lavado express gratis…" className={INPUT} />
+          </Field>
+          <PrimaryBtn type="submit" className="w-full">Guardar nivel</PrimaryBtn>
+        </form>
+      </Sheet>
+
+      {/* Sheet: socio */}
+      <Sheet open={showPartForm} onClose={() => { setShowPartForm(false); setEditingPart(null); }} title={editingPart ? `Editar: ${editingPart.name}` : "Nuevo socio"}>
+        <form key={editingPart?.id ?? "new-part"} onSubmit={handlePartSubmit} className="space-y-4">
+          <Field label="Nombre de la empresa"><input type="text" name="name" required defaultValue={editingPart?.name} className={INPUT} /></Field>
+          <Field label="Rubro / descripción corta"><input type="text" name="description" defaultValue={editingPart?.description || ""} className={INPUT} /></Field>
+          <Field label="Beneficios para socios" hint="Uno por línea">
+            <textarea name="benefits" rows={2} required defaultValue={editingPart?.benefits.join("\n")} placeholder="20% dcto en neumáticos…" className={INPUT} />
+          </Field>
+          <Field label="Logo" hint={editingPart?.logo ? "Ya hay un logo. Sube otro para reemplazar." : "Opcional"}>
+            <input type="file" accept="image/*" name="logoFile" className="w-full text-xs text-white file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-brand-cyan file:text-black" />
+          </Field>
+          <PrimaryBtn type="submit" disabled={uploadingLogo} className="w-full">
+            {uploadingLogo ? "Guardando…" : "Guardar socio"}
+          </PrimaryBtn>
+        </form>
+      </Sheet>
+    </Screen>
   );
 }
