@@ -65,9 +65,77 @@ model Booking {
   
   services      Service[]
   selectedOptions Json?    // Almacena la variante elegida por servicio. Ej: { "serviceId": "Opción 1" }
-  
+
+  intakes       VehicleIntake[] // Ingresos de vehículo asociados a esta reserva
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ==========================================
+// MÓDULO: RECEPCIÓN DE VEHÍCULOS (lo usa el TRABAJADOR)
+// ==========================================
+// Clientes/vehículos que atiende el taller, identificados por PATENTE. Es
+// independiente del modelo `Customer` (cuentas de la tienda/Club con
+// contraseña). Acá el registro lo hace el trabajador cuando llega un auto,
+// con o sin reserva previa.
+
+model WorkshopClient {
+  id        String    @id @default(cuid())
+  name      String
+  rut       String?   @unique // Normalizado sin puntos, con guion. Único si viene.
+  phone     String?
+  email     String?
+
+  vehicles  Vehicle[]
+
+  createdByStaffId String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Vehicle {
+  id        String   @id @default(cuid())
+  plate     String   @unique // Normalizada: MAYÚSCULAS, sin espacios ni guiones
+  make      String
+  model     String
+  color     String?
+
+  clientId  String
+  client    WorkshopClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  intakes   VehicleIntake[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+}
+
+model VehicleIntake {
+  id         String   @id @default(cuid())
+  vehicleId  String
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  // Opcional: si el ingreso corresponde a una reserva de la agenda.
+  bookingId  String?
+  booking    Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  photoUrl   String?  // Foto del vehículo / patente al ingresar (R2)
+  odometer   Int?     // Kilometraje declarado
+  notes      String?  // Observaciones de recepción (rayones, detalles, etc.)
+  status     String   @default("IN_SHOP") // IN_SHOP = en taller, DELIVERED = entregado
+
+  createdByStaffId   String?
+  createdByStaffName String? // Copia denormalizada para la bitácora
+  deliveredAt        DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([vehicleId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ==========================================

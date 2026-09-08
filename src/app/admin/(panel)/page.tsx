@@ -15,6 +15,18 @@ export default async function AdminDashboard() {
     include: { services: true },
   });
 
+  // Qué reservas ya tienen el vehículo ingresado al taller (para el badge).
+  const arrived = new Set(
+    (
+      await prisma.vehicleIntake.findMany({
+        where: { status: "IN_SHOP", bookingId: { in: bookings.map((b) => b.id) } },
+        select: { bookingId: true },
+      })
+    )
+      .map((i) => i.bookingId)
+      .filter((id): id is string => !!id)
+  );
+
   return (
     <div className="px-3 sm:px-6 py-4 max-w-5xl mx-auto w-full">
       <BookingsManager
@@ -27,6 +39,7 @@ export default async function AdminDashboard() {
           status: b.status,
           workStatus: b.workStatus,
           paymentStatus: b.paymentStatus,
+          arrived: arrived.has(b.id),
           customerName: b.customerName,
           customerPhone: b.customerPhone,
           customerEmail: b.customerEmail,

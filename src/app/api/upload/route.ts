@@ -5,13 +5,11 @@ import { verifyStaffSession } from "@/lib/staff-session";
 
 export async function POST(request: Request) {
   try {
-    // Subir imágenes es parte de la gestión de catálogo/tienda: solo ADMIN.
+    // Cualquier miembro del personal con sesión: el admin sube imágenes de
+    // catálogo/tienda, el trabajador sube la foto del vehículo al ingresar.
     const session = await verifyStaffSession();
     if (!session) {
       return NextResponse.json({ error: "No autorizado." }, { status: 401 });
-    }
-    if (session.role !== "ADMIN") {
-      return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
 
     const formData = await request.formData();

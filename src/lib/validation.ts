@@ -55,6 +55,34 @@ export const rutSchema = z
   .trim()
   .regex(/^\d{1,2}\.?\d{3}\.?\d{3}-?[\dkK]$/, "RUT inválido.");
 
+// ── Recepción de vehículos (trabajador) ──
+const optionalRut = z
+  .union([rutSchema, z.literal("")])
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
+export const intakeSchema = z.object({
+  plate: z
+    .string()
+    .trim()
+    .min(4, "Patente muy corta.")
+    .max(10, "Patente inválida."),
+  make: z.string().trim().min(1, "Falta la marca.").max(50),
+  model: z.string().trim().min(1, "Falta el modelo.").max(50),
+  color: z.string().trim().max(30).optional(),
+  clientName: z.string().trim().min(2, "Falta el nombre del cliente.").max(120),
+  clientRut: optionalRut,
+  clientPhone: z.string().trim().max(30).optional(),
+  clientEmail: z.union([z.email("Correo inválido."), z.literal("")]).optional(),
+  odometer: z
+    .union([z.coerce.number().int().min(0).max(2_000_000), z.literal("")])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : Number(v))),
+  notes: z.string().trim().max(1000).optional(),
+  photoUrl: z.union([z.url(), z.literal("")]).optional(),
+  bookingId: z.string().trim().max(40).optional(),
+});
+
 export const bookingPaymentSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida."),

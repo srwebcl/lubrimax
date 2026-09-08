@@ -15,6 +15,7 @@ type Booking = {
   status: string;
   workStatus: string;
   paymentStatus: string;
+  arrived?: boolean;
   customerName: string;
   customerPhone: string;
   customerEmail: string | null;
@@ -197,13 +198,20 @@ export default function BookingsManager({
                         {format(d, "EEE d MMM", { locale: es })} · {Math.round((total / 60) * 10) / 10}h
                       </span>
                     </div>
-                    {isAdmin && (
-                      <span
-                        className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full border ${pill.cls}`}
-                      >
-                        {pill.label}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {b.arrived && (
+                        <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full border bg-brand-cyan/10 text-brand-cyan border-brand-cyan/25">
+                          En taller
+                        </span>
+                      )}
+                      {isAdmin && (
+                        <span
+                          className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full border ${pill.cls}`}
+                        >
+                          {pill.label}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Cliente + vehículo */}

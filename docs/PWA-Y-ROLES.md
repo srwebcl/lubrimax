@@ -202,6 +202,40 @@ Una vez que entras bien con tu cuenta nueva, en Vercel puedes **eliminar**
       contiene respuestas de `/admin` ni `/api`.
 - [ ] Lighthouse → PWA: installable OK.
 
+## Módulo: Recepción de vehículos (rama `feat/ingreso-vehiculos`)
+
+Lo usa el **trabajador** (y el admin). Nueva pestaña **"Ingreso"** en el panel.
+
+**Flujo:** el trabajador escribe la **patente** → si el vehículo ya existe,
+se cargan solos los datos del cliente; si no, completa
+`Marca, Modelo, Color, Nombre, RUT, Teléfono, Correo`, kilometraje,
+observaciones y (opcional) una **foto** (abre la cámara en el celular).
+Puede asociar el ingreso a una reserva del día. Abajo se ve la lista
+**"En el taller ahora"** con botón "Entregar".
+
+**Datos nuevos (schema):**
+- `WorkshopClient` — cliente del taller identificado por RUT (independiente de
+  `Customer`, que son las cuentas de tienda/Club con contraseña).
+- `Vehicle` — vehículo por `plate` (patente única, normalizada).
+- `VehicleIntake` — cada ingreso: foto, km, notas, estado `IN_SHOP`/`DELIVERED`,
+  quién lo registró, reserva asociada (opcional).
+- La agenda muestra un badge **"En taller"** cuando la reserva ya tiene ingreso.
+
+**Pasos para producción de este módulo** (después de que el módulo de roles
+ya esté funcionando):
+
+1. `git merge feat/ingreso-vehiculos` (o desplegar esa rama).
+2. **Aplicar el schema otra vez** (agrega 3 tablas, aditivo):
+   ```
+   npx prisma db push
+   ```
+3. Listo — no necesita variables nuevas. La subida de fotos usa el mismo
+   `/api/upload` (ahora habilitado también para el rol `WORKER`).
+
+> **OCR de patente por foto:** no incluido. La foto se adjunta pero la
+> patente se escribe a mano. Automatizar la lectura requiere un servicio de
+> OCR (follow-up).
+
 ## Follow-ups recomendados (no incluidos)
 
 - **Rate limit en Redis (Upstash)**: el actual es en memoria y en serverless
