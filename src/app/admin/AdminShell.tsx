@@ -60,12 +60,6 @@ function Icon({ d, className = "w-6 h-6" }: { d: string; className?: string }) {
   );
 }
 
-function titleFor(pathname: string) {
-  const exact = DESTS.find((d) => d.href === pathname);
-  if (exact) return exact.name;
-  return "Panel";
-}
-
 export default function AdminShell({
   role,
   staffName,
@@ -81,7 +75,6 @@ export default function AdminShell({
   const visible = DESTS.filter((d) => role === "ADMIN" || !d.adminOnly);
   const initial = staffName.trim().charAt(0).toUpperCase() || "?";
   const roleLabel = role === "ADMIN" ? "Administrador" : "Trabajador";
-  const title = titleFor(pathname);
 
   // Barra inferior: máx. 4 accesos fijos + "Más" cuando sobra.
   const primary =
@@ -148,21 +141,17 @@ export default function AdminShell({
 
       {/* ───────────── Área principal ───────────── */}
       <div className="flex-1 min-w-0 flex flex-col min-h-[100dvh]">
-        {/* Top bar */}
+        {/* Top bar — chrome mínimo; cada pantalla pone su propio título */}
         <header className="sticky top-0 z-40 bg-brand-surface/80 backdrop-blur-xl border-b border-white/5 pt-safe">
           <div className="h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <Image
-                src="/logo-lubrimax.webp"
-                alt="Lubrimax"
-                width={72}
-                height={20}
-                className="h-5 w-auto object-contain md:hidden shrink-0"
-              />
-              <span className="hidden md:block text-base font-bold text-white truncate">
-                {title}
-              </span>
-            </div>
+            <Image
+              src="/logo-lubrimax.webp"
+              alt="Lubrimax"
+              width={80}
+              height={22}
+              className="h-5 w-auto object-contain md:hidden shrink-0"
+            />
+            <span className="hidden md:block" />
             <Link
               href="/admin/perfil"
               aria-label="Mi perfil"
@@ -178,10 +167,6 @@ export default function AdminShell({
                 {initial}
               </span>
             </Link>
-          </div>
-          {/* Título de página en móvil */}
-          <div className="md:hidden px-4 pb-2.5 -mt-0.5">
-            <h1 className="text-xl font-bold text-white tracking-tight">{title}</h1>
           </div>
         </header>
 

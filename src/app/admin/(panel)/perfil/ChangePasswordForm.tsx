@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { changeMyPassword } from "@/actions/admin-staff";
+import { INPUT, Msg } from "@/components/admin/kit";
 
 export default function ChangePasswordForm() {
   const [saving, setSaving] = useState(false);
@@ -31,10 +32,8 @@ export default function ChangePasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4 border-t border-white/5">
-      <h3 className="text-sm text-gray-400 uppercase tracking-widest font-bold">
-        Cambiar mi contraseña
-      </h3>
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <h3 className="text-sm font-bold text-white">Cambiar mi contraseña</h3>
 
       <input
         type="password"
@@ -42,7 +41,7 @@ export default function ChangePasswordForm() {
         required
         autoComplete="current-password"
         placeholder="Contraseña actual"
-        className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan text-sm"
+        className={INPUT}
       />
       <input
         type="password"
@@ -50,8 +49,8 @@ export default function ChangePasswordForm() {
         required
         minLength={10}
         autoComplete="new-password"
-        placeholder="Nueva contraseña (mín. 10 caracteres)"
-        className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan text-sm"
+        placeholder="Nueva contraseña (mín. 10)"
+        className={INPUT}
       />
       <input
         type="password"
@@ -60,27 +59,17 @@ export default function ChangePasswordForm() {
         minLength={10}
         autoComplete="new-password"
         placeholder="Repetir nueva contraseña"
-        className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan text-sm"
+        className={INPUT}
       />
 
-      {msg && (
-        <div
-          className={`p-3 rounded-lg text-xs font-bold border ${
-            msg.type === "ok"
-              ? "bg-green-500/10 text-green-400 border-green-500/20"
-              : "bg-red-500/10 text-red-400 border-red-500/20"
-          }`}
-        >
-          {msg.text}
-        </div>
-      )}
+      {msg && <Msg kind={msg.type}>{msg.text}</Msg>}
 
       <button
         type="submit"
         disabled={saving}
-        className="bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs px-6 py-3 rounded-lg hover:bg-white transition-colors disabled:opacity-50"
+        className="w-full h-11 rounded-xl bg-brand-cyan text-brand-pure text-sm font-bold disabled:opacity-50"
       >
-        {saving ? "Guardando..." : "Actualizar contraseña"}
+        {saving ? "Guardando…" : "Actualizar contraseña"}
       </button>
     </form>
   );

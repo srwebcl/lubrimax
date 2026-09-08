@@ -27,7 +27,11 @@ export default async function IntakePage() {
   ]);
 
   return (
-    <div className="px-3 sm:px-6 py-4 max-w-2xl mx-auto w-full">
+    <div className="px-4 sm:px-6 py-4 max-w-2xl mx-auto w-full space-y-4">
+      <header>
+        <h1 className="text-[22px] leading-tight font-bold tracking-tight text-white">Ingreso de vehículos</h1>
+        <p className="text-sm text-gray-500">Registra el auto por patente al llegar al taller.</p>
+      </header>
       <IntakeConsole inShop={inShop} todayBookings={todayBookings} />
     </div>
   );

@@ -98,75 +98,64 @@ export default function UsersManager({
       <div className="space-y-3">
         {initialUsers.map((u) => (
           <div key={u.id} className={CARD}>
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-bold text-white">{u.name}</span>
-                  <span
-                    className={`text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border ${
-                      u.role === "ADMIN"
-                        ? "bg-brand-cyan/10 text-brand-cyan border-brand-cyan/30"
-                        : "bg-white/5 text-gray-300 border-white/10"
-                    }`}
-                  >
-                    {u.role === "ADMIN" ? "Admin" : "Trabajador"}
-                  </span>
-                  {!u.isActive && (
-                    <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border bg-red-500/10 text-red-400 border-red-500/30">
-                      Desactivado
-                    </span>
-                  )}
-                  {u.id === currentUserId && (
-                    <span className="text-[10px] uppercase tracking-widest text-gray-500">(tú)</span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 mt-1 font-mono">{u.email}</div>
-                <div className="text-[11px] text-gray-600 mt-1">
-                  Último ingreso:{" "}
-                  {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("es-CL") : "nunca"}
-                </div>
-              </div>
+            <div className="flex items-start gap-2 flex-wrap">
+              <span className="font-bold text-white">{u.name}</span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  u.role === "ADMIN"
+                    ? "bg-brand-cyan/15 text-brand-cyan"
+                    : "bg-white/8 text-gray-300"
+                }`}
+              >
+                {u.role === "ADMIN" ? "Admin" : "Trabajador"}
+              </span>
+              {!u.isActive && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400">
+                  Desactivado
+                </span>
+              )}
+              {u.id === currentUserId && (
+                <span className="text-[10px] text-gray-500">(tú)</span>
+              )}
+            </div>
+            <div className="text-xs text-gray-500 mt-1 font-mono">{u.email}</div>
+            <div className="text-[11px] text-gray-600 mt-0.5">
+              Último ingreso: {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("es-CL") : "nunca"}
+            </div>
 
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => {
-                    setEditing(editing === u.id ? null : u.id);
-                    setResetting(null);
-                  }}
-                  className="text-[10px] uppercase font-bold tracking-widest border border-brand-cyan/20 text-brand-cyan hover:bg-brand-cyan/10 px-3 py-2 rounded transition-colors"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => {
-                    setResetting(resetting === u.id ? null : u.id);
-                    setEditing(null);
-                  }}
-                  className="text-[10px] uppercase font-bold tracking-widest border border-white/10 text-gray-300 hover:bg-white/5 px-3 py-2 rounded transition-colors"
-                >
-                  Resetear clave
-                </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => { setEditing(editing === u.id ? null : u.id); setResetting(null); }}
+                className="text-xs font-bold px-3 py-2 rounded-lg border border-brand-cyan/25 text-brand-cyan"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => { setResetting(resetting === u.id ? null : u.id); setEditing(null); }}
+                className="text-xs font-bold px-3 py-2 rounded-lg border border-white/12 text-gray-300"
+              >
+                Resetear clave
+              </button>
+              <button
+                disabled={pending}
+                onClick={() => run(() => forceLogoutStaff(u.id), "Sesiones cerradas.")}
+                className="text-xs font-bold px-3 py-2 rounded-lg border border-amber-500/25 text-amber-400 disabled:opacity-50"
+              >
+                Forzar logout
+              </button>
+              {u.id !== currentUserId && (
                 <button
                   disabled={pending}
-                  onClick={() => run(() => forceLogoutStaff(u.id), "Sesiones cerradas.")}
-                  className="text-[10px] uppercase font-bold tracking-widest border border-amber-500/20 text-amber-400 hover:bg-amber-500/10 px-3 py-2 rounded transition-colors disabled:opacity-50"
+                  onClick={() => {
+                    if (confirm(`¿Eliminar la cuenta de ${u.name}? Es irreversible.`)) {
+                      run(() => deleteStaffUser(u.id), "Cuenta eliminada.");
+                    }
+                  }}
+                  className="text-xs font-bold px-3 py-2 rounded-lg border border-red-500/25 text-red-400 disabled:opacity-50"
                 >
-                  Forzar logout
+                  Eliminar
                 </button>
-                {u.id !== currentUserId && (
-                  <button
-                    disabled={pending}
-                    onClick={() => {
-                      if (confirm(`¿Eliminar la cuenta de ${u.name}? Es irreversible.`)) {
-                        run(() => deleteStaffUser(u.id), "Cuenta eliminada.");
-                      }
-                    }}
-                    className="text-[10px] uppercase font-bold tracking-widest border border-red-500/20 text-red-400 hover:bg-red-500/10 px-3 py-2 rounded transition-colors disabled:opacity-50"
-                  >
-                    Eliminar
-                  </button>
-                )}
-              </div>
+              )}
             </div>
 
             {editing === u.id && (

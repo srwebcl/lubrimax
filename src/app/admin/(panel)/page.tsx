@@ -28,7 +28,13 @@ export default async function AdminDashboard() {
   );
 
   return (
-    <div className="px-3 sm:px-6 py-4 max-w-5xl mx-auto w-full">
+    <div className="px-4 sm:px-6 py-4 max-w-3xl mx-auto w-full space-y-1">
+      <header className="pb-1">
+        <h1 className="text-[22px] leading-tight font-bold tracking-tight text-white">Agenda</h1>
+        <p className="text-sm text-gray-500">
+          {role === "ADMIN" ? "Reservas y avance de los trabajos." : "Marca el avance de cada trabajo."}
+        </p>
+      </header>
       <BookingsManager
         role={role}
         initialBookings={bookings.map((b) => ({
