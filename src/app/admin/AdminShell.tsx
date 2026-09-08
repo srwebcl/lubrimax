@@ -1,96 +1,67 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
 import { logout } from "@/actions/auth";
 
 type Role = "ADMIN" | "WORKER";
 
-type NavItem = { name: string; href: string; icon: string; adminOnly?: boolean };
-type NavCategory = { title: string; items: NavItem[] };
+type Dest = { name: string; href: string; icon: string; adminOnly?: boolean };
 
-const NAV: NavCategory[] = [
-  {
-    title: "Operación",
-    items: [
-      {
-        name: "Agenda",
-        href: "/admin",
-        icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
-      },
-    ],
-  },
-  {
-    title: "Servicios & Club",
-    items: [
-      {
-        name: "Catálogo Serv.",
-        href: "/admin/servicios",
-        icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
-        adminOnly: true,
-      },
-      {
-        name: "Categorías",
-        href: "/admin/categorias",
-        icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
-        adminOnly: true,
-      },
-      {
-        name: "Club Lubrimax",
-        href: "/admin/club",
-        icon: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
-        adminOnly: true,
-      },
-    ],
-  },
-  {
-    title: "Tienda",
-    items: [
-      {
-        name: "Pedidos",
-        href: "/admin/pedidos",
-        icon: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
-        adminOnly: true,
-      },
-      {
-        name: "Productos",
-        href: "/admin/tienda",
-        icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
-        adminOnly: true,
-      },
-      {
-        name: "Cupones",
-        href: "/admin/cupones",
-        icon: "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
-        adminOnly: true,
-      },
-    ],
-  },
-  {
-    title: "Configuración",
-    items: [
-      {
-        name: "Ajustes",
-        href: "/admin/configuracion",
-        icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-        adminOnly: true,
-      },
-      {
-        name: "Usuarios",
-        href: "/admin/usuarios",
-        icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-3.5-6",
-        adminOnly: true,
-      },
-    ],
-  },
+const ICONS = {
+  agenda:
+    "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  catalogo:
+    "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10",
+  categorias:
+    "M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z",
+  club: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
+  pedidos:
+    "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z",
+  productos:
+    "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z",
+  cupones:
+    "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z",
+  ajustes: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  usuarios:
+    "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-3.5-6",
+  perfil: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+  mas: "M4 6h16M4 12h16M4 18h16",
+  logout:
+    "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
+  home: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+} as const;
+
+// Todos los destinos del panel, en orden.
+const DESTS: Dest[] = [
+  { name: "Agenda", href: "/admin", icon: ICONS.agenda },
+  { name: "Productos", href: "/admin/tienda", icon: ICONS.productos, adminOnly: true },
+  { name: "Pedidos", href: "/admin/pedidos", icon: ICONS.pedidos, adminOnly: true },
+  { name: "Catálogo", href: "/admin/servicios", icon: ICONS.catalogo, adminOnly: true },
+  { name: "Categorías", href: "/admin/categorias", icon: ICONS.categorias, adminOnly: true },
+  { name: "Club Lubrimax", href: "/admin/club", icon: ICONS.club, adminOnly: true },
+  { name: "Cupones", href: "/admin/cupones", icon: ICONS.cupones, adminOnly: true },
+  { name: "Ajustes", href: "/admin/configuracion", icon: ICONS.ajustes, adminOnly: true },
+  { name: "Usuarios", href: "/admin/usuarios", icon: ICONS.usuarios, adminOnly: true },
+  { name: "Mi perfil", href: "/admin/perfil", icon: ICONS.perfil },
 ];
 
-const PROFILE_ICON =
-  "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z";
-const LOGOUT_ICON =
-  "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1";
+function Icon({ d, className = "w-6 h-6" }: { d: string; className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={d} />
+    </svg>
+  );
+}
+
+function titleFor(pathname: string) {
+  const exact = DESTS.find((d) => d.href === pathname);
+  if (exact) return exact.name;
+  return "Panel";
+}
 
 export default function AdminShell({
   role,
@@ -102,22 +73,35 @@ export default function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const categories = NAV.map((cat) => ({
-    ...cat,
-    items: cat.items.filter((item) => role === "ADMIN" || !item.adminOnly),
-  })).filter((cat) => cat.items.length > 0);
-
-  const flatNavItems = categories.flatMap((cat) => cat.items);
+  const visible = DESTS.filter((d) => role === "ADMIN" || !d.adminOnly);
   const initial = staffName.trim().charAt(0).toUpperCase() || "?";
   const roleLabel = role === "ADMIN" ? "Administrador" : "Trabajador";
+  const title = titleFor(pathname);
+
+  // Barra inferior: máx. 4 accesos fijos + "Más" cuando sobra.
+  const primary =
+    role === "ADMIN"
+      ? visible.filter((d) =>
+          ["/admin", "/admin/tienda", "/admin/pedidos"].includes(d.href)
+        )
+      : visible.filter((d) => ["/admin", "/admin/perfil"].includes(d.href));
+
+  const inSheet =
+    role === "ADMIN"
+      ? visible.filter((d) => !primary.some((p) => p.href === d.href))
+      : [];
+
+  const isActive = (href: string) =>
+    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
   return (
-    <div className="min-h-screen bg-brand-pure flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-brand-surface border-r border-white/5 hidden md:flex flex-col">
-        <div className="p-6 border-b border-white/5 text-center">
-          <Link href="/admin" className="flex justify-center items-center">
+    <div className="min-h-[100dvh] bg-brand-pure flex">
+      {/* ───────────── Sidebar (escritorio) ───────────── */}
+      <aside className="w-60 bg-brand-surface border-r border-white/5 hidden md:flex flex-col shrink-0">
+        <div className="p-6 border-b border-white/5">
+          <Link href="/admin" className="flex justify-center">
             <Image
               src="/logo-lubrimax.webp"
               alt="Lubrimax"
@@ -127,129 +111,170 @@ export default function AdminShell({
             />
           </Link>
         </div>
-
-        <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
-          {categories.map((category) => (
-            <div key={category.title}>
-              <h3 className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">
-                {category.title}
-              </h3>
-              <div className="space-y-1">
-                {category.items.map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm uppercase tracking-widest font-bold transition-all ${
-                        isActive
-                          ? "bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/20"
-                          : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
-                      }`}
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                      </svg>
-                      <span>{item.name}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+          {visible.map((d) => {
+            const active = isActive(d.href);
+            return (
+              <Link
+                key={d.href}
+                href={d.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  active
+                    ? "bg-brand-cyan/10 text-brand-cyan"
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Icon d={d.icon} className="w-5 h-5" />
+                <span>{d.name}</span>
+              </Link>
+            );
+          })}
         </nav>
-
-        <div className="p-4 border-t border-white/5">
+        <div className="p-3 border-t border-white/5">
           <button
             onClick={() => logout()}
-            className="w-full flex items-center justify-center space-x-2 text-gray-500 hover:text-red-400 text-sm uppercase tracking-widest font-bold py-2 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-500 hover:text-red-400 hover:bg-red-500/5 transition-colors"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={LOGOUT_ICON} />
-            </svg>
-            <span>Cerrar Sesión</span>
+            <Icon d={ICONS.logout} className="w-5 h-5" />
+            <span>Cerrar sesión</span>
           </button>
         </div>
       </aside>
 
-      {/* Navegación móvil inferior */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-brand-surface/95 backdrop-blur-md border-t border-white/10 z-50 pb-safe">
-        <div className="flex items-center gap-2 overflow-x-auto px-4 py-2 custom-scrollbar">
-          {flatNavItems.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex flex-col items-center justify-center p-2 min-w-[72px] flex-shrink-0 transition-colors ${
-                pathname === item.href ? "text-brand-cyan" : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-              </svg>
-              <span className="text-[9px] uppercase font-bold text-center leading-tight truncate w-full">
-                {item.name}
+      {/* ───────────── Área principal ───────────── */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-[100dvh]">
+        {/* Top bar */}
+        <header className="sticky top-0 z-40 bg-brand-surface/80 backdrop-blur-xl border-b border-white/5 pt-safe">
+          <div className="h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Image
+                src="/logo-lubrimax.webp"
+                alt="Lubrimax"
+                width={72}
+                height={20}
+                className="h-5 w-auto object-contain md:hidden shrink-0"
+              />
+              <span className="hidden md:block text-base font-bold text-white truncate">
+                {title}
               </span>
-            </Link>
-          ))}
-          <Link
-            href="/admin/perfil"
-            className={`flex flex-col items-center justify-center p-2 min-w-[72px] flex-shrink-0 transition-colors ${
-              pathname === "/admin/perfil" ? "text-brand-cyan" : "text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={PROFILE_ICON} />
-            </svg>
-            <span className="text-[9px] uppercase font-bold text-center leading-tight truncate w-full">
-              Perfil
-            </span>
-          </Link>
-          <button
-            onClick={() => logout()}
-            className="flex flex-col items-center justify-center p-2 min-w-[72px] flex-shrink-0 transition-colors text-red-500/70 hover:text-red-400"
-          >
-            <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={LOGOUT_ICON} />
-            </svg>
-            <span className="text-[9px] uppercase font-bold text-center leading-tight truncate w-full">
-              Salir
-            </span>
-          </button>
-        </div>
-      </nav>
-
-      {/* Contenido principal */}
-      <main className="flex-1 h-screen overflow-y-auto pb-20 md:pb-0 flex flex-col relative">
-        <header className="sticky top-0 z-40 bg-brand-surface/90 backdrop-blur-md border-b border-white/5 px-4 sm:px-8 py-3 flex justify-between md:justify-end items-center gap-4">
-          <div className="md:hidden flex items-center">
-            <Image
-              src="/logo-lubrimax.webp"
-              alt="Lubrimax"
-              width={90}
-              height={24}
-              className="h-6 w-auto object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]"
-            />
-          </div>
-          <div className="flex items-center gap-4">
+            </div>
             <Link
               href="/admin/perfil"
-              className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-lg transition-colors group"
+              aria-label="Mi perfil"
+              className="flex items-center gap-2.5 rounded-full pl-2.5 pr-1 py-1 hover:bg-white/5 transition-colors"
             >
-              <div className="text-right hidden sm:block">
-                <div className="text-sm font-bold text-white leading-none group-hover:text-brand-cyan transition-colors">
-                  {staffName}
-                </div>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-1">{roleLabel}</div>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-blue to-brand-cyan flex items-center justify-center text-white font-bold shadow-[0_0_15px_rgba(56,189,248,0.4)]">
+              <span className="hidden sm:block text-right leading-tight">
+                <span className="block text-xs font-bold text-white">{staffName}</span>
+                <span className="block text-[10px] text-gray-500 uppercase tracking-wider">
+                  {roleLabel}
+                </span>
+              </span>
+              <span className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-blue to-brand-cyan flex items-center justify-center text-white text-sm font-bold">
                 {initial}
-              </div>
+              </span>
             </Link>
+          </div>
+          {/* Título de página en móvil */}
+          <div className="md:hidden px-4 pb-2.5 -mt-0.5">
+            <h1 className="text-xl font-bold text-white tracking-tight">{title}</h1>
           </div>
         </header>
 
-        <div className="flex-1">{children}</div>
-      </main>
+        {/* Contenido — con espacio para la tab bar en móvil */}
+        <main className="flex-1 overflow-y-auto overscroll-contain pb-[calc(4.5rem_+_env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
+      </div>
+
+      {/* ───────────── Tab bar (móvil) ───────────── */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-brand-surface/90 backdrop-blur-xl border-t border-white/10 pb-safe">
+        <div className="flex items-stretch h-[4.5rem]">
+          {primary.map((d) => {
+            const active = isActive(d.href);
+            return (
+              <Link
+                key={d.href}
+                href={d.href}
+                className={`flex-1 flex flex-col items-center justify-center gap-1 relative ${
+                  active ? "text-brand-cyan" : "text-gray-500"
+                }`}
+              >
+                {active && (
+                  <span className="absolute top-0 h-0.5 w-8 rounded-full bg-brand-cyan" />
+                )}
+                <Icon d={d.icon} className="w-6 h-6" />
+                <span className="text-[10px] font-semibold tracking-tight">{d.name}</span>
+              </Link>
+            );
+          })}
+          {inSheet.length > 0 && (
+            <button
+              onClick={() => setSheetOpen(true)}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 ${
+                inSheet.some((d) => isActive(d.href)) ? "text-brand-cyan" : "text-gray-500"
+              }`}
+            >
+              <Icon d={ICONS.mas} className="w-6 h-6" />
+              <span className="text-[10px] font-semibold tracking-tight">Más</span>
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {/* ───────────── Bottom sheet "Más" ───────────── */}
+      <AnimatePresence>
+        {sheetOpen && (
+          <div className="md:hidden fixed inset-0 z-[60]">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSheetOpen(false)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 380, damping: 38 }}
+              className="absolute bottom-0 inset-x-0 bg-brand-surface border-t border-white/10 rounded-t-3xl pb-safe max-h-[80dvh] overflow-y-auto"
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <span className="w-10 h-1.5 rounded-full bg-white/15" />
+              </div>
+              <div className="px-4 pt-2 pb-6">
+                <div className="grid grid-cols-3 gap-2">
+                  {inSheet.map((d) => {
+                    const active = isActive(d.href);
+                    return (
+                      <Link
+                        key={d.href}
+                        href={d.href}
+                        onClick={() => setSheetOpen(false)}
+                        className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl border text-center ${
+                          active
+                            ? "bg-brand-cyan/10 border-brand-cyan/30 text-brand-cyan"
+                            : "bg-white/[0.03] border-white/5 text-gray-300"
+                        }`}
+                      >
+                        <Icon d={d.icon} className="w-6 h-6" />
+                        <span className="text-[11px] font-semibold leading-tight">{d.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+                <button
+                  onClick={() => logout()}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-red-500/20 text-red-400 font-semibold text-sm"
+                >
+                  <Icon d={ICONS.logout} className="w-5 h-5" />
+                  Cerrar sesión
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

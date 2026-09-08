@@ -1,18 +1,12 @@
-import React from "react";
 import { prisma } from "@/lib/prisma";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { verifyStaffSession } from "@/lib/staff-session";
-
 import BookingsManager from "./BookingsManager";
 
 export const metadata = {
-  title: "Agenda | Centro de Comando Lubrimax",
+  title: "Agenda | Lubrimax",
 };
 
 export default async function AdminDashboard() {
-  // El layout (panel) ya garantizó la sesión; acá solo necesitamos el rol
-  // para decidir qué controles mostrar.
   const session = await verifyStaffSession();
   const role = session?.role ?? "WORKER";
 
@@ -21,78 +15,26 @@ export default async function AdminDashboard() {
     include: { services: true },
   });
 
-  const totalBookings = bookings.length;
-  const confirmedBookings = bookings.filter((b) => b.status === "CONFIRMED").length;
-  const inProgress = bookings.filter((b) => b.workStatus === "IN_PROGRESS").length;
-
   return (
-    <div className="min-h-screen bg-brand-pure text-brand-chrome py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[100px] bg-brand-blue/10 blur-[100px] pointer-events-none rounded-full" />
-
-      <div className="max-w-7xl mx-auto relative z-10">
-        <header className="mb-12 border-b border-white/10 pb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div>
-            <h1 className="text-2xl md:text-4xl font-bold uppercase tracking-widest text-white italic drop-shadow-md mb-2">
-              Centro de Comando{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">
-                Lubrimax
-              </span>
-            </h1>
-            <p className="text-gray-400">
-              {role === "ADMIN"
-                ? "Sistema central de reservas y operaciones"
-                : "Agenda operativa — marca el avance de cada trabajo"}
-            </p>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-brand-surface border border-white/5 p-6 rounded-lg shadow-lg relative overflow-hidden group hover:border-white/20 transition-colors">
-            <div className="absolute top-0 left-0 w-1 h-full bg-brand-cyan" />
-            <h3 className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">Reservas Totales</h3>
-            <p className="text-4xl font-black text-white">{totalBookings}</p>
-          </div>
-          <div className="bg-brand-surface border border-white/5 p-6 rounded-lg shadow-lg relative overflow-hidden group hover:border-white/20 transition-colors">
-            <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
-            <h3 className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">Confirmadas</h3>
-            <p className="text-4xl font-black text-white">{confirmedBookings}</p>
-          </div>
-          <div className="bg-brand-surface border border-white/5 p-6 rounded-lg shadow-lg relative overflow-hidden group hover:border-white/20 transition-colors">
-            <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
-            <h3 className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-2">
-              {role === "ADMIN" ? "Última Actividad" : "En Proceso Ahora"}
-            </h3>
-            {role === "ADMIN" ? (
-              <p className="text-xl font-bold text-white mt-2">
-                {bookings[0]
-                  ? format(bookings[0].createdAt, "dd MMM HH:mm", { locale: es })
-                  : "N/A"}
-              </p>
-            ) : (
-              <p className="text-4xl font-black text-white">{inProgress}</p>
-            )}
-          </div>
-        </div>
-
-        <BookingsManager
-          role={role}
-          initialBookings={bookings.map((b) => ({
-            id: b.id,
-            date: b.date,
-            startTime: b.startTime,
-            endTime: b.endTime,
-            status: b.status,
-            workStatus: b.workStatus,
-            paymentStatus: b.paymentStatus,
-            customerName: b.customerName,
-            customerPhone: b.customerPhone,
-            customerEmail: b.customerEmail,
-            vehicleMake: b.vehicleMake,
-            vehicleModel: b.vehicleModel,
-            services: b.services.map((s) => ({ name: s.name, duration: s.duration })),
-          }))}
-        />
-      </div>
+    <div className="px-3 sm:px-6 py-4 max-w-5xl mx-auto w-full">
+      <BookingsManager
+        role={role}
+        initialBookings={bookings.map((b) => ({
+          id: b.id,
+          date: b.date.toISOString(),
+          startTime: b.startTime,
+          endTime: b.endTime,
+          status: b.status,
+          workStatus: b.workStatus,
+          paymentStatus: b.paymentStatus,
+          customerName: b.customerName,
+          customerPhone: b.customerPhone,
+          customerEmail: b.customerEmail,
+          vehicleMake: b.vehicleMake,
+          vehicleModel: b.vehicleModel,
+          services: b.services.map((s) => ({ name: s.name, duration: s.duration })),
+        }))}
+      />
     </div>
   );
 }

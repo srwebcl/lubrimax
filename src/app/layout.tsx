@@ -36,6 +36,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#000000",
   colorScheme: "dark",
+  // La PWA dibuja hasta los bordes: el contenido gestiona sus safe-areas.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

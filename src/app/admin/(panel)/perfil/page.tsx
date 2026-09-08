@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyStaffSession } from "@/lib/staff-session";
 import ChangePasswordForm from "./ChangePasswordForm";
 import LogoutButton from "./LogoutButton";
+import InstallCard from "@/components/pwa/InstallCard";
 
 export const metadata = { title: "Mi perfil | Lubrimax" };
 
@@ -76,6 +77,8 @@ export default async function AdminProfilePage() {
                 </dd>
               </div>
             </dl>
+
+            <InstallCard />
 
             <ChangePasswordForm />
           </div>

@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { updateBookingStatus, updateWorkStatus } from "@/actions/admin-bookings";
-import { format } from "date-fns";
+import { format, isToday, isSameWeek, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 
 type Role = "ADMIN" | "WORKER";
 
-type BookingWithService = {
+type Booking = {
   id: string;
-  date: Date;
+  date: string; // ISO
   startTime: string;
   endTime: string;
   status: string;
@@ -23,35 +23,35 @@ type BookingWithService = {
   services: { name: string; duration: number }[];
 };
 
-const WORK_STEPS: { value: string; label: string; cls: string }[] = [
-  { value: "PENDING", label: "Por hacer", cls: "bg-gray-500/15 text-gray-300 border-gray-500/30" },
-  { value: "IN_PROGRESS", label: "En proceso", cls: "bg-amber-500/15 text-amber-300 border-amber-500/40" },
-  { value: "DONE", label: "Terminado", cls: "bg-green-500/15 text-green-300 border-green-500/40" },
-];
+const WORK_STEPS = [
+  { value: "PENDING", short: "Por hacer" },
+  { value: "IN_PROGRESS", short: "En proceso" },
+  { value: "DONE", short: "Terminado" },
+] as const;
 
-function statusColor(status: string) {
-  switch (status) {
-    case "PENDING":
-      return "text-yellow-500 bg-yellow-500/10 border-yellow-500/30";
-    case "CONFIRMED":
-      return "text-green-400 bg-green-500/10 border-green-500/30";
-    case "CANCELLED":
-      return "text-red-400 bg-red-500/10 border-red-500/30";
-    default:
-      return "text-brand-cyan bg-brand-blue/10 border-brand-blue/30";
-  }
+const FILTERS = [
+  { key: "today", label: "Hoy" },
+  { key: "week", label: "Semana" },
+  { key: "all", label: "Todas" },
+] as const;
+type FilterKey = (typeof FILTERS)[number]["key"];
+
+function workAccent(v: string) {
+  if (v === "DONE") return "text-green-400";
+  if (v === "IN_PROGRESS") return "text-amber-400";
+  return "text-gray-500";
 }
 
-function statusLabel(status: string) {
+function statusPill(status: string) {
   switch (status) {
-    case "PENDING":
-      return "Pendiente";
     case "CONFIRMED":
-      return "Confirmada";
+      return { label: "Confirmada", cls: "bg-green-500/10 text-green-400 border-green-500/25" };
     case "CANCELLED":
-      return "Cancelada";
+      return { label: "Cancelada", cls: "bg-red-500/10 text-red-400 border-red-500/25" };
+    case "PENDING":
+      return { label: "Pendiente", cls: "bg-yellow-500/10 text-yellow-500 border-yellow-500/25" };
     default:
-      return status;
+      return { label: status, cls: "bg-white/5 text-gray-300 border-white/10" };
   }
 }
 
@@ -59,241 +59,276 @@ export default function BookingsManager({
   initialBookings,
   role,
 }: {
-  initialBookings: BookingWithService[];
+  initialBookings: Booking[];
   role: Role;
 }) {
-  const [bookings, setBookings] = useState(initialBookings);
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const isAdmin = role === "ADMIN";
+  const [bookings, setBookings] = useState(initialBookings);
+  const [filter, setFilter] = useState<FilterKey>("today");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
 
-  const handleStatusUpdate = async (
-    e: React.FormEvent<HTMLFormElement>,
-    bookingId: string
-  ) => {
+  const counts = useMemo(() => {
+    const now = new Date();
+    let today = 0;
+    let week = 0;
+    for (const b of bookings) {
+      const d = new Date(b.date);
+      if (isToday(d)) today++;
+      if (isSameWeek(d, now, { weekStartsOn: 1 })) week++;
+    }
+    return { today, week, all: bookings.length };
+  }, [bookings]);
+
+  const shown = useMemo(() => {
+    const now = new Date();
+    const list = bookings.filter((b) => {
+      const d = new Date(b.date);
+      if (filter === "today") return isToday(d);
+      if (filter === "week") return isSameWeek(d, now, { weekStartsOn: 1 });
+      return true;
+    });
+    // Cronológico ascendente: lo próximo primero.
+    return [...list].sort((a, b) => {
+      const da = startOfDay(new Date(a.date)).getTime();
+      const db = startOfDay(new Date(b.date)).getTime();
+      if (da !== db) return da - db;
+      return a.startTime.localeCompare(b.startTime);
+    });
+  }, [bookings, filter]);
+
+  async function setWork(id: string, workStatus: string) {
+    setBusy(id);
+    const res = await updateWorkStatus(id, workStatus);
+    if (res.success) {
+      setBookings((p) => p.map((b) => (b.id === id ? { ...b, workStatus } : b)));
+    } else {
+      alert(res.error);
+    }
+    setBusy(null);
+  }
+
+  async function saveAdmin(e: React.FormEvent<HTMLFormElement>, id: string) {
     e.preventDefault();
-    setUpdating(bookingId);
-    const formData = new FormData(e.currentTarget);
-    const result = await updateBookingStatus(bookingId, formData);
-
-    if (result.success) {
-      setExpandedRow(null);
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === bookingId
+    setBusy(id);
+    const fd = new FormData(e.currentTarget);
+    const res = await updateBookingStatus(id, fd);
+    if (res.success) {
+      setBookings((p) =>
+        p.map((b) =>
+          b.id === id
             ? {
                 ...b,
-                status: String(formData.get("status")),
-                paymentStatus: String(formData.get("paymentStatus")),
+                status: String(fd.get("status")),
+                paymentStatus: String(fd.get("paymentStatus")),
+                date: fd.get("newDate")
+                  ? new Date(String(fd.get("newDate"))).toISOString()
+                  : b.date,
+                startTime: fd.get("newTime") ? String(fd.get("newTime")) : b.startTime,
               }
             : b
         )
       );
+      setEditing(null);
     } else {
-      alert(result.error);
+      alert(res.error);
     }
-    setUpdating(null);
-  };
-
-  const handleWorkStatus = async (bookingId: string, workStatus: string) => {
-    setUpdating(bookingId);
-    const result = await updateWorkStatus(bookingId, workStatus);
-    if (result.success) {
-      setBookings((prev) =>
-        prev.map((b) => (b.id === bookingId ? { ...b, workStatus } : b))
-      );
-    } else {
-      alert(result.error);
-    }
-    setUpdating(null);
-  };
-
-  const colSpan = isAdmin ? 7 : 6;
+    setBusy(null);
+  }
 
   return (
-    <div className="bg-brand-surface/50 border border-white/10 rounded-lg overflow-hidden backdrop-blur-md">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-black/50 text-gray-400 uppercase tracking-widest text-[10px] md:text-xs border-b border-white/10">
-            <tr>
-              <th className="px-4 py-3 md:px-6 md:py-4 font-bold">Cliente</th>
-              <th className="px-4 py-3 md:px-6 md:py-4 font-bold">Vehículo</th>
-              <th className="px-4 py-3 md:px-6 md:py-4 font-bold">Servicio</th>
-              <th className="px-4 py-3 md:px-6 md:py-4 font-bold">Fecha y Hora</th>
-              {isAdmin && <th className="px-4 py-3 md:px-6 md:py-4 font-bold">Estado</th>}
-              <th className="px-4 py-3 md:px-6 md:py-4 font-bold">Trabajo</th>
-              {isAdmin && (
-                <th className="px-4 py-3 md:px-6 md:py-4 font-bold text-center">Acción</th>
-              )}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {bookings.map((booking) => (
-              <React.Fragment key={booking.id}>
-                <tr className="hover:bg-white/5 transition-colors duration-200">
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="font-bold text-white text-xs md:text-sm">
-                      {booking.customerName}
-                    </div>
-                    <div className="text-[10px] md:text-xs text-gray-500 mt-1">
-                      <a href={`tel:${booking.customerPhone}`} className="hover:text-brand-cyan">
-                        {booking.customerPhone}
-                      </a>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-gray-300 text-xs md:text-sm">{booking.vehicleMake}</div>
-                    <div className="text-[10px] md:text-xs text-brand-cyan uppercase tracking-wider mt-1">
-                      {booking.vehicleModel}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-gray-300 text-xs md:text-sm">
-                      {booking.services.map((s) => s.name).join(" + ")}
-                    </div>
-                    <div className="text-[10px] md:text-xs text-gray-500 mt-1">
-                      {booking.services.reduce((acc, s) => acc + s.duration, 0) / 60} hrs
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="text-white font-medium text-xs md:text-sm">
-                      {format(new Date(booking.date), "dd MMM yyyy", { locale: es })}
-                    </div>
-                    <div className="text-[10px] md:text-xs text-gray-400 mt-1">
-                      {booking.startTime} - {booking.endTime}
-                    </div>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-4 py-3 md:px-6 md:py-4">
-                      <span
-                        className={`px-2 md:px-3 py-1 text-[9px] md:text-[10px] uppercase tracking-widest font-bold rounded-full border ${statusColor(
-                          booking.status
-                        )}`}
-                      >
-                        {statusLabel(booking.status)}
+    <div>
+      {/* Filtro segmentado — pegajoso bajo el header */}
+      <div className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] md:top-14 z-30 -mx-3 sm:mx-0 px-3 sm:px-0 py-2.5 bg-brand-pure/85 backdrop-blur-md">
+        <div className="flex gap-1 p-1 bg-white/5 rounded-full">
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            const n = counts[f.key];
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-xs font-bold uppercase tracking-wide transition-colors ${
+                  active ? "bg-brand-cyan text-brand-pure" : "text-gray-400"
+                }`}
+              >
+                {f.label}
+                <span
+                  className={`text-[10px] px-1.5 rounded-full ${
+                    active ? "bg-black/20" : "bg-white/10"
+                  }`}
+                >
+                  {n}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="text-center py-20 text-gray-500 text-sm">
+          {filter === "today"
+            ? "No hay reservas para hoy."
+            : filter === "week"
+            ? "No hay reservas esta semana."
+            : "No hay reservas registradas."}
+        </div>
+      ) : (
+        <ul className="space-y-3 pt-1">
+          {shown.map((b) => {
+            const d = new Date(b.date);
+            const total = b.services.reduce((a, s) => a + s.duration, 0);
+            const pill = statusPill(b.status);
+            const open = editing === b.id;
+            return (
+              <li
+                key={b.id}
+                className="bg-brand-surface border border-white/8 rounded-2xl overflow-hidden"
+              >
+                <div className="p-4">
+                  {/* Fila 1: hora + estado */}
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-bold text-white tabular-nums">
+                        {b.startTime}
                       </span>
-                    </td>
-                  )}
-                  <td className="px-4 py-3 md:px-6 md:py-4">
-                    <div className="flex gap-1">
-                      {WORK_STEPS.map((step) => {
-                        const active = booking.workStatus === step.value;
+                      <span className="text-xs text-gray-500">
+                        {format(d, "EEE d MMM", { locale: es })} · {Math.round((total / 60) * 10) / 10}h
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <span
+                        className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full border ${pill.cls}`}
+                      >
+                        {pill.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Cliente + vehículo */}
+                  <div className="mb-1">
+                    <span className="font-semibold text-white">{b.customerName}</span>
+                    <span className="text-gray-500"> · {b.vehicleMake} {b.vehicleModel}</span>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-3">
+                    {b.services.map((s) => s.name).join(" + ")}
+                  </p>
+
+                  {/* Acciones rápidas: llamar + (admin) editar */}
+                  <div className="flex gap-2 mb-3">
+                    <a
+                      href={`tel:${b.customerPhone}`}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan bg-brand-cyan/10 px-3 py-1.5 rounded-full"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                        />
+                      </svg>
+                      Llamar
+                    </a>
+                    {isAdmin && (
+                      <button
+                        onClick={() => setEditing(open ? null : b.id)}
+                        className="text-xs font-semibold text-gray-300 bg-white/5 px-3 py-1.5 rounded-full"
+                      >
+                        {open ? "Cerrar" : "Editar reserva"}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Avance del trabajo — control grande */}
+                  <div>
+                    <span className={`text-[10px] uppercase tracking-widest font-bold ${workAccent(b.workStatus)}`}>
+                      Avance
+                    </span>
+                    <div className="mt-1 flex gap-1 p-1 bg-black/40 rounded-xl">
+                      {WORK_STEPS.map((s) => {
+                        const active = b.workStatus === s.value;
                         return (
                           <button
-                            key={step.value}
-                            type="button"
-                            disabled={updating === booking.id}
-                            onClick={() => handleWorkStatus(booking.id, step.value)}
-                            className={`px-2.5 py-1 text-[9px] md:text-[10px] uppercase tracking-widest font-bold rounded border transition-colors disabled:opacity-40 ${
+                            key={s.value}
+                            disabled={busy === b.id}
+                            onClick={() => setWork(b.id, s.value)}
+                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 ${
                               active
-                                ? step.cls
-                                : "bg-transparent text-gray-500 border-white/10 hover:border-white/30 hover:text-gray-300"
+                                ? s.value === "DONE"
+                                  ? "bg-green-500 text-black"
+                                  : s.value === "IN_PROGRESS"
+                                  ? "bg-amber-500 text-black"
+                                  : "bg-white/15 text-white"
+                                : "text-gray-500"
                             }`}
                           >
-                            {step.label}
+                            {s.short}
                           </button>
                         );
                       })}
                     </div>
-                  </td>
-                  {isAdmin && (
-                    <td className="px-4 py-3 md:px-6 md:py-4 text-center">
-                      <button
-                        onClick={() =>
-                          setExpandedRow(expandedRow === booking.id ? null : booking.id)
-                        }
-                        className="text-[10px] uppercase tracking-widest bg-white/10 hover:bg-white/20 text-white font-bold py-1 px-3 rounded transition-colors"
-                      >
-                        {expandedRow === booking.id ? "Cerrar" : "Editar"}
-                      </button>
-                    </td>
-                  )}
-                </tr>
-                {isAdmin && expandedRow === booking.id && (
-                  <tr className="bg-black/30 border-l-2 border-brand-cyan">
-                    <td colSpan={colSpan} className="px-6 py-4">
-                      <form
-                        onSubmit={(e) => handleStatusUpdate(e, booking.id)}
-                        className="flex flex-col md:flex-row items-center gap-4"
-                      >
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div>
-                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">
-                              Estado de la Reserva
-                            </label>
-                            <select
-                              name="status"
-                              defaultValue={booking.status}
-                              className="w-full bg-black border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan"
-                            >
-                              <option value="PENDING">Pendiente</option>
-                              <option value="CONFIRMED">Confirmada</option>
-                              <option value="CANCELLED">Cancelada</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">
-                              Estado del Pago
-                            </label>
-                            <select
-                              name="paymentStatus"
-                              defaultValue={booking.paymentStatus}
-                              className="w-full bg-black border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan"
-                            >
-                              <option value="PENDING">Pendiente</option>
-                              <option value="PAID_RESERVATION">Reserva Pagada (Abono)</option>
-                              <option value="PAID_FULL">Pago Completo</option>
-                              <option value="REFUNDED">Reembolsado (Cancelación)</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">
-                              Fecha
-                            </label>
-                            <input
-                              type="date"
-                              name="newDate"
-                              defaultValue={format(new Date(booking.date), "yyyy-MM-dd")}
-                              className="w-full bg-black border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[10px] uppercase tracking-widest text-gray-500 mb-1">
-                              Hora
-                            </label>
-                            <input
-                              type="time"
-                              name="newTime"
-                              defaultValue={booking.startTime}
-                              className="w-full bg-black border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-brand-cyan"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-end mt-4 md:mt-0">
-                          <button
-                            disabled={updating === booking.id}
-                            type="submit"
-                            className="bg-brand-cyan hover:bg-brand-blue text-black font-bold uppercase tracking-widest text-xs py-2 px-6 rounded transition-colors disabled:opacity-50"
-                          >
-                            {updating === booking.id ? "Guardando..." : "Guardar"}
-                          </button>
-                        </div>
-                      </form>
-                    </td>
-                  </tr>
+                  </div>
+                </div>
+
+                {/* Panel admin */}
+                {isAdmin && open && (
+                  <form
+                    onSubmit={(e) => saveAdmin(e, b.id)}
+                    className="border-t border-white/8 bg-black/30 p-4 grid grid-cols-2 gap-3"
+                  >
+                    <label className="text-[10px] uppercase tracking-widest text-gray-500 col-span-2 -mb-1">
+                      Estado y pago
+                    </label>
+                    <select
+                      name="status"
+                      defaultValue={b.status}
+                      className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
+                    >
+                      <option value="PENDING">Pendiente</option>
+                      <option value="CONFIRMED">Confirmada</option>
+                      <option value="CANCELLED">Cancelada</option>
+                    </select>
+                    <select
+                      name="paymentStatus"
+                      defaultValue={b.paymentStatus}
+                      className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
+                    >
+                      <option value="PENDING">Pago pendiente</option>
+                      <option value="PAID_RESERVATION">Abono pagado</option>
+                      <option value="PAID_FULL">Pago completo</option>
+                      <option value="REFUNDED">Reembolsado</option>
+                    </select>
+                    <label className="text-[10px] uppercase tracking-widest text-gray-500 col-span-2 -mb-1 mt-1">
+                      Reagendar (opcional)
+                    </label>
+                    <input
+                      type="date"
+                      name="newDate"
+                      defaultValue={format(d, "yyyy-MM-dd")}
+                      className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
+                    />
+                    <input
+                      type="time"
+                      name="newTime"
+                      defaultValue={b.startTime}
+                      className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
+                    />
+                    <button
+                      type="submit"
+                      disabled={busy === b.id}
+                      className="col-span-2 mt-1 bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-xs py-3 rounded-xl disabled:opacity-50"
+                    >
+                      {busy === b.id ? "Guardando…" : "Guardar cambios"}
+                    </button>
+                  </form>
                 )}
-              </React.Fragment>
-            ))}
-            {bookings.length === 0 && (
-              <tr>
-                <td colSpan={colSpan} className="px-6 py-12 text-center text-gray-500">
-                  No hay reservas registradas en el sistema.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

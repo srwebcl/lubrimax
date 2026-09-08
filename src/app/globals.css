@@ -40,4 +40,80 @@
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
-}html { scroll-behavior: smooth; }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+
+  /* Safe areas (notch / barra inferior del sistema en la PWA instalada). */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .h-safe-bottom {
+    height: env(safe-area-inset-bottom);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Sensación de aplicación ──────────────────────────────────────────
+   Aplica sobre todo cuando la PWA está instalada (display-mode: standalone),
+   pero también suaviza la experiencia en el navegador móvil. */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (display-mode: standalone) {
+  html,
+  body {
+    /* Sin "rebote" de scroll ni pull-to-refresh accidental dentro de la app. */
+    overscroll-behavior: none;
+  }
+
+  /* En modo app, el texto de la UI no se selecciona al mantener presionado;
+     el contenido editable y los datos sí. */
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  [data-selectable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* Botones y enlaces con feedback táctil inmediato. */
+button:not(:disabled),
+a[role="button"],
+[data-tap] {
+  transition: transform 0.08s ease;
+}
+button:not(:disabled):active,
+a[role="button"]:active,
+[data-tap]:active {
+  transform: scale(0.97);
+}
+
+/* Inputs a 16px reales en móvil: evita el zoom automático de iOS al enfocar. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

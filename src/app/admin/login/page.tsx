@@ -14,8 +14,6 @@ export default function LoginPage() {
     setError(null);
     const formData = new FormData(e.currentTarget);
     const result = await login(formData);
-    
-    // Si result existe, es porque devolvió un error (si tiene éxito, Next.js hace un redirect internamente)
     if (result?.error) {
       setError(result.error);
       setLoading(false);
@@ -23,64 +21,57 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-pure flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Elementos decorativos */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-cyan/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-brand-blue via-brand-cyan to-brand-blue opacity-50" />
-
-      <div className="w-full max-w-md bg-brand-surface/80 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Image 
-              src="/logo-lubrimax.webp" 
-              alt="Lubrimax Admin" 
-              width={160} 
-              height={45} 
-              className="h-10 w-auto object-contain drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]"
-            />
-          </div>
-          <p className="text-brand-cyan text-xs uppercase tracking-widest font-bold">Acceso Restringido</p>
+    <div className="min-h-[100dvh] bg-brand-pure flex flex-col justify-center px-6 pt-safe pb-safe">
+      <div className="w-full max-w-sm mx-auto">
+        <div className="flex flex-col items-center mb-10">
+          <Image
+            src="/logo-lubrimax.webp"
+            alt="Lubrimax"
+            width={180}
+            height={48}
+            priority
+            className="h-11 w-auto object-contain drop-shadow-[0_0_25px_rgba(56,189,248,0.35)]"
+          />
+          <p className="text-gray-500 text-xs uppercase tracking-[0.2em] font-bold mt-4">
+            Panel de operaciones
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Correo</label>
-            <input
-              type="email"
-              name="email"
-              autoComplete="username"
-              required
-              className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all"
-              placeholder="tu@correo.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Contraseña</label>
-            <input
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all"
-              placeholder="••••••••"
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            type="email"
+            name="email"
+            autoComplete="username"
+            inputMode="email"
+            required
+            placeholder="Correo"
+            className="w-full bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan"
+          />
+          <input
+            type="password"
+            name="password"
+            autoComplete="current-password"
+            required
+            placeholder="Contraseña"
+            className="w-full bg-white/[0.04] border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan"
+          />
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm px-4 py-3 rounded-lg text-center">
+            <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm px-4 py-3 rounded-2xl text-center">
               {error}
             </div>
           )}
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-sm py-4 rounded-lg hover:bg-white transition-colors disabled:opacity-50 shadow-[0_0_20px_rgba(56,189,248,0.2)]"
+            className="w-full bg-brand-cyan text-brand-pure font-bold uppercase tracking-widest text-sm py-4 rounded-2xl disabled:opacity-50"
           >
-            {loading ? "Autenticando..." : "Ingresar al Panel"}
+            {loading ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
+
+        <p className="text-center text-gray-600 text-xs mt-8">LUBRIMAX · La Serena</p>
       </div>
     </div>
   );

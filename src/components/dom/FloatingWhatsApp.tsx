@@ -2,8 +2,14 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
 
 export default function FloatingWhatsApp() {
+  const pathname = usePathname();
+  // El botón de WhatsApp es para clientes en el sitio público; en el panel
+  // (/admin) estorba y rompe la sensación de app.
+  if (pathname?.startsWith('/admin')) return null;
+
   return (
     <motion.a
       href="https://wa.me/56982703493?text=Hola,%20me%20gustaría%20hacer%20una%20consulta."
