@@ -41,25 +41,35 @@ export async function login(formData: FormData) {
     return { error: `Demasiados intentos. Espera ${wait}s antes de volver a intentar.` };
   }
 
-  const user = await prisma.staffUser.findUnique({ where: { email } });
+  let user: Awaited<ReturnType<typeof prisma.staffUser.findUnique>>;
+  try {
+    user = await prisma.staffUser.findUnique({ where: { email } });
 
-  // Comparación siempre contra un hash (real o dummy) para no filtrar por
-  // timing si el correo existe o no.
-  const hash =
-    user?.password ??
-    "$2b$12$0000000000000000000000000000000000000000000000000000a";
-  const passwordOk = await bcrypt.compare(password, hash);
+    // Comparación siempre contra un hash (real o dummy) para no filtrar por
+    // timing si el correo existe o no.
+    const hash =
+      user?.password ??
+      "$2b$12$0000000000000000000000000000000000000000000000000000a";
+    const passwordOk = await bcrypt.compare(password, hash);
 
-  if (!user || !user.isActive || !passwordOk) {
-    return { error: "Credenciales incorrectas o cuenta desactivada." };
+    if (!user || !user.isActive || !passwordOk) {
+      return { error: "Credenciales incorrectas o cuenta desactivada." };
+    }
+
+    await prisma.staffUser.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    await setStaffSessionCookie(user);
+  } catch (error) {
+    console.error("login(): error de base de datos", error);
+    return {
+      error:
+        "No pudimos verificar tus credenciales. Si el problema persiste, revisa que la base de datos esté migrada.",
+    };
   }
 
-  await prisma.staffUser.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
-
-  await setStaffSessionCookie(user);
   redirect("/admin");
 }
 
