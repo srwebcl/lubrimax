@@ -2,7 +2,7 @@
 // "lubrimax_customer_session" era el customer.id en texto plano: quien
 // conociera o adivinara el id de un cliente podía pegarlo como valor de
 // cookie y quedar autenticado como esa persona, sin contraseña. Ahora el id
-// va firmado, igual que la sesión de admin (ver admin-session.ts).
+// va firmado, igual que la sesión del personal (ver staff-session.ts).
 
 import { cookies } from "next/headers";
 import { createSignedToken, verifySignedToken } from "./signed-token";
