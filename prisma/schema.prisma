@@ -47,6 +47,12 @@ model Booking {
   startTime     String   // Formato "HH:mm" (ej: "14:00")
   endTime       String   // Formato "HH:mm" (ej: "20:00")
   status        String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
+  // Estado operativo del trabajo en taller. Campo SEPARADO de `status` a
+  // propósito: `status` es el ciclo comercial/administrativo de la reserva
+  // (lo maneja el admin), `workStatus` es el avance físico del trabajo que
+  // marca el trabajador desde la PWA. PENDING = por hacer, IN_PROGRESS = en
+  // proceso, DONE = terminado.
+  workStatus    String   @default("PENDING")
   paymentStatus String   @default("PENDING") // PENDING, PAID_RESERVATION, PAID_FULL
   paymentType   String?  // RESERVATION o FULL: lo que el cliente eligió pagar en Webpay
   paymentId     String?  // Token de la transacción Webpay
@@ -62,6 +68,51 @@ model Booking {
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ==========================================
+// MÓDULO: PERSONAL / ACCESOS AL PANEL (PWA)
+// ==========================================
+
+enum StaffRole {
+  ADMIN  // Acceso total al panel
+  WORKER // Solo la Agenda operativa (marcar avance de trabajos)
+}
+
+model StaffUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String    // Hash bcrypt
+  name         String
+  role         StaffRole @default(WORKER)
+  isActive     Boolean   @default(true)
+  // Se incrementa para invalidar de inmediato todas las sesiones abiertas de
+  // este usuario (cambio de contraseña, "forzar cierre de sesión",
+  // desactivación). El token de sesión lleva este número y se compara contra
+  // la BD en cada request sensible.
+  sessionEpoch Int       @default(0)
+  lastLoginAt  DateTime?
+
+  activity     BookingActivityLog[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Bitácora de acciones del personal sobre las reservas (quién marcó qué y
+// cuándo). Sirve para auditoría y para resolver disputas operativas.
+model BookingActivityLog {
+  id          String    @id @default(cuid())
+  bookingId   String
+  staffUserId String?
+  staffUser   StaffUser? @relation(fields: [staffUserId], references: [id], onDelete: SetNull)
+  staffName   String    // Copia denormalizada: el log sobrevive aunque se borre el usuario
+  action      String    // Ej: "WORK_STATUS", "STATUS", "RESCHEDULE"
+  detail      String?   // Ej: "PENDING -> IN_PROGRESS"
+  createdAt   DateTime  @default(now())
+
+  @@index([bookingId])
+  @@index([createdAt])
 }
 
 model Settings {

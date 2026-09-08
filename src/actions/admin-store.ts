@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath, updateTag } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdmin } from "@/lib/staff-session";
 
 export async function getProducts() {
   try {

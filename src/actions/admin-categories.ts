@@ -2,9 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireRole } from "@/lib/staff-session";
 
 export async function getAdminCategories() {
   try {
+    await requireRole("ADMIN");
+
     const categories = await prisma.serviceCategory.findMany({
       orderBy: { createdAt: 'asc' }
     });
@@ -17,6 +20,8 @@ export async function getAdminCategories() {
 
 export async function createCategory(formData: FormData) {
   try {
+    await requireRole("ADMIN");
+
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const image = formData.get("image") as string;
@@ -49,6 +54,8 @@ export async function createCategory(formData: FormData) {
 
 export async function updateCategory(id: string, formData: FormData) {
   try {
+    await requireRole("ADMIN");
+
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;
     const image = formData.get("image") as string;
@@ -82,6 +89,8 @@ export async function updateCategory(id: string, formData: FormData) {
 
 export async function deleteCategory(id: string) {
   try {
+    await requireRole("ADMIN");
+
     await prisma.serviceCategory.delete({
       where: { id }
     });

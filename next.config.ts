@@ -31,6 +31,39 @@ const nextConfig: NextConfig = {
       ...(r2RemotePattern() ? [r2RemotePattern()!] : []),
     ],
   },
+  async headers() {
+    return [
+      {
+        // Cabeceras de seguridad para todo el sitio.
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+          },
+          {
+            // Solo tiene efecto sobre HTTPS; en producción (Vercel) fuerza
+            // HTTPS en visitas futuras.
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+        ],
+      },
+      {
+        // El service worker nunca debe quedar cacheado por el navegador: así
+        // cada visita recoge la última versión.
+        source: '/sw.js',
+        headers: [
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

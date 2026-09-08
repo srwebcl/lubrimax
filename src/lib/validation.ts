@@ -17,6 +17,28 @@ export const registerCustomerSchema = z.object({
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
 });
 
+export const loginStaffSchema = z.object({
+  email: z.email("Correo inválido."),
+  password: z.string().min(1, "Ingresa tu contraseña."),
+});
+
+export const createStaffSchema = z.object({
+  name: z.string().trim().min(2, "Nombre muy corto.").max(120),
+  email: z.email("Correo inválido."),
+  password: z.string().min(10, "La contraseña debe tener al menos 10 caracteres.").max(200),
+  role: z.enum(["ADMIN", "WORKER"], { error: "Rol inválido." }),
+});
+
+export const updateStaffSchema = z.object({
+  name: z.string().trim().min(2, "Nombre muy corto.").max(120),
+  role: z.enum(["ADMIN", "WORKER"], { error: "Rol inválido." }),
+  isActive: z.boolean(),
+});
+
+export const resetStaffPasswordSchema = z.object({
+  password: z.string().min(10, "La contraseña debe tener al menos 10 caracteres.").max(200),
+});
+
 export const reviewSchema = z.object({
   productId: z.string().min(1),
   rating: z.coerce.number().int().min(1).max(5),

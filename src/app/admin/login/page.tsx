@@ -44,21 +44,23 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Usuario</label>
-            <input 
-              type="text"
-              name="username"
+            <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Correo</label>
+            <input
+              type="email"
+              name="email"
+              autoComplete="username"
               required
               className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all"
-              placeholder="admin"
+              placeholder="tu@correo.com"
             />
           </div>
 
           <div>
             <label className="block text-gray-400 text-xs uppercase tracking-widest font-bold mb-2">Contraseña</label>
-            <input 
+            <input
               type="password"
               name="password"
+              autoComplete="current-password"
               required
               className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all"
               placeholder="••••••••"

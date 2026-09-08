@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdmin } from "@/lib/staff-session";
 
 export async function getOrders() {
   try {

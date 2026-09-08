@@ -1,64 +1,74 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createAdminSessionToken } from "@/lib/admin-session";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import {
+  setStaffSessionCookie,
+  clearStaffSessionCookie,
+  verifyStaffSession,
+} from "@/lib/staff-session";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { timingSafeEqual } from "crypto";
+import { loginStaffSchema, flattenZodError } from "@/lib/validation";
 
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 1 semana
-
-function safeEqual(a: string, b: string) {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  // timingSafeEqual exige buffers del mismo largo; si difieren ya sabemos
-  // que no son iguales, pero igual comparamos contra sí mismo para no
-  // filtrar por timing cuánto difiere el largo.
-  if (bufA.length !== bufB.length) {
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return timingSafeEqual(bufA, bufB);
-}
-
+/**
+ * Login del panel para administradores y trabajadores. Ambos roles usan el
+ * mismo formulario (/admin/login); el rol se resuelve desde la fila de
+ * StaffUser. Reemplaza la antigua credencial única de entorno.
+ */
 export async function login(formData: FormData) {
   const ip = await getClientIp();
-  const limit = checkRateLimit(`admin-login:${ip}`, 5, 5 * 60 * 1000);
-  if (!limit.allowed) {
-    return { error: `Demasiados intentos. Espera ${limit.retryAfterSeconds}s antes de volver a intentar.` };
+
+  const parsed = loginStaffSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { error: flattenZodError(parsed.error) };
+  }
+  const email = parsed.data.email.toLowerCase().trim();
+  const { password } = parsed.data;
+
+  // Doble límite: por IP (frena scripts) y por correo (frena fuerza bruta
+  // dirigida a una cuenta desde varias IPs).
+  const ipLimit = checkRateLimit(`staff-login-ip:${ip}`, 10, 10 * 60 * 1000);
+  const emailLimit = checkRateLimit(`staff-login-email:${email}`, 5, 10 * 60 * 1000);
+  if (!ipLimit.allowed || !emailLimit.allowed) {
+    const wait = Math.max(
+      ipLimit.retryAfterSeconds ?? 0,
+      emailLimit.retryAfterSeconds ?? 0
+    );
+    return { error: `Demasiados intentos. Espera ${wait}s antes de volver a intentar.` };
   }
 
-  const username = formData.get("username") as string;
-  const password = formData.get("password") as string;
+  const user = await prisma.staffUser.findUnique({ where: { email } });
 
-  // Sin fallback: si estas variables no están seteadas en el entorno
-  // (ej. un preview de Vercel sin las env vars configuradas), el login debe
-  // fallar duro en vez de aceptar credenciales de ejemplo conocidas.
-  const validUser = process.env.ADMIN_USER;
-  const validPwd = process.env.ADMIN_PASSWORD;
-  if (!validUser || !validPwd) {
-    throw new Error("ADMIN_USER / ADMIN_PASSWORD no están configurados en el servidor.");
+  // Comparación siempre contra un hash (real o dummy) para no filtrar por
+  // timing si el correo existe o no.
+  const hash =
+    user?.password ??
+    "$2b$12$0000000000000000000000000000000000000000000000000000a";
+  const passwordOk = await bcrypt.compare(password, hash);
+
+  if (!user || !user.isActive || !passwordOk) {
+    return { error: "Credenciales incorrectas o cuenta desactivada." };
   }
 
-  if (username && password && safeEqual(username, validUser) && safeEqual(password, validPwd)) {
-    const token = await createAdminSessionToken(SESSION_MAX_AGE);
-    const cookieStore = await cookies();
-    cookieStore.set("lubrimax_admin_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: SESSION_MAX_AGE,
-      path: "/",
-    });
-  } else {
-    return { error: "Credenciales incorrectas. Acceso denegado." };
-  }
+  await prisma.staffUser.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
 
+  await setStaffSessionCookie(user);
   redirect("/admin");
 }
 
 export async function logout() {
-  const cookieStore = await cookies();
-  cookieStore.delete("lubrimax_admin_session");
+  await clearStaffSessionCookie();
   redirect("/admin/login");
+}
+
+/** Datos mínimos de la sesión actual para la UI del panel (o null). */
+export async function getCurrentStaff() {
+  return verifyStaffSession();
 }

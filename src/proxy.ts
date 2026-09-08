@@ -1,46 +1,72 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyAdminSessionToken } from '@/lib/admin-session';
+import {
+  STAFF_SESSION_COOKIE,
+  verifyStaffTokenPayload,
+} from '@/lib/staff-token';
 import { verifyCustomerSessionToken } from '@/lib/customer-session';
+
+// Rutas del panel que SOLO puede ver un ADMIN. El trabajador (WORKER) queda
+// restringido a la agenda operativa (`/admin`) y su perfil. Esto es un
+// chequeo OPTIMISTA (solo lee la cookie firmada, no la BD) para redirigir
+// antes de renderizar; la verdad la imponen los layouts de servidor y cada
+// Server Action (ver requireRole en src/lib/staff-session.ts).
+const ADMIN_ONLY_PREFIXES = [
+  '/admin/servicios',
+  '/admin/categorias',
+  '/admin/club',
+  '/admin/pedidos',
+  '/admin/tienda',
+  '/admin/cupones',
+  '/admin/configuracion',
+  '/admin/usuarios',
+];
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl;
+  const path = url.pathname;
 
-  // Protect all /admin routes except /admin/login
-  if (url.pathname.startsWith('/admin') && url.pathname !== '/admin/login') {
-    const session = request.cookies.get('lubrimax_admin_session');
+  // ---------- Panel de personal (/admin) ----------
+  if (path.startsWith('/admin') && path !== '/admin/login') {
+    const token = request.cookies.get(STAFF_SESSION_COOKIE)?.value;
+    const payload = await verifyStaffTokenPayload(token);
 
-    if (!(await verifyAdminSessionToken(session?.value))) {
-      const loginUrl = new URL('/admin/login', request.url);
-      return NextResponse.redirect(loginUrl);
+    if (!payload) {
+      return NextResponse.redirect(new URL('/admin/login', request.url));
     }
-  }
 
-  // Redirect authenticated users away from the login page
-  if (url.pathname === '/admin/login') {
-    const session = request.cookies.get('lubrimax_admin_session');
-    if (await verifyAdminSessionToken(session?.value)) {
+    // Un trabajador que intenta entrar a una sección de gestión vuelve a la
+    // agenda.
+    if (
+      payload.role !== 'ADMIN' &&
+      ADMIN_ONLY_PREFIXES.some((p) => path === p || path.startsWith(p + '/'))
+    ) {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
   }
 
-  // Protect customer private routes. Esto es solo un chequeo optimista para
-  // UX (redirigir antes de renderizar) — cada Server Action que toca datos
-  // de un cliente vuelve a verificar la sesión por su cuenta, como recomienda
-  // la guía de seguridad de Next.js para Server Actions.
-  if (url.pathname.startsWith('/perfil')) {
+  if (path === '/admin/login') {
+    const token = request.cookies.get(STAFF_SESSION_COOKIE)?.value;
+    if (await verifyStaffTokenPayload(token)) {
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
+  }
+
+  // ---------- Rutas privadas de cliente ----------
+  // Chequeo optimista para UX; cada Server Action de cliente revalida por su
+  // cuenta.
+  if (path.startsWith('/perfil')) {
     const customerSession = request.cookies.get('lubrimax_customer_session');
     const customerId = await verifyCustomerSessionToken(customerSession?.value);
 
     if (!customerId) {
       const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('callbackUrl', url.pathname);
+      loginUrl.searchParams.set('callbackUrl', path);
       return NextResponse.redirect(loginUrl);
     }
   }
 
-  // Redirect authenticated customers away from public auth pages
-  if (url.pathname === '/login' || url.pathname === '/registro') {
+  if (path === '/login' || path === '/registro') {
     const customerSession = request.cookies.get('lubrimax_customer_session');
     const customerId = await verifyCustomerSessionToken(customerSession?.value);
     if (customerId) {

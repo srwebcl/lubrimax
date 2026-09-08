@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { r2 } from "@/lib/r2";
-import { cookies } from "next/headers";
-import { verifyAdminSessionToken } from "@/lib/admin-session";
+import { verifyStaffSession } from "@/lib/staff-session";
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const session = cookieStore.get("lubrimax_admin_session")?.value;
-    if (!(await verifyAdminSessionToken(session))) {
+    // Subir imágenes es parte de la gestión de catálogo/tienda: solo ADMIN.
+    const session = await verifyStaffSession();
+    if (!session) {
       return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+    if (session.role !== "ADMIN") {
+      return NextResponse.json({ error: "No autorizado." }, { status: 403 });
     }
 
     const formData = await request.formData();

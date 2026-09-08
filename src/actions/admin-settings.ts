@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath, updateTag, unstable_cache } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdmin } from "@/lib/staff-session";
 
 async function fetchSettings() {
   let settings = await prisma.settings.findUnique({

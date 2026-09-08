@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin-session";
+import { requireAdmin } from "@/lib/staff-session";
 
 export async function getCoupons() {
   try {
