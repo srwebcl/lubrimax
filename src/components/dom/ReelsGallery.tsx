@@ -80,7 +80,7 @@ export default function ReelsGallery({ reels }: Props) {
   }
 
   return (
-    <div className="w-full relative z-10 flex flex-col items-center">
+    <div className="w-full relative z-10 flex flex-col items-center overflow-hidden">
       <div className="relative w-full max-w-6xl flex justify-center items-center h-[600px] md:h-[650px]">
         
         {/* Carrusel Dinámico 3D con soporte para Swipe */}

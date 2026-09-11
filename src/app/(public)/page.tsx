@@ -22,7 +22,7 @@ export default async function Home() {
       <Stats />
 
       {/* Sección principal de Videos (Reels / Social Proof) */}
-      <section id="resultados" className="pt-24 pb-8 md:pb-12 max-w-7xl mx-auto px-4 w-full">
+      <section id="resultados" className="pt-24 pb-8 md:pb-12 max-w-7xl mx-auto px-4 w-full overflow-hidden">
         <h2 className="text-3xl md:text-5xl font-bold italic uppercase tracking-widest text-brand-chrome mb-4 text-center flex flex-col md:block">
           <span>Resultados</span> <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">Clínicos</span>
         </h2>
