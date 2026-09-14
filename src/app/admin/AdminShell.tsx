@@ -95,9 +95,9 @@ export default function AdminShell({
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
 
   return (
-    <div className="min-h-[100dvh] bg-brand-pure flex">
+    <div className="h-[100dvh] bg-brand-pure flex overflow-hidden">
       {/* ───────────── Sidebar (escritorio) ───────────── */}
-      <aside className="w-60 bg-brand-surface border-r border-white/5 hidden md:flex flex-col shrink-0">
+      <aside className="w-60 h-full bg-brand-surface border-r border-white/5 hidden md:flex flex-col shrink-0">
         <div className="p-6 border-b border-white/5">
           <Link href="/admin" className="flex justify-center">
             <Image
@@ -109,7 +109,7 @@ export default function AdminShell({
             />
           </Link>
         </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 min-h-0 p-3 space-y-1 overflow-y-auto custom-scrollbar">
           {visible.map((d) => {
             const active = isActive(d.href);
             return (
@@ -140,9 +140,13 @@ export default function AdminShell({
       </aside>
 
       {/* ───────────── Área principal ───────────── */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-[100dvh]">
+      {/* min-h-0 es la clave: sin esto, un hijo flex-1 no se acota a la
+          altura del contenedor y `overflow-y-auto` de `main` nunca activa un
+          scroll interno — la pantalla queda "cortada" y sin poder scrollear
+          (justo el bug reportado en escritorio). */}
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col h-full">
         {/* Top bar — chrome mínimo; cada pantalla pone su propio título */}
-        <header className="sticky top-0 z-40 bg-brand-surface/80 backdrop-blur-xl border-b border-white/5 pt-safe">
+        <header className="shrink-0 sticky top-0 z-40 bg-brand-surface/80 backdrop-blur-xl border-b border-white/5 pt-safe">
           <div className="h-14 px-4 sm:px-6 flex items-center justify-between gap-3">
             <Image
               src="/logo-lubrimax.webp"
@@ -170,8 +174,8 @@ export default function AdminShell({
           </div>
         </header>
 
-        {/* Contenido — con espacio para la tab bar en móvil */}
-        <main className="flex-1 overflow-y-auto overscroll-contain pb-[calc(4.5rem_+_env(safe-area-inset-bottom))] md:pb-0">
+        {/* Contenido — único elemento que scrollea; con espacio para la tab bar en móvil */}
+        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[calc(4.5rem_+_env(safe-area-inset-bottom))] md:pb-0">
           {children}
         </main>
       </div>

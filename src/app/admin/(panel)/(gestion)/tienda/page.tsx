@@ -40,6 +40,7 @@ export default function TiendaPage() {
   const [savingCategory, setSavingCategory] = useState(false);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [query, setQuery] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
@@ -126,53 +127,125 @@ export default function TiendaPage() {
     setSavingCategory(false);
   };
 
+  const filtered = query.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : products;
+
   return (
-    <Screen size="lg">
+    <Screen size="xl">
       <PageHead
         title="Productos"
         subtitle="Inventario, variantes e imágenes de la tienda."
         action={<AddBtn label="Producto" onClick={() => openForm()} />}
       />
 
-      <GhostBtn onClick={() => setShowCategoryForm(true)} className="h-9 text-xs">
-        Gestionar categorías ({categories.length})
-      </GhostBtn>
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar producto…"
+          className={`${INPUT} sm:max-w-xs`}
+        />
+        <GhostBtn onClick={() => setShowCategoryForm(true)} className="h-11 sm:h-9 text-xs shrink-0">
+          Categorías ({categories.length})
+        </GhostBtn>
+      </div>
 
       {loading ? (
         <Spinner />
-      ) : products.length === 0 ? (
-        <Empty>Sin productos.</Empty>
+      ) : filtered.length === 0 ? (
+        <Empty>{products.length === 0 ? "Sin productos." : "Sin resultados para esa búsqueda."}</Empty>
       ) : (
-        <ul className="space-y-3">
-          {products.map((prod) => (
-            <li key={prod.id} className={`${CARD} ${prod.isActive ? "" : "opacity-55"} flex gap-3`}>
-              <div className="w-20 h-20 rounded-xl overflow-hidden bg-black/40 shrink-0 relative">
-                {prod.image ? (
-                  <Image src={prod.image} alt={prod.name} fill sizes="80px" className="object-cover" />
-                ) : (
-                  <span className="absolute inset-0 grid place-items-center text-[10px] text-gray-600">Sin foto</span>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] text-brand-cyan font-bold uppercase tracking-wider">
-                  {prod.category?.name || "Sin categoría"}
-                </div>
-                <div className="font-bold text-white truncate">{prod.name}</div>
-                <div className="text-sm text-gray-400">
-                  ${prod.price.toLocaleString("es-CL")} ·{" "}
-                  <span className={prod.stock > 0 ? "text-green-400" : "text-red-400"}>stock {prod.stock}</span>
-                  {prod.variants?.length > 0 && ` · ${prod.variants.length} variantes`}
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <button onClick={() => openForm(prod)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-cyan/25 text-brand-cyan">Editar</button>
-                  {prod.isActive && (
-                    <button onClick={() => { if (confirm("¿Dar de baja este producto?")) deleteProduct(prod.id).then(fetchData); }} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400">Dar de baja</button>
+        <>
+          {/* Escritorio: listado tipo tabla (denso, tipo Shopify) */}
+          <div className="hidden md:block rounded-2xl border border-white/8 overflow-hidden">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-white/[0.03] text-left text-[11px] uppercase tracking-wider text-gray-500">
+                  <th className="py-3 pl-4 pr-3 font-semibold">Producto</th>
+                  <th className="py-3 px-3 font-semibold">Categoría</th>
+                  <th className="py-3 px-3 font-semibold text-right">Precio</th>
+                  <th className="py-3 px-3 font-semibold text-right">Stock</th>
+                  <th className="py-3 px-3 font-semibold">Estado</th>
+                  <th className="py-3 pl-3 pr-4 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/6">
+                {filtered.map((prod) => (
+                  <tr key={prod.id} className={`hover:bg-white/[0.025] transition-colors ${prod.isActive ? "" : "opacity-50"}`}>
+                    <td className="py-2.5 pl-4 pr-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-lg overflow-hidden bg-black/40 shrink-0 relative">
+                          {prod.image ? (
+                            <Image src={prod.image} alt={prod.name} fill sizes="44px" className="object-cover" />
+                          ) : (
+                            <span className="absolute inset-0 grid place-items-center text-[9px] text-gray-600">—</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-white truncate">{prod.name}</div>
+                          {prod.variants?.length > 0 && (
+                            <div className="text-[11px] text-gray-500">{prod.variants.length} variantes</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-2.5 px-3 text-gray-400">{prod.category?.name || "—"}</td>
+                    <td className="py-2.5 px-3 text-right text-white font-medium tabular-nums">
+                      ${prod.price.toLocaleString("es-CL")}
+                    </td>
+                    <td className={`py-2.5 px-3 text-right tabular-nums font-medium ${prod.stock > 0 ? "text-green-400" : "text-red-400"}`}>
+                      {prod.stock}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${prod.isActive ? "bg-green-500/15 text-green-400" : "bg-white/8 text-gray-400"}`}>
+                        {prod.isActive ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 pl-3 pr-4 text-right whitespace-nowrap">
+                      <button onClick={() => openForm(prod)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-cyan/25 text-brand-cyan mr-2">Editar</button>
+                      {prod.isActive && (
+                        <button onClick={() => { if (confirm("¿Dar de baja este producto?")) deleteProduct(prod.id).then(fetchData); }} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400">Dar de baja</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Móvil: tarjetas */}
+          <ul className="md:hidden space-y-3">
+            {filtered.map((prod) => (
+              <li key={prod.id} className={`${CARD} ${prod.isActive ? "" : "opacity-55"} flex gap-3`}>
+                <div className="w-20 h-20 rounded-xl overflow-hidden bg-black/40 shrink-0 relative">
+                  {prod.image ? (
+                    <Image src={prod.image} alt={prod.name} fill sizes="80px" className="object-cover" />
+                  ) : (
+                    <span className="absolute inset-0 grid place-items-center text-[10px] text-gray-600">Sin foto</span>
                   )}
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-brand-cyan font-bold uppercase tracking-wider">
+                    {prod.category?.name || "Sin categoría"}
+                  </div>
+                  <div className="font-bold text-white truncate">{prod.name}</div>
+                  <div className="text-sm text-gray-400">
+                    ${prod.price.toLocaleString("es-CL")} ·{" "}
+                    <span className={prod.stock > 0 ? "text-green-400" : "text-red-400"}>stock {prod.stock}</span>
+                    {prod.variants?.length > 0 && ` · ${prod.variants.length} variantes`}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <button onClick={() => openForm(prod)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-cyan/25 text-brand-cyan">Editar</button>
+                    {prod.isActive && (
+                      <button onClick={() => { if (confirm("¿Dar de baja este producto?")) deleteProduct(prod.id).then(fetchData); }} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400">Dar de baja</button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {/* Sheet: categorías */}

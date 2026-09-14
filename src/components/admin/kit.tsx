@@ -16,19 +16,23 @@ export const LABEL =
 export const CARD = "rounded-2xl border border-white/8 bg-brand-surface p-4";
 
 /* ---------- contenedor de pantalla ---------- */
+const SCREEN_WIDTH = {
+  md: "max-w-2xl",
+  lg: "max-w-3xl",
+  // Para pantallas densas en datos (listados tipo tienda/pedidos en
+  // escritorio) donde una tabla necesita más aire.
+  xl: "max-w-6xl",
+} as const;
+
 export function Screen({
   children,
   size = "md",
 }: {
   children: React.ReactNode;
-  size?: "md" | "lg";
+  size?: keyof typeof SCREEN_WIDTH;
 }) {
   return (
-    <div
-      className={`mx-auto w-full px-4 py-5 space-y-5 ${
-        size === "lg" ? "max-w-3xl" : "max-w-2xl"
-      }`}
-    >
+    <div className={`mx-auto w-full px-4 py-5 space-y-5 ${SCREEN_WIDTH[size]}`}>
       {children}
     </div>
   );
