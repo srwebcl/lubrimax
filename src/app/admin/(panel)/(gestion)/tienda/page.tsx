@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import {
-  createProduct, updateProduct, deleteProduct, getProducts,
+  createProduct, updateProduct, toggleProductStatus, deleteProductPermanently, getProducts,
   getCategories, createCategory, deleteCategory, ProductPayload,
 } from "@/actions/admin-store";
 import { Screen, PageHead, AddBtn, GhostBtn, Sheet, Field, INPUT, CARD, Msg, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
@@ -50,6 +50,7 @@ export default function TiendaPage() {
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [query, setQuery] = useState("");
+  const [productActionId, setProductActionId] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -182,6 +183,29 @@ export default function TiendaPage() {
     setSavingInlineCategory(false);
   };
 
+  const handleToggleProductStatus = async (prod: Product) => {
+    setProductActionId(prod.id);
+    const result = await toggleProductStatus(prod.id, prod.isActive);
+    if (result.success) {
+      setProducts((prev) => prev.map((p) => (p.id === prod.id ? { ...p, isActive: !p.isActive } : p)));
+    } else {
+      alert(result.error);
+    }
+    setProductActionId(null);
+  };
+
+  const handleDeleteProductPermanently = async (prod: Product) => {
+    if (!confirm(`¿Eliminar "${prod.name}" definitivamente? Esta acción no se puede deshacer.`)) return;
+    setProductActionId(prod.id);
+    const result = await deleteProductPermanently(prod.id);
+    if (result.success) {
+      setProducts((prev) => prev.filter((p) => p.id !== prod.id));
+    } else {
+      alert(result.error);
+    }
+    setProductActionId(null);
+  };
+
   const filtered = query.trim()
     ? products.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase()))
     : products;
@@ -264,10 +288,23 @@ export default function TiendaPage() {
                       </span>
                     </td>
                     <td className="py-2.5 pl-3 pr-4 text-right whitespace-nowrap">
-                      <button onClick={() => openForm(prod)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-cyan/25 text-brand-cyan mr-2">Editar</button>
-                      {prod.isActive && (
-                        <button onClick={() => { if (confirm("¿Dar de baja este producto?")) deleteProduct(prod.id).then(fetchData); }} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400">Dar de baja</button>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => openForm(prod)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-cyan/25 text-brand-cyan">Editar</button>
+                        <button
+                          disabled={productActionId === prod.id}
+                          onClick={() => handleToggleProductStatus(prod)}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-500/25 text-amber-400 disabled:opacity-50"
+                        >
+                          {prod.isActive ? "Desactivar" : "Activar"}
+                        </button>
+                        <button
+                          disabled={productActionId === prod.id}
+                          onClick={() => handleDeleteProductPermanently(prod)}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400 disabled:opacity-50"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -296,11 +333,22 @@ export default function TiendaPage() {
                     <span className={prod.stock > 0 ? "text-green-400" : "text-red-400"}>stock {prod.stock}</span>
                     {prod.variants?.length > 0 && ` · ${prod.variants.length} variantes`}
                   </div>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <button onClick={() => openForm(prod)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-brand-cyan/25 text-brand-cyan">Editar</button>
-                    {prod.isActive && (
-                      <button onClick={() => { if (confirm("¿Dar de baja este producto?")) deleteProduct(prod.id).then(fetchData); }} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400">Dar de baja</button>
-                    )}
+                    <button
+                      disabled={productActionId === prod.id}
+                      onClick={() => handleToggleProductStatus(prod)}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-500/25 text-amber-400 disabled:opacity-50"
+                    >
+                      {prod.isActive ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      disabled={productActionId === prod.id}
+                      onClick={() => handleDeleteProductPermanently(prod)}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400 disabled:opacity-50"
+                    >
+                      Eliminar
+                    </button>
                   </div>
                 </div>
               </li>

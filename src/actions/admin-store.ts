@@ -128,13 +128,14 @@ export async function updateProduct(id: string, data: ProductPayload) {
   }
 }
 
-export async function deleteProduct(id: string) {
+/** Activa o desactiva un producto (no lo borra: solo deja de mostrarse en la tienda). */
+export async function toggleProductStatus(id: string, currentStatus: boolean) {
   try {
     await requireAdmin();
 
     await prisma.product.update({
       where: { id },
-      data: { isActive: false }
+      data: { isActive: !currentStatus }
     });
 
     updateTag("products");
@@ -143,6 +144,46 @@ export async function deleteProduct(id: string) {
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+/** @deprecated usar toggleProductStatus — se mantiene por compatibilidad. */
+export async function deleteProduct(id: string) {
+  return toggleProductStatus(id, true);
+}
+
+/**
+ * Elimina el producto de forma permanente (borra también sus imágenes,
+ * variantes y reseñas en cascada). Falla a propósito si el producto tiene
+ * pedidos asociados: borrarlo rompería el historial de compras de un
+ * cliente real.
+ */
+export async function deleteProductPermanently(id: string) {
+  try {
+    await requireAdmin();
+
+    const ordersCount = await prisma.orderItem.count({ where: { productId: id } });
+    if (ordersCount > 0) {
+      return {
+        success: false,
+        error: "No se puede eliminar: este producto tiene pedidos asociados. Desactívalo en su lugar.",
+      };
+    }
+
+    await prisma.product.delete({ where: { id } });
+
+    updateTag("products");
+    revalidatePath("/admin/tienda");
+    revalidatePath("/tienda");
+    return { success: true };
+  } catch (error: any) {
+    if (error.code === "P2003" || error.code === "P2014") {
+      return {
+        success: false,
+        error: "No se puede eliminar: este producto tiene pedidos asociados. Desactívalo en su lugar.",
+      };
+    }
+    return { success: false, error: error.message || "No se pudo eliminar el producto." };
   }
 }
 
