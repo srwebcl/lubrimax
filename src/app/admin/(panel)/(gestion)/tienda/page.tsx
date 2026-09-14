@@ -8,7 +8,7 @@ import {
 } from "@/actions/admin-store";
 import { Screen, PageHead, AddBtn, GhostBtn, Sheet, Field, INPUT, CARD, Msg, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; _count?: { products: number } };
 type Variant = { id?: string; name: string; price: number | null; stock: number };
 type ProductImage = { id: string; url: string };
 type Product = {
@@ -38,6 +38,15 @@ export default function TiendaPage() {
 
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [categoryFormError, setCategoryFormError] = useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+
+  // Categoría del producto en edición + creación rápida sin salir del formulario
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [showInlineNewCategory, setShowInlineNewCategory] = useState(false);
+  const [inlineCategoryName, setInlineCategoryName] = useState("");
+  const [savingInlineCategory, setSavingInlineCategory] = useState(false);
+  const [inlineCategoryError, setInlineCategoryError] = useState<string | null>(null);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [query, setQuery] = useState("");
@@ -57,12 +66,17 @@ export default function TiendaPage() {
       setEditingProduct(prod);
       setVariants(prod.variants || []);
       setExistingImages(prod.images?.map((i) => i.url) || []);
+      setSelectedCategoryId(prod.categoryId || "");
     } else {
       setEditingProduct(null);
       setVariants([]);
       setExistingImages([]);
+      setSelectedCategoryId("");
     }
     setMessage(null);
+    setShowInlineNewCategory(false);
+    setInlineCategoryName("");
+    setInlineCategoryError(null);
     setShowForm(true);
   };
 
@@ -77,6 +91,10 @@ export default function TiendaPage() {
 
   const handleProductSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (showInlineNewCategory) {
+      setMessage({ type: "error", text: "Termina de crear la categoría (o cancélala) antes de guardar." });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const form = e.currentTarget;
@@ -121,10 +139,47 @@ export default function TiendaPage() {
   const handleCategorySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSavingCategory(true);
+    setCategoryFormError(null);
     const result = await createCategory(new FormData(e.currentTarget));
-    if (result.success) { await fetchData(); e.currentTarget.reset(); }
-    else alert(result.error);
+    if (result.success && result.category) {
+      setCategories((prev) => [...prev, result.category!].sort((a, b) => a.name.localeCompare(b.name)));
+      e.currentTarget.reset();
+    } else {
+      setCategoryFormError(result.error || "No se pudo crear la categoría.");
+    }
     setSavingCategory(false);
+  };
+
+  const handleDeleteCategory = async (cat: Category) => {
+    if (!confirm(`¿Eliminar la categoría "${cat.name}"? Solo se puede si no tiene productos.`)) return;
+    setDeletingCategoryId(cat.id);
+    const result = await deleteCategory(cat.id);
+    if (result.success) {
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+    } else {
+      alert(result.error);
+    }
+    setDeletingCategoryId(null);
+  };
+
+  /** Crear categoría sin salir del formulario de producto: la deja seleccionada al toque. */
+  const handleAddCategoryInline = async () => {
+    const name = inlineCategoryName.trim();
+    if (!name) return;
+    setSavingInlineCategory(true);
+    setInlineCategoryError(null);
+    const fd = new FormData();
+    fd.set("name", name);
+    const result = await createCategory(fd);
+    if (result.success && result.category) {
+      setCategories((prev) => [...prev, result.category!].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedCategoryId(result.category.id);
+      setInlineCategoryName("");
+      setShowInlineNewCategory(false);
+    } else {
+      setInlineCategoryError(result.error || "No se pudo crear la categoría.");
+    }
+    setSavingInlineCategory(false);
   };
 
   const filtered = query.trim()
@@ -146,7 +201,13 @@ export default function TiendaPage() {
           placeholder="Buscar producto…"
           className={`${INPUT} sm:max-w-xs`}
         />
-        <GhostBtn onClick={() => setShowCategoryForm(true)} className="h-11 sm:h-9 text-xs shrink-0">
+        <GhostBtn
+          onClick={() => { setCategoryFormError(null); setShowCategoryForm(true); }}
+          className="h-11 sm:h-9 text-xs shrink-0"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+          </svg>
           Categorías ({categories.length})
         </GhostBtn>
       </div>
@@ -250,17 +311,56 @@ export default function TiendaPage() {
 
       {/* Sheet: categorías */}
       <Sheet open={showCategoryForm} onClose={() => setShowCategoryForm(false)} title="Categorías de la tienda">
-        <form onSubmit={handleCategorySubmit} className="flex gap-2">
-          <input type="text" name="name" required placeholder="Nueva categoría" className={INPUT} />
-          <button disabled={savingCategory} type="submit" className="h-11 px-4 rounded-xl bg-white/10 text-white text-sm font-bold shrink-0">Agregar</button>
+        <form onSubmit={handleCategorySubmit} className="space-y-3">
+          <Field label="Nueva categoría">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                name="name"
+                required
+                placeholder="Ej. Aceites y lubricantes"
+                className={`${INPUT} flex-1`}
+              />
+              <button
+                disabled={savingCategory}
+                type="submit"
+                className="h-[46px] px-5 rounded-xl bg-brand-cyan text-brand-pure text-sm font-bold shrink-0 disabled:opacity-50"
+              >
+                {savingCategory ? "…" : "Agregar"}
+              </button>
+            </div>
+          </Field>
+          {categoryFormError && <Msg kind="err">{categoryFormError}</Msg>}
         </form>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {categories.map((c) => (
-            <span key={c.id} className="bg-white/5 border border-white/8 px-3 py-1.5 rounded-full text-xs text-gray-300 flex items-center gap-2">
-              {c.name}
-              <button type="button" onClick={() => deleteCategory(c.id).then(fetchData)} className="text-red-400 text-sm leading-none">×</button>
-            </span>
-          ))}
+
+        <div className="mt-5 pt-4 border-t border-white/8">
+          <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">
+            {categories.length} {categories.length === 1 ? "categoría" : "categorías"}
+          </div>
+          {categories.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">Aún no hay categorías. Crea la primera arriba.</p>
+          ) : (
+            <ul className="divide-y divide-white/6 -mx-1">
+              {categories.map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-3 px-1 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-white font-medium truncate">{c.name}</div>
+                    <div className="text-[11px] text-gray-500">
+                      {c._count?.products ?? 0} {c._count?.products === 1 ? "producto" : "productos"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={deletingCategoryId === c.id}
+                    onClick={() => handleDeleteCategory(c)}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/25 text-red-400 shrink-0 disabled:opacity-50"
+                  >
+                    {deletingCategoryId === c.id ? "…" : "Eliminar"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </Sheet>
 
@@ -270,12 +370,56 @@ export default function TiendaPage() {
           <Field label="Nombre">
             <input type="text" name="name" required defaultValue={editingProduct?.name || ""} className={INPUT} />
           </Field>
-          <Field label="Categoría">
-            <select name="categoryId" required defaultValue={editingProduct?.categoryId || ""} className={INPUT}>
-              <option value="" disabled>Seleccionar…</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Categoría</label>
+              <button
+                type="button"
+                onClick={() => { setShowInlineNewCategory((v) => !v); setInlineCategoryError(null); }}
+                className="text-brand-cyan text-xs font-bold"
+              >
+                {showInlineNewCategory ? "Cancelar" : "+ Nueva categoría"}
+              </button>
+            </div>
+
+            {showInlineNewCategory ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={inlineCategoryName}
+                    onChange={(e) => setInlineCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { e.preventDefault(); handleAddCategoryInline(); }
+                    }}
+                    placeholder="Nombre de la categoría"
+                    className={`${INPUT} flex-1`}
+                  />
+                  <button
+                    type="button"
+                    disabled={savingInlineCategory || !inlineCategoryName.trim()}
+                    onClick={handleAddCategoryInline}
+                    className="h-[46px] px-4 rounded-xl bg-brand-cyan text-brand-pure text-sm font-bold shrink-0 disabled:opacity-50"
+                  >
+                    {savingInlineCategory ? "…" : "Crear"}
+                  </button>
+                </div>
+                {inlineCategoryError && <Msg kind="err">{inlineCategoryError}</Msg>}
+              </div>
+            ) : (
+              <select
+                name="categoryId"
+                required
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
+                className={INPUT}
+              >
+                <option value="" disabled>Seleccionar…</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Precio base ($)">
               <input type="number" name="price" required defaultValue={editingProduct?.price || ""} className={INPUT} />

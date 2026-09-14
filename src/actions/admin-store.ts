@@ -155,7 +155,8 @@ export async function getCategories() {
     await requireAdmin();
 
     return await prisma.productCategory.findMany({
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { products: true } } }
     });
   } catch (error) {
     console.error("Error fetching categories:", error);
@@ -167,18 +168,22 @@ export async function createCategory(formData: FormData) {
   try {
     await requireAdmin();
 
-    const name = formData.get("name") as string;
+    const name = (formData.get("name") as string)?.trim();
     if (!name) return { success: false, error: "Nombre requerido" };
 
-    await prisma.productCategory.create({
+    const category = await prisma.productCategory.create({
       data: { name }
     });
 
     updateTag("products");
     revalidatePath("/admin/tienda");
-    return { success: true };
+    return { success: true, category };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    // P2002 = violación de índice único (ya existe una categoría con ese nombre).
+    if (error.code === "P2002") {
+      return { success: false, error: "Ya existe una categoría con ese nombre." };
+    }
+    return { success: false, error: error.message || "No se pudo crear la categoría." };
   }
 }
 
