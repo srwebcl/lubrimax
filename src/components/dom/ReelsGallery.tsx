@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
@@ -10,10 +10,28 @@ interface Props {
 export default function ReelsGallery({ reels }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
+  // El sonido arranca SIEMPRE apagado (los navegadores bloquean el
+  // autoplay con audio sin un gesto previo del usuario). Un solo botón
+  // controla el video activo/centrado; los de atrás nunca suenan.
+  const [muted, setMuted] = useState(true);
+  const activeVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Aplica el estado de sonido al video activo cada vez que cambia el
+  // slide o se toca el botón. Si el navegador rechaza el audio (política
+  // de autoplay), volvemos a silenciar en vez de dejar el video pausado.
+  useEffect(() => {
+    const el = activeVideoRef.current;
+    if (!el) return;
+    el.muted = muted;
+    const playPromise = el.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => setMuted(true));
+    }
+  }, [activeIndex, muted]);
 
   const handleNext = () => {
     setActiveIndex((prev) => prev + 1);
@@ -48,8 +66,8 @@ export default function ReelsGallery({ reels }: Props) {
       <motion.div
         key={virtualIndex}
         initial={{ opacity: 0, x: offset * (typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 320) + (offset > 0 ? 100 : -100), scale: 0.8 }}
-        animate={{ 
-          opacity: isActive ? 1 : 0.4, 
+        animate={{
+          opacity: isActive ? 1 : 0.4,
           x: offset * (typeof window !== 'undefined' && window.innerWidth < 768 ? 80 : 320),
           scale: isActive ? 1 : 0.85,
           zIndex: isActive ? 50 : 40 - Math.abs(offset)
@@ -67,11 +85,12 @@ export default function ReelsGallery({ reels }: Props) {
 
         <div className="w-full h-full flex items-center justify-center overflow-hidden bg-black">
           <video
+            ref={isActive ? activeVideoRef : undefined}
             src={reelId}
             className="w-full h-full object-cover"
             autoPlay
             loop
-            muted
+            muted={!isActive || muted}
             playsInline
           />
         </div>
@@ -82,9 +101,9 @@ export default function ReelsGallery({ reels }: Props) {
   return (
     <div className="w-full relative z-10 flex flex-col items-center overflow-hidden">
       <div className="relative w-full max-w-6xl flex justify-center items-center h-[600px] md:h-[650px]">
-        
+
         {/* Carrusel Dinámico 3D con soporte para Swipe */}
-        <motion.div 
+        <motion.div
           className="relative w-full h-full flex justify-center items-center touch-pan-y"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
@@ -95,6 +114,34 @@ export default function ReelsGallery({ reels }: Props) {
             {slides}
           </AnimatePresence>
         </motion.div>
+
+        {/* Control de sonido — único para toda la sección, aplica al video activo */}
+        <button
+          type="button"
+          onClick={() => setMuted((m) => !m)}
+          aria-label={muted ? "Activar sonido" : "Silenciar"}
+          aria-pressed={!muted}
+          className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border backdrop-blur-md transition-colors ${
+            muted
+              ? "bg-black/60 border-white/15 text-gray-300 hover:border-white/30"
+              : "bg-brand-cyan/15 border-brand-cyan/50 text-brand-cyan shadow-[0_0_20px_rgba(56,189,248,0.25)]"
+          }`}
+        >
+          {muted ? (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5L6 9H3v6h3l5 4V5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 9l4 6m0-6l-4 6" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5L6 9H3v6h3l5 4V5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.5 8.5a5 5 0 010 7M18 6a9 9 0 010 12" />
+            </svg>
+          )}
+          <span className="text-xs font-bold uppercase tracking-widest">
+            {muted ? "Activar sonido" : "Silenciar"}
+          </span>
+        </button>
       </div>
     </div>
   );
