@@ -236,6 +236,40 @@ ya esté funcionando):
 > patente se escribe a mano. Automatizar la lectura requiere un servicio de
 > OCR (follow-up).
 
+## Subida de archivos a R2 — requiere CORS en el bucket
+
+Las subidas (imágenes, videos, foto de recepción) suben **directo del
+navegador al bucket de R2** con una URL pre-firmada (`actions/upload.ts` +
+`lib/uploadClient.ts`) — ya no pasan por el servidor de Next.js, porque los
+Functions de Vercel rechazan cuerpos de más de ~4.5MB (un video corto ya lo
+supera) con "Request Entity Too Large".
+
+Como el navegador ahora hace un `PUT` directo a
+`https://<bucket>.<cuenta>.r2.cloudflarestorage.com/...` (un origen distinto
+al del sitio), **el bucket necesita CORS configurado** o la subida falla con
+un error de CORS en la consola del navegador.
+
+**Cómo configurarlo:** Cloudflare Dashboard → R2 → tu bucket → Settings →
+CORS Policy → agregar:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://lubrimax-eta.vercel.app",
+      "https://lubrimax.cl",
+      "http://localhost:3000"
+    ],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Ajustá `AllowedOrigins` a los dominios reales que uses (producción, previews
+de Vercel si aplica, y `localhost` para desarrollo).
+
 ## Follow-ups recomendados (no incluidos)
 
 - **Rate limit en Redis (Upstash)**: el actual es en memoria y en serverless
