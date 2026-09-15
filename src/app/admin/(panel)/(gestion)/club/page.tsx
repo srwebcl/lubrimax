@@ -6,6 +6,7 @@ import {
   getMemberships, createMembership, updateMembership, deleteMembership,
   getPartners, createPartner, updatePartner, deletePartner,
 } from "@/actions/admin-club";
+import { uploadFileToR2 } from "@/lib/uploadClient";
 import { Screen, PageHead, AddBtn, Sheet, Field, INPUT, CARD, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
 
 type Membership = { id: string; name: string; price: number; discountPercent: number; features: string[]; isActive: boolean };
@@ -52,15 +53,11 @@ export default function ClubAdminPage() {
     const formData = new FormData(form);
     const fileInput = form.querySelector('input[name="logoFile"]') as HTMLInputElement;
     if (fileInput?.files?.length) {
-      const uploadData = new FormData();
-      uploadData.append("file", fileInput.files[0]);
       try {
-        const upRes = await fetch("/api/upload", { method: "POST", body: uploadData });
-        const upJson = await upRes.json();
-        if (upJson.publicUrl) formData.set("logo", upJson.publicUrl);
-        else { alert("Error al subir logo: " + (upJson.error || "Desconocido")); setUploadingLogo(false); return; }
-      } catch {
-        alert("Error de red al subir logo");
+        const logoUrl = await uploadFileToR2(fileInput.files[0]);
+        formData.set("logo", logoUrl);
+      } catch (err) {
+        alert("Error al subir logo: " + (err as Error).message);
         setUploadingLogo(false);
         return;
       }

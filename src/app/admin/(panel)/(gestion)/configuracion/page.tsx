@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { getSettings, updateSettings } from "@/actions/admin-settings";
+import { uploadFileToR2 } from "@/lib/uploadClient";
 import { Screen, PageHead, CARD, INPUT, Field, Msg, PrimaryBtn } from "@/components/admin/kit";
 
 export default function ConfigPage() {
@@ -31,15 +32,6 @@ export default function ConfigPage() {
       setLoading(false);
     });
   }, []);
-
-  const uploadFileToR2 = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al subir archivo");
-    return data.publicUrl;
-  };
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();

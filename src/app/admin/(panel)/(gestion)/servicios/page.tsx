@@ -5,6 +5,7 @@ import { createService, deleteService, updateService, getAdminServices } from "@
 import { getAdminCategories } from "@/actions/admin-categories";
 import VariantsEditor from "@/components/admin/VariantsEditor";
 import { ServiceCategory } from "@prisma/client";
+import { uploadFileToR2 } from "@/lib/uploadClient";
 import { Screen, PageHead, AddBtn, Sheet, Field, INPUT, CARD, Msg, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
 
 type Service = {
@@ -46,15 +47,6 @@ export default function ServicesPage() {
   };
 
   useEffect(() => { fetchServices(); }, []);
-
-  const uploadFileToR2 = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || "Fallo al subir archivo");
-    return data.publicUrl;
-  };
 
   const handleManualSubmit = async () => {
     setSaving(true);

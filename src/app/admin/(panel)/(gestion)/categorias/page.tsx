@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { getAdminCategories, createCategory, updateCategory, deleteCategory } from "@/actions/admin-categories";
 import { ServiceCategory } from "@prisma/client";
+import { uploadFileToR2 } from "@/lib/uploadClient";
 import { Screen, PageHead, AddBtn, Sheet, Field, INPUT, LABEL, CARD, Msg, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
 
 export default function CategoriesPage() {
@@ -22,15 +23,6 @@ export default function CategoriesPage() {
   useEffect(() => {
     fetchCategories();
   }, []);
-
-  const uploadFileToR2 = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || "Fallo al subir archivo");
-    return data.publicUrl;
-  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

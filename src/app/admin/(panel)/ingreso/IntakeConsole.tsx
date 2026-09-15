@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { lookupByPlate, registerIntake, markDelivered, type PlateLookup } from "@/actions/intake";
 import { formatPlate, normalizePlate } from "@/lib/plate";
+import { uploadFileToR2 } from "@/lib/uploadClient";
 
 type InShop = {
   id: string;
@@ -69,12 +70,8 @@ export default function IntakeConsole({
     setUploading(true);
     setMsg(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const r = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await r.json();
-      if (!r.ok || data.error) throw new Error(data.error || "Fallo al subir");
-      setPhotoUrl(data.publicUrl);
+      const url = await uploadFileToR2(file);
+      setPhotoUrl(url);
     } catch (err) {
       setMsg({ type: "err", text: "No se pudo subir la foto: " + (err as Error).message });
     } finally {

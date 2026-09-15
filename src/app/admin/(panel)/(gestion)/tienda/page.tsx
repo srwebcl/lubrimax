@@ -6,6 +6,7 @@ import {
   createProduct, updateProduct, toggleProductStatus, deleteProductPermanently, getProducts,
   getCategories, createCategory, deleteCategory, ProductPayload,
 } from "@/actions/admin-store";
+import { uploadFileToR2 } from "@/lib/uploadClient";
 import { Screen, PageHead, AddBtn, GhostBtn, Sheet, Field, INPUT, CARD, Msg, Spinner, Empty, PrimaryBtn } from "@/components/admin/kit";
 
 type Category = { id: string; name: string; _count?: { products: number } };
@@ -81,14 +82,6 @@ export default function TiendaPage() {
     setShowForm(true);
   };
 
-  const uploadFileToR2 = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok || data.error) throw new Error(data.error || "Fallo al subir archivo");
-    return data.publicUrl;
-  };
 
   const handleProductSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
