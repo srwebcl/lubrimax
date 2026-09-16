@@ -15,7 +15,11 @@ import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice, RESERVATION_PERCEN
 // texto de la descripción es el mismo que ya se usa en el tooltip de precios
 // de ServiceCard.tsx (sección Servicios) — se mantiene igual acá para que
 // sea consistente en todo el sitio.
-type VehicleThumb = { src: string; size?: string };
+// El ANCHO es la restricción real acá (3 tarjetas angostas en escritorio),
+// no el alto: por eso cada miniatura fija su ancho y deja el alto libre
+// (proporcional), en vez de al revés. Evita que object-contain la aplaste
+// al toparse con el límite de ancho de la columna.
+type VehicleThumb = { src: string; width?: string };
 const VEHICLE_TYPE_INFO: Record<string, { images: [VehicleThumb, VehicleThumb]; description: string }> = {
   "Sedán / Hatchback": {
     images: [{ src: "/images/auto-sedan.png" }, { src: "/images/auto-hatchaback.png" }],
@@ -27,7 +31,7 @@ const VEHICLE_TYPE_INFO: Record<string, { images: [VehicleThumb, VehicleThumb]; 
   },
   "SUV o Camionetas Grandes": {
     // suv-grande se muestra más grande que su par a propósito
-    images: [{ src: "/images/suv-grande.avif", size: "h-16 md:h-20" }, { src: "/images/camioneta-grande.webp" }],
+    images: [{ src: "/images/suv-grande.avif", width: "w-24" }, { src: "/images/camioneta-grande.webp" }],
     description: "SUV Grande, Camionetas grandes (RAM, F-150)",
   },
 };
@@ -333,15 +337,15 @@ export default function BookingWizard() {
                   <button
                     key={type}
                     onClick={() => setVehicleType(type)}
-                    className={`flex flex-col items-center justify-center p-6 md:p-8 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
+                    className={`flex flex-col items-center justify-center p-5 md:p-6 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
                   >
-                    <div className="flex items-end justify-center gap-3 h-16 md:h-20 mb-4 w-full">
+                    <div className="flex items-end justify-center gap-2 h-14 md:h-16 mb-4 w-full">
                       {info.images.map((img, i) => (
                         <img
                           key={i}
                           src={img.src}
                           alt=""
-                          className={`${img.size || "h-12 md:h-14"} w-auto max-w-[46%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]`}
+                          className={`${img.width || "w-20"} h-auto object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]`}
                         />
                       ))}
                     </div>
