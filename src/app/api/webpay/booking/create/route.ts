@@ -164,7 +164,27 @@ export async function POST(request: Request) {
       bookingId = freeBooking.id;
 
       if (freeBooking.customerEmail) {
-        const friendlyDate = format(freeBooking.date, "dd/MM/yyyy");
+        const [y, m, d] = freeBooking.date.toISOString().substring(0, 10).split("-");
+        const friendlyDate = `${d}/${m}/${y}`;
+
+        const ownerEmail = process.env.OWNER_EMAIL || "contacto@lubrimax.cl";
+        const adminEmailResult = await sendEmail({
+          to: ownerEmail,
+          subject: `NUEVA RESERVA (MODO PRUEBA) - ${freeBooking.customerName} - ${friendlyDate} ${freeBooking.startTime}`,
+          html: (
+            `<h1>Nueva Reserva (Modo Prueba)</h1>
+             <p><strong>Cliente:</strong> ${freeBooking.customerName} (${freeBooking.customerPhone})</p>
+             <p><strong>Vehículo:</strong> ${freeBooking.vehicleMake} ${freeBooking.vehicleModel}</p>
+             <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${freeBooking.startTime} a ${freeBooking.endTime}</p>
+             <p><strong>Servicios:</strong> ${freeBooking.services.map(s => s.name).join(' + ')}</p>
+             <p><em>Esta reserva fue realizada en modo de prueba sin cobro.</em></p>
+             <p><a href="${baseUrl}/admin">Ver en panel de administración</a></p>`
+          )
+        });
+        if (!adminEmailResult.success) {
+          console.error("No se pudo notificar al administrador:", adminEmailResult.error);
+        }
+
         const emailResult = await sendEmail({
           to: freeBooking.customerEmail,
           subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,

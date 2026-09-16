@@ -31,10 +31,19 @@ const WORK_STEPS = [
 ] as const;
 
 const FILTERS = [
-  { key: "today", label: "Hoy" },
-  { key: "week", label: "Semana" },
-  { key: "all", label: "Todas" },
+  { key: "pending", label: "Pendientes" },
+  { key: "done", label: "Terminados" },
+  { key: "all", label: "Todos" },
 ] as const;
+
+function parseSafeDate(isoString?: string): Date {
+  if (!isoString || typeof isoString !== "string" || isoString.length < 10) {
+    return new Date();
+  }
+  const [y, m, day] = isoString.substring(0, 10).split("-").map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(day)) return new Date();
+  return new Date(y, m - 1, day);
+}
 type FilterKey = (typeof FILTERS)[number]["key"];
 
 function workAccent(v: string) {
@@ -65,38 +74,30 @@ export default function BookingsManager({
 }) {
   const isAdmin = role === "ADMIN";
   const [bookings, setBookings] = useState(initialBookings);
-  const [filter, setFilter] = useState<FilterKey>("today");
+  const [filter, setFilter] = useState<FilterKey>("pending");
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
 
   const counts = useMemo(() => {
-    const now = new Date();
-    let today = 0;
-    let week = 0;
+    let pending = 0;
+    let done = 0;
     for (const b of bookings) {
-      const [y, m, day] = b.date.substring(0, 10).split("-").map(Number);
-      const d = new Date(y, m - 1, day);
-      if (isToday(d)) today++;
-      if (isSameWeek(d, now, { weekStartsOn: 1 })) week++;
+      if (b.workStatus === "DONE") done++;
+      else pending++;
     }
-    return { today, week, all: bookings.length };
+    return { pending, done, all: bookings.length };
   }, [bookings]);
 
   const shown = useMemo(() => {
-    const now = new Date();
     const list = bookings.filter((b) => {
-      const [y, m, day] = b.date.substring(0, 10).split("-").map(Number);
-      const d = new Date(y, m - 1, day);
-      if (filter === "today") return isToday(d);
-      if (filter === "week") return isSameWeek(d, now, { weekStartsOn: 1 });
+      if (filter === "pending") return b.workStatus !== "DONE";
+      if (filter === "done") return b.workStatus === "DONE";
       return true;
     });
     // Cronológico ascendente: lo próximo primero.
     return [...list].sort((a, b) => {
-      const [yA, mA, dayA] = a.date.substring(0, 10).split("-").map(Number);
-      const da = startOfDay(new Date(yA, mA - 1, dayA)).getTime();
-      const [yB, mB, dayB] = b.date.substring(0, 10).split("-").map(Number);
-      const db = startOfDay(new Date(yB, mB - 1, dayB)).getTime();
+      const da = startOfDay(parseSafeDate(a.date)).getTime();
+      const db = startOfDay(parseSafeDate(b.date)).getTime();
       if (da !== db) return da - db;
       return a.startTime.localeCompare(b.startTime);
     });
@@ -173,17 +174,16 @@ export default function BookingsManager({
 
       {shown.length === 0 ? (
         <div className="text-center py-20 text-gray-500 text-sm">
-          {filter === "today"
-            ? "No hay reservas para hoy."
-            : filter === "week"
-            ? "No hay reservas esta semana."
+          {filter === "pending"
+            ? "No hay reservas pendientes."
+            : filter === "done"
+            ? "No hay trabajos terminados."
             : "No hay reservas registradas."}
         </div>
       ) : (
         <ul className="space-y-3 pt-1">
           {shown.map((b) => {
-            const [y, m, day] = b.date.substring(0, 10).split("-").map(Number);
-            const d = new Date(y, m - 1, day);
+            const d = parseSafeDate(b.date);
             const total = b.services.reduce((a, s) => a + s.duration, 0);
             const pill = statusPill(b.status);
             const open = editing === b.id;
@@ -319,7 +319,7 @@ export default function BookingsManager({
                     <input
                       type="date"
                       name="newDate"
-                      defaultValue={b.date.substring(0, 10)}
+                      defaultValue={b.date && b.date.length >= 10 ? b.date.substring(0, 10) : ""}
                       className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
                     />
                     <input

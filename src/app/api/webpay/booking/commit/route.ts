@@ -55,6 +55,25 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
           const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
           const friendlyDate = `${d}/${m}/${y}`;
           const paidLabel = booking.paymentType === "FULL" ? "el servicio completo" : "la seña de reserva (20%)";
+
+          const ownerEmail = process.env.OWNER_EMAIL || "contacto@lubrimax.cl";
+          const adminEmailResult = await sendEmail({
+            to: ownerEmail,
+            subject: `NUEVA RESERVA - ${booking.customerName} - ${friendlyDate} ${booking.startTime}`,
+            html: (
+              `<h1>Nueva Reserva Pagada</h1>
+               <p><strong>Cliente:</strong> ${booking.customerName} (${booking.customerPhone})</p>
+               <p><strong>Vehículo:</strong> ${booking.vehicleMake} ${booking.vehicleModel}</p>
+               <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${booking.startTime} a ${booking.endTime}</p>
+               <p><strong>Servicios:</strong> ${booking.services.map(s => s.name).join(' + ')}</p>
+               <p><strong>Monto pagado (${paidLabel}):</strong> $${booking.amount?.toLocaleString("es-CL")}</p>
+               <p><a href="${baseUrl}/admin">Ver en panel de administración</a></p>`
+            )
+          });
+          if (!adminEmailResult.success) {
+            console.error("No se pudo notificar al administrador:", adminEmailResult.error);
+          }
+
           const emailResult = await sendEmail({
             to: booking.customerEmail,
             subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
