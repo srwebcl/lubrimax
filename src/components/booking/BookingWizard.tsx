@@ -27,7 +27,7 @@ const VEHICLE_TYPE_INFO: Record<string, { images: [VehicleThumb, VehicleThumb]; 
   },
   "SUV o Camionetas Grandes": {
     // suv-grande se muestra más grande que su par a propósito
-    images: [{ src: "/images/suv-grande.avif", size: "h-20 md:h-24" }, { src: "/images/camioneta-grande.webp" }],
+    images: [{ src: "/images/suv-grande.avif", size: "h-16 md:h-20" }, { src: "/images/camioneta-grande.webp" }],
     description: "SUV Grande, Camionetas grandes (RAM, F-150)",
   },
 };
@@ -333,19 +333,19 @@ export default function BookingWizard() {
                   <button
                     key={type}
                     onClick={() => setVehicleType(type)}
-                    className={`p-6 md:p-8 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
+                    className={`flex flex-col items-center justify-center p-6 md:p-8 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
                   >
-                    <div className="flex items-end justify-center gap-2 h-20 md:h-24 mb-4">
+                    <div className="flex items-end justify-center gap-3 h-16 md:h-20 mb-4 w-full">
                       {info.images.map((img, i) => (
                         <img
                           key={i}
                           src={img.src}
                           alt=""
-                          className={`${img.size || "h-14 md:h-16"} w-auto max-w-[48%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]`}
+                          className={`${img.size || "h-12 md:h-14"} w-auto max-w-[46%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]`}
                         />
                       ))}
                     </div>
-                    <div className="font-bold text-white text-sm md:text-base leading-snug px-1">
+                    <div className="font-bold text-white text-sm md:text-base leading-snug px-1 min-h-[2.5rem] md:min-h-[2.75rem] flex items-center justify-center">
                       {type}
                       <span
                         className="group/tt relative inline-flex align-middle items-center justify-center w-5 h-5 ml-1.5 -mt-0.5 rounded-full border border-gray-500 text-gray-400 hover:border-brand-cyan hover:text-brand-cyan hover:bg-brand-cyan/10 transition-colors cursor-help"
