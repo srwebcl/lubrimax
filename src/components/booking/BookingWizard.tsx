@@ -15,17 +15,19 @@ import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice, RESERVATION_PERCEN
 // texto de la descripción es el mismo que ya se usa en el tooltip de precios
 // de ServiceCard.tsx (sección Servicios) — se mantiene igual acá para que
 // sea consistente en todo el sitio.
-const VEHICLE_TYPE_INFO: Record<string, { images: [string, string]; description: string }> = {
+type VehicleThumb = { src: string; size?: string };
+const VEHICLE_TYPE_INFO: Record<string, { images: [VehicleThumb, VehicleThumb]; description: string }> = {
   "Sedán / Hatchback": {
-    images: ["/images/auto-hatchback.png", "/images/auto-sedan.png"],
+    images: [{ src: "/images/auto-sedan.png" }, { src: "/images/auto-hatchaback.png" }],
     description: "Sedán, Hatchback, Citycar",
   },
   "SUV o Camionetas Medianas": {
-    images: ["/images/suv-mediano.webp", "/images/camioneta-mediana.webp"],
+    images: [{ src: "/images/camioneta-mediana.png" }, { src: "/images/suv-mediano.webp" }],
     description: "SUV Mediano, Pick-up mediana",
   },
   "SUV o Camionetas Grandes": {
-    images: ["/images/suv-grande.webp", "/images/camioneta-grande.webp"],
+    // suv-grande se muestra más grande que su par a propósito
+    images: [{ src: "/images/suv-grande.webp", size: "h-20 md:h-24" }, { src: "/images/camioneta-grande.webp" }],
     description: "SUV Grande, Camionetas grandes (RAM, F-150)",
   },
 };
@@ -333,13 +335,13 @@ export default function BookingWizard() {
                     onClick={() => setVehicleType(type)}
                     className={`p-6 md:p-8 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
                   >
-                    <div className="flex items-center justify-center gap-2 h-16 mb-4">
-                      {info.images.map((src, i) => (
+                    <div className="flex items-end justify-center gap-2 h-20 md:h-24 mb-4">
+                      {info.images.map((img, i) => (
                         <img
                           key={i}
-                          src={src}
+                          src={img.src}
                           alt=""
-                          className="h-14 md:h-16 w-auto max-w-[45%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]"
+                          className={`${img.size || "h-14 md:h-16"} w-auto max-w-[48%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]`}
                         />
                       ))}
                     </div>
