@@ -52,20 +52,24 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
         });
 
         if (booking.customerEmail) {
-          const friendlyDate = format(booking.date, "dd/MM/yyyy");
+          const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
+          const friendlyDate = `${d}/${m}/${y}`;
           const paidLabel = booking.paymentType === "FULL" ? "el servicio completo" : "la seña de reserva (20%)";
-          await sendEmail({
+          const emailResult = await sendEmail({
             to: booking.customerEmail,
             subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
-            react: (
+            html: (
               `<h1>¡Hola ${booking.customerName}!</h1>
                <p>Tu reserva para <strong>${booking.services.map(s => s.name).join(' + ')}</strong> quedó confirmada.</p>
                <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
                <p>Vehículo: ${booking.vehicleMake} ${booking.vehicleModel}</p>
                <p>Pagaste ${paidLabel}: $${booking.amount?.toLocaleString("es-CL")}</p>
                <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
-            ) as any
+            )
           });
+          if (!emailResult.success) {
+            console.error("No se pudo enviar el correo de confirmación de reserva", booking.id, emailResult.error);
+          }
         }
       }
 

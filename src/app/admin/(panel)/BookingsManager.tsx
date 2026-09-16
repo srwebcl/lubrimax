@@ -74,7 +74,8 @@ export default function BookingsManager({
     let today = 0;
     let week = 0;
     for (const b of bookings) {
-      const d = new Date(b.date);
+      const [y, m, day] = b.date.substring(0, 10).split("-").map(Number);
+      const d = new Date(y, m - 1, day);
       if (isToday(d)) today++;
       if (isSameWeek(d, now, { weekStartsOn: 1 })) week++;
     }
@@ -84,15 +85,18 @@ export default function BookingsManager({
   const shown = useMemo(() => {
     const now = new Date();
     const list = bookings.filter((b) => {
-      const d = new Date(b.date);
+      const [y, m, day] = b.date.substring(0, 10).split("-").map(Number);
+      const d = new Date(y, m - 1, day);
       if (filter === "today") return isToday(d);
       if (filter === "week") return isSameWeek(d, now, { weekStartsOn: 1 });
       return true;
     });
     // Cronológico ascendente: lo próximo primero.
     return [...list].sort((a, b) => {
-      const da = startOfDay(new Date(a.date)).getTime();
-      const db = startOfDay(new Date(b.date)).getTime();
+      const [yA, mA, dayA] = a.date.substring(0, 10).split("-").map(Number);
+      const da = startOfDay(new Date(yA, mA - 1, dayA)).getTime();
+      const [yB, mB, dayB] = b.date.substring(0, 10).split("-").map(Number);
+      const db = startOfDay(new Date(yB, mB - 1, dayB)).getTime();
       if (da !== db) return da - db;
       return a.startTime.localeCompare(b.startTime);
     });
@@ -178,7 +182,8 @@ export default function BookingsManager({
       ) : (
         <ul className="space-y-3 pt-1">
           {shown.map((b) => {
-            const d = new Date(b.date);
+            const [y, m, day] = b.date.substring(0, 10).split("-").map(Number);
+            const d = new Date(y, m - 1, day);
             const total = b.services.reduce((a, s) => a + s.duration, 0);
             const pill = statusPill(b.status);
             const open = editing === b.id;
@@ -314,7 +319,7 @@ export default function BookingsManager({
                     <input
                       type="date"
                       name="newDate"
-                      defaultValue={format(d, "yyyy-MM-dd")}
+                      defaultValue={b.date.substring(0, 10)}
                       className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
                     />
                     <input

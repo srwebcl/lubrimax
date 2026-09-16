@@ -47,15 +47,18 @@ export async function updateOrderStatus(id: string, formData: FormData) {
     });
 
     if (status === "SHIPPED") {
-      await sendEmail({
+      const emailResult = await sendEmail({
         to: order.customer.email,
         subject: `Tu pedido ha sido enviado - Lubrimax`,
-        react: (
+        html: (
           `<h1>¡Buenas noticias, ${order.customer.name}!</h1>
            <p>Tu pedido #${order.id.slice(-8).toUpperCase()} ya está en camino.</p>
            ${trackingCode ? `<p>Código de seguimiento: <strong>${trackingCode}</strong></p>` : ''}`
-        ) as any
+        )
       });
+      if (!emailResult.success) {
+        console.error("No se pudo enviar el correo de envío de pedido", order.id, emailResult.error);
+      }
     }
 
     revalidatePath("/admin/pedidos");

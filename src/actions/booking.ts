@@ -48,8 +48,8 @@ export async function getAvailableSlots(dateString: string, serviceIds: string[]
     // Fecha consultada (asumimos formato YYYY-MM-DD)
     const [year, month, day] = dateString.split("-").map(Number);
     
-    const queryStart = new Date(year, month - 1, day, 0, 0, 0, 0);
-    const queryEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+    const queryStart = new Date(`${dateString}T00:00:00.000Z`);
+    const queryEnd = new Date(`${dateString}T23:59:59.999Z`);
     
     // Obtener horarios de la BD
     const settings = await getSettings();

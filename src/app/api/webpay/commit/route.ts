@@ -37,15 +37,18 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
       }
       revalidateTag("products", "max");
 
-      await sendEmail({
+      const emailResult = await sendEmail({
         to: order.customer.email,
         subject: `Confirmación de Orden #${order.id.slice(-8).toUpperCase()} - Lubrimax`,
-        react: (
+        html: (
           `<h1>¡Gracias por tu compra, ${order.customer.name}!</h1>
            <p>Hemos recibido tu orden y estamos procesándola.</p>
            <p>Monto Pagado: $${order.total}</p>`
-        ) as any
+        )
       });
+      if (!emailResult.success) {
+        console.error("No se pudo enviar el correo de confirmación de orden", order.id, emailResult.error);
+      }
 
       return NextResponse.redirect(`${baseUrl}/checkout?success=true&order=${order.id}&token_ws=${tokenWs}`);
     } else {

@@ -26,8 +26,8 @@ const tx = getWebpayTransaction();
 // "use server" module dentro de un Route Handler).
 async function isSlotStillAvailable(dateString: string, startTime: string, serviceDuration: number) {
   const [year, month, day] = dateString.split("-").map(Number);
-  const queryStart = new Date(year, month - 1, day, 0, 0, 0, 0);
-  const queryEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+  const queryStart = new Date(`${dateString}T00:00:00.000Z`);
+  const queryEnd = new Date(`${dateString}T23:59:59.999Z`);
   const pendingCutoff = new Date(Date.now() - 20 * 60 * 1000);
 
   const [sHour, sMin] = startTime.split(":").map(Number);
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
     if (FREE_MODE) {
       const freeBooking = await prisma.booking.create({
         data: {
-          date: new Date(date),
+          date: new Date(`${date}T00:00:00.000Z`),
           startTime,
           endTime: endTimeStr,
           customerName,
@@ -165,18 +165,21 @@ export async function POST(request: Request) {
 
       if (freeBooking.customerEmail) {
         const friendlyDate = format(freeBooking.date, "dd/MM/yyyy");
-        await sendEmail({
+        const emailResult = await sendEmail({
           to: freeBooking.customerEmail,
           subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
-          react: (
+          html: (
             `<h1>¡Hola ${freeBooking.customerName}!</h1>
              <p>Tu reserva para <strong>${freeBooking.services.map(s => s.name).join(' + ')}</strong> quedó confirmada.</p>
              <p>Fecha: ${friendlyDate}<br/>Hora: ${freeBooking.startTime} - ${freeBooking.endTime}</p>
              <p>Vehículo: ${freeBooking.vehicleMake} ${freeBooking.vehicleModel}</p>
              <p><em>Reserva de prueba, sin costo.</em></p>
              <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
-          ) as any
+          )
         });
+        if (!emailResult.success) {
+          console.error("No se pudo enviar el correo de confirmación (modo gratis)", freeBooking.id, emailResult.error);
+        }
       }
 
       return NextResponse.json({
@@ -190,7 +193,7 @@ export async function POST(request: Request) {
     // isSlotStillAvailable/getAvailableSlots lo liberan solos pasados 20 min.
     const booking = await prisma.booking.create({
       data: {
-        date: new Date(date),
+        date: new Date(`${date}T00:00:00.000Z`),
         startTime,
         endTime: endTimeStr,
         customerName,

@@ -48,21 +48,23 @@ export async function updateBookingStatus(id: string, formData: FormData) {
     let rescheduled = false;
     // Si se envió una nueva fecha u hora, recalculamos el reagendamiento
     if (newDate && newTime) {
-      const [year, month, day] = newDate.split("-").map(Number);
-      const [sHour, sMin] = newTime.split(":").map(Number);
+      const dbDate = currentBooking.date.toISOString().substring(0, 10);
+      rescheduled = newDate !== dbDate || newTime !== currentBooking.startTime;
 
-      const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-      const end = addMinutes(
-        start,
-        currentBooking.services.reduce((acc, s) => acc + s.duration, 0)
-      );
+      if (rescheduled) {
+        const [year, month, day] = newDate.split("-").map(Number);
+        const [sHour, sMin] = newTime.split(":").map(Number);
 
-      updateData.date = new Date(newDate);
-      updateData.startTime = newTime;
-      updateData.endTime = format(end, "HH:mm");
-      rescheduled =
-        newDate !== format(currentBooking.date, "yyyy-MM-dd") ||
-        newTime !== currentBooking.startTime;
+        const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
+        const end = addMinutes(
+          start,
+          currentBooking.services.reduce((acc, s) => acc + s.duration, 0)
+        );
+
+        updateData.date = new Date(`${newDate}T00:00:00.000Z`);
+        updateData.startTime = newTime;
+        updateData.endTime = format(end, "HH:mm");
+      }
     }
 
     await prisma.booking.update({ where: { id }, data: updateData });
