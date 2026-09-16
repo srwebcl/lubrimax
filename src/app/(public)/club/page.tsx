@@ -126,8 +126,8 @@ export default function ClubPage() {
               </div>
 
               {partners.length === 0 ? (
-                <div className="text-center text-gray-500 text-sm border border-white/10 rounded-2xl py-12">
-                  Pronto anunciaremos nuevos convenios.
+                <div className="text-center text-gray-500 text-sm uppercase tracking-widest border border-white/10 rounded-2xl py-12 px-6">
+                  Próximamente descubrirás los mejores beneficios de nuestras membresías.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
