@@ -9,7 +9,7 @@ export default function Stats() {
   ];
 
   return (
-    <section className="relative z-40 -mt-24 md:-mt-32 mb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative z-40 -mt-32 md:-mt-44 mb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="bg-brand-surface/60 backdrop-blur-xl border border-white/10 rounded-2xl py-6 md:py-8 relative overflow-hidden shadow-2xl">
         {/* Resplandor central de fondo */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[60px] bg-brand-blue/15 blur-[60px] pointer-events-none rounded-full" />

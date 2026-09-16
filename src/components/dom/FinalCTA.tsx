@@ -21,7 +21,7 @@ export default function FinalCTA() {
 
       <div className="container mx-auto px-4 relative z-10 text-center">
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold italic uppercase tracking-widest text-white mb-6 drop-shadow-lg leading-tight px-2">
-          Protección premium y <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">brillo absoluto</span>, sin compromisos.
+          Protección premium y <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">brillo absoluto</span>. Servicios profesionales para tu automóvil.
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto text-lg mb-10">
           Nuestra agenda se llena rápido. Asegura tu espacio hoy y transforma la estética de tu automóvil con los mejores expertos de La Serena.

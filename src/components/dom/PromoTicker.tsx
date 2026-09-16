@@ -1,11 +1,12 @@
 import React from 'react';
+import Link from 'next/link';
 
 export default function PromoTicker() {
-  const text = '⚡ AGENDA TU SELLADO CERÁMICO HOY Y OBTÉN UN LAVADO DE CHASIS GRATIS ⚡';
-  
+  const text = 'Limpieza Interior Gratis con todos los servicios de Pulido y Sellado Cerámico.';
+
   // Repetimos el texto para asegurar que cubra toda la pantalla y permita un loop fluido
   const items = Array(15).fill(text);
-  
+
   return (
     <div className="bg-gradient-to-r from-brand-cyan/20 via-brand-blue/30 to-brand-cyan/20 border-y border-brand-cyan/30 text-gray-300 py-6 overflow-hidden flex whitespace-nowrap w-full shadow-[0_0_50px_rgba(0,180,216,0.15)] relative">
       {/* Resplandor superior e inferior */}
@@ -14,15 +15,34 @@ export default function PromoTicker() {
 
       <div className="animate-marquee-left flex shrink-0 [animation-duration:120s]">
         {items.map((item, i) => (
-          <span key={i} className="mx-8 font-black tracking-[0.25em] text-sm md:text-base uppercase text-transparent bg-clip-text bg-gradient-to-r from-white to-brand-cyan drop-shadow-[0_0_10px_rgba(0,180,216,0.3)]">
-            {item}
+          <span key={i} className="mx-8 font-black tracking-[0.25em] text-sm md:text-base uppercase whitespace-nowrap">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-brand-cyan drop-shadow-[0_0_10px_rgba(0,180,216,0.3)]">
+              {item}{' '}
+            </span>
+            <Link
+              href="/agendar"
+              prefetch={false}
+              className="text-white underline decoration-2 underline-offset-4 decoration-brand-cyan hover:decoration-white transition-colors"
+            >
+              Agenda tu hora aquí
+            </Link>
           </span>
         ))}
       </div>
       <div className="animate-marquee-left flex shrink-0 [animation-duration:120s]" aria-hidden="true">
         {items.map((item, i) => (
-          <span key={i} className="mx-8 font-black tracking-[0.25em] text-sm md:text-base uppercase text-transparent bg-clip-text bg-gradient-to-r from-white to-brand-cyan drop-shadow-[0_0_10px_rgba(0,180,216,0.3)]">
-            {item}
+          <span key={i} className="mx-8 font-black tracking-[0.25em] text-sm md:text-base uppercase whitespace-nowrap">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-brand-cyan drop-shadow-[0_0_10px_rgba(0,180,216,0.3)]">
+              {item}{' '}
+            </span>
+            <Link
+              href="/agendar"
+              prefetch={false}
+              tabIndex={-1}
+              className="text-white underline decoration-2 underline-offset-4 decoration-brand-cyan hover:decoration-white transition-colors"
+            >
+              Agenda tu hora aquí
+            </Link>
           </span>
         ))}
       </div>

@@ -45,7 +45,7 @@ export default function Hero() {
   }, { scope: container });
 
   return (
-    <section ref={container} className="relative h-[100svh] w-full overflow-hidden flex items-center pt-20 bg-brand-pure">
+    <section ref={container} className="relative h-[88svh] md:h-[92svh] w-full overflow-hidden flex items-center pt-20 bg-brand-pure">
 
       {/* Capa 1: Video Background Estático de Alta Calidad (GSAP fade in) */}
       <div className="absolute inset-0 z-0 bg-brand-pure hero-video-layer opacity-0">

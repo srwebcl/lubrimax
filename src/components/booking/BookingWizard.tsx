@@ -11,6 +11,25 @@ import { getServices, getAvailableSlots, getBookingById } from "@/actions/bookin
 import { getSessionCustomer } from "@/actions/customer-auth";
 import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice, RESERVATION_PERCENT } from "@/lib/booking-constants";
 
+// Miniaturas representativas + descripción de cada tipo de vehículo. El
+// texto de la descripción es el mismo que ya se usa en el tooltip de precios
+// de ServiceCard.tsx (sección Servicios) — se mantiene igual acá para que
+// sea consistente en todo el sitio.
+const VEHICLE_TYPE_INFO: Record<string, { images: [string, string]; description: string }> = {
+  "Auto / Hatchback": {
+    images: ["/images/auto-hatchback.png", "/images/auto-sedan.png"],
+    description: "Sedán, Hatchback, Citycar",
+  },
+  "SUV Medianos": {
+    images: ["/images/suv-mediano.webp", "/images/camioneta-mediana.webp"],
+    description: "SUV Mediano, Pick-up mediana",
+  },
+  "SUV Grandes": {
+    images: ["/images/suv-grande.webp", "/images/camioneta-grande.webp"],
+    description: "SUV Grande, Camionetas grandes (RAM, F-150)",
+  },
+};
+
 type Service = {
   id: string;
   name: string;
@@ -306,21 +325,42 @@ export default function BookingWizard() {
             <p className="text-gray-400 mb-8">Nuestros precios se ajustan al tamaño de tu vehículo para garantizar un trabajo perfecto.</p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-              {VEHICLE_TYPES.map(type => (
-                <button
-                  key={type}
-                  onClick={() => setVehicleType(type)}
-                  className={`p-8 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
-                >
-                  <div className="w-16 h-16 mx-auto mb-4 bg-brand-pure rounded-full flex items-center justify-center border border-white/5">
-                    {/* Icono placeholder de auto */}
-                    <svg className={`w-8 h-8 ${vehicleType === type ? 'text-brand-cyan' : 'text-gray-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h8M8 11h8M5 19h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div className="font-bold text-white">{type}</div>
-                </button>
-              ))}
+              {VEHICLE_TYPES.map(type => {
+                const info = VEHICLE_TYPE_INFO[type];
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setVehicleType(type)}
+                    className={`p-6 md:p-8 text-center border rounded-lg transition-all duration-300 ${vehicleType === type ? 'border-brand-cyan bg-brand-cyan/10 shadow-[0_0_20px_rgba(56,189,248,0.2)]' : 'border-white/10 hover:border-brand-cyan/50 hover:bg-white/5'}`}
+                  >
+                    <div className="flex items-center justify-center gap-2 h-16 mb-4">
+                      {info.images.map((src, i) => (
+                        <img
+                          key={i}
+                          src={src}
+                          alt=""
+                          className="h-14 md:h-16 w-auto max-w-[45%] object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.5)]"
+                        />
+                      ))}
+                    </div>
+                    <div className="font-bold text-white flex items-center justify-center gap-1.5">
+                      <span>{type}</span>
+                      <span
+                        className="group/tt relative inline-flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg className="w-3.5 h-3.5 text-gray-500 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16v-4m0-3.5h.01" />
+                        </svg>
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-36 p-2 bg-black/90 backdrop-blur-md border border-brand-cyan/30 text-white text-[10px] font-normal normal-case text-center rounded opacity-0 invisible group-hover/tt:opacity-100 group-hover/tt:visible transition-all z-30 pointer-events-none shadow-xl">
+                          {info.description}
+                        </div>
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex justify-end">
