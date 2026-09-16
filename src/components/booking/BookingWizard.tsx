@@ -27,7 +27,7 @@ const VEHICLE_TYPE_INFO: Record<string, { images: [VehicleThumb, VehicleThumb]; 
   },
   "SUV o Camionetas Grandes": {
     // suv-grande se muestra más grande que su par a propósito
-    images: [{ src: "/images/suv-grande.webp", size: "h-20 md:h-24" }, { src: "/images/camioneta-grande.webp" }],
+    images: [{ src: "/images/suv-grande.avif", size: "h-20 md:h-24" }, { src: "/images/camioneta-grande.webp" }],
     description: "SUV Grande, Camionetas grandes (RAM, F-150)",
   },
 };
