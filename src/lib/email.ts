@@ -11,7 +11,7 @@ export async function sendEmail({ to, subject, react }: { to: string; subject: s
 
   try {
     const data = await resend.emails.send({
-      from: 'Lubrimax <ventas@lubrimax.cl>', // Se debe verificar el dominio en Resend
+      from: 'Lubrimax <contacto@lubrimax.cl>', // Se debe verificar el dominio en Resend
       to: [to],
       subject: subject,
       react: react,
