@@ -20,7 +20,7 @@ export default function FinalCTA() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[200px] bg-brand-cyan/20 blur-[120px] pointer-events-none rounded-full mix-blend-screen" />
 
       <div className="container mx-auto px-4 relative z-10 text-center">
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold italic uppercase tracking-widest text-white mb-6 drop-shadow-lg leading-tight px-2">
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold italic uppercase tracking-widest text-white mb-6 drop-shadow-lg leading-tight px-2">
           Protección premium y <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-brand-cyan">brillo absoluto</span>. Servicios profesionales para tu automóvil.
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto text-lg mb-10">
