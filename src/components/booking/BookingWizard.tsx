@@ -16,15 +16,15 @@ import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice, RESERVATION_PERCEN
 // de ServiceCard.tsx (sección Servicios) — se mantiene igual acá para que
 // sea consistente en todo el sitio.
 const VEHICLE_TYPE_INFO: Record<string, { images: [string, string]; description: string }> = {
-  "Auto / Hatchback": {
+  "Sedán / Hatchback": {
     images: ["/images/auto-hatchback.png", "/images/auto-sedan.png"],
     description: "Sedán, Hatchback, Citycar",
   },
-  "SUV Medianos": {
+  "SUV o Camionetas Medianas": {
     images: ["/images/suv-mediano.webp", "/images/camioneta-mediana.webp"],
     description: "SUV Mediano, Pick-up mediana",
   },
-  "SUV Grandes": {
+  "SUV o Camionetas Grandes": {
     images: ["/images/suv-grande.webp", "/images/camioneta-grande.webp"],
     description: "SUV Grande, Camionetas grandes (RAM, F-150)",
   },
@@ -343,17 +343,17 @@ export default function BookingWizard() {
                         />
                       ))}
                     </div>
-                    <div className="font-bold text-white flex items-center justify-center gap-1.5">
-                      <span>{type}</span>
+                    <div className="font-bold text-white text-sm md:text-base leading-snug px-1">
+                      {type}
                       <span
-                        className="group/tt relative inline-flex items-center"
+                        className="group/tt relative inline-flex align-middle items-center justify-center w-5 h-5 ml-1.5 -mt-0.5 rounded-full border border-gray-500 text-gray-400 hover:border-brand-cyan hover:text-brand-cyan hover:bg-brand-cyan/10 transition-colors cursor-help"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <svg className="w-3.5 h-3.5 text-gray-500 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16v-4m0-3.5h.01" />
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 16.5v-5m0-3.25h.01" />
+                          <circle cx="12" cy="12" r="9" strokeWidth={1.6} />
                         </svg>
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-36 p-2 bg-black/90 backdrop-blur-md border border-brand-cyan/30 text-white text-[10px] font-normal normal-case text-center rounded opacity-0 invisible group-hover/tt:opacity-100 group-hover/tt:visible transition-all z-30 pointer-events-none shadow-xl">
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-2.5 bg-black/95 backdrop-blur-md border border-brand-cyan/30 text-white text-[10px] font-normal normal-case leading-relaxed text-center rounded-lg opacity-0 invisible group-hover/tt:opacity-100 group-hover/tt:visible transition-all z-30 pointer-events-none shadow-xl">
                           {info.description}
                         </div>
                       </span>

@@ -4,9 +4,9 @@
 // puede mandar cualquier monto al endpoint de pago.
 
 export const VEHICLE_TYPES = [
-  'Auto / Hatchback',
-  'SUV Medianos',
-  'SUV Grandes',
+  'Sedán / Hatchback',
+  'SUV o Camionetas Medianas',
+  'SUV o Camionetas Grandes',
 ] as const;
 
 export type VehicleType = (typeof VEHICLE_TYPES)[number];
