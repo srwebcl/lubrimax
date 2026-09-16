@@ -7,8 +7,17 @@ import { getExactPrice, RESERVATION_PERCENT } from "@/lib/booking-constants";
 import { getSessionCustomer } from "@/actions/customer-auth";
 import { bookingPaymentSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
+import { sendEmail } from "@/lib/email";
 
 import { getWebpayTransaction } from "@/lib/webpay";
+
+// Interruptor TEMPORAL para probar el agendamiento en producción sin pasar
+// por Webpay/Transbank de verdad. Se activa poniendo BOOKING_FREE_MODE=true
+// en las variables de entorno (Vercel) y se desactiva sacando esa variable
+// (o poniéndola en "false") — no requiere otro cambio de código. Mientras
+// está prendido, TODAS las reservas quedan confirmadas gratis, sin cobrar
+// nada; apagarlo apenas termine la prueba.
+const FREE_MODE = process.env.BOOKING_FREE_MODE === "true";
 
 const tx = getWebpayTransaction();
 
@@ -111,7 +120,7 @@ export async function POST(request: Request) {
     const reservationAmount = Math.round(totalAmount * RESERVATION_PERCENT);
     const amount = paymentType === "FULL" ? totalAmount : reservationAmount;
 
-    if (amount <= 0) {
+    if (amount <= 0 && !FREE_MODE) {
       return NextResponse.json({ error: "Monto inválido para este servicio." }, { status: 400 });
     }
 
@@ -119,12 +128,62 @@ export async function POST(request: Request) {
     const [sHour, sMin] = startTime.split(":").map(Number);
     const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
     const endOfDay = new Date(year, month - 1, day, 18, 0, 0, 0);
-    
+
     let end = addMinutes(start, totalDuration);
     if (end > endOfDay) {
       end = endOfDay; // Tope al final del día para evitar wrap-arounds de Date
     }
     const endTimeStr = format(end, "HH:mm");
+
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
+    // ── Modo de prueba: confirma la reserva al toque, sin cobrar ni tocar
+    // Webpay. Precio real habría sido `amount`, pero queda en 0 para que se
+    // note en la agenda que fue una reserva de prueba.
+    if (FREE_MODE) {
+      const freeBooking = await prisma.booking.create({
+        data: {
+          date: new Date(date),
+          startTime,
+          endTime: endTimeStr,
+          customerName,
+          customerPhone,
+          customerEmail: customerEmail || null,
+          vehicleMake: `${vehicleType} - ${make}`,
+          vehicleModel: `${model} (Patente: ${plate})`,
+          services: { connect: serviceIds.map(id => ({ id })) },
+          selectedOptions: selectedVariants ?? undefined,
+          status: "CONFIRMED",
+          paymentStatus: "PAID_FULL",
+          paymentType,
+          paymentId: "FREE_TEST",
+          amount: 0,
+        },
+        include: { services: { select: { name: true } } }
+      });
+      bookingId = freeBooking.id;
+
+      if (freeBooking.customerEmail) {
+        const friendlyDate = format(freeBooking.date, "dd/MM/yyyy");
+        await sendEmail({
+          to: freeBooking.customerEmail,
+          subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
+          react: (
+            `<h1>¡Hola ${freeBooking.customerName}!</h1>
+             <p>Tu reserva para <strong>${freeBooking.services.map(s => s.name).join(' + ')}</strong> quedó confirmada.</p>
+             <p>Fecha: ${friendlyDate}<br/>Hora: ${freeBooking.startTime} - ${freeBooking.endTime}</p>
+             <p>Vehículo: ${freeBooking.vehicleMake} ${freeBooking.vehicleModel}</p>
+             <p><em>Reserva de prueba, sin costo.</em></p>
+             <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
+          ) as any
+        });
+      }
+
+      return NextResponse.json({
+        free: true,
+        redirectUrl: `${baseUrl}/agendar?success=true&booking=${freeBooking.id}`,
+      });
+    }
 
     // Reservamos el horario como PENDING antes de ir a Webpay para evitar
     // que otro cliente lo tome mientras este paga. Si el pago se abandona,
@@ -149,7 +208,6 @@ export async function POST(request: Request) {
     });
     bookingId = booking.id;
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const returnUrl = `${baseUrl}/api/webpay/booking/commit`;
 
     const createResponse = await tx.create(booking.id, booking.id, amount, returnUrl);

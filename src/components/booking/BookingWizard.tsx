@@ -238,6 +238,13 @@ export default function BookingWizard() {
 
       const data = await response.json();
 
+      // Modo de prueba (BOOKING_FREE_MODE en el servidor): la reserva ya
+      // quedó confirmada sin pasar por Webpay, solo navegamos al éxito.
+      if (data.free && data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
+
       if (data.token && data.url) {
         // Webpay exige un POST con el token como campo de formulario, no un
         // simple redirect GET (ver documentación de Webpay Plus).
