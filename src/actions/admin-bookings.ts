@@ -8,8 +8,8 @@ import { addMinutes, format } from "date-fns";
 
 // Estados operativos válidos que puede marcar el personal desde la agenda.
 // Deben coincidir con lo que espera la UI (BookingsManager).
-export const WORK_STATUSES = ["PENDING", "IN_PROGRESS", "DONE"] as const;
-export type WorkStatus = (typeof WORK_STATUSES)[number];
+const WORK_STATUSES = ["PENDING", "IN_PROGRESS", "DONE"] as const;
+type WorkStatus = (typeof WORK_STATUSES)[number];
 
 /**
  * Actualiza estado comercial, pago y fecha/hora de una reserva.

@@ -45,7 +45,37 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
     },
   });
 
-  if (!vehicle) return { found: false };
+  if (!vehicle) {
+    // Buscar en reservas recientes si no existe en la BD maestra de vehículos
+    const recentBooking = await prisma.booking.findFirst({
+      where: { vehicleModel: { contains: `Patente: ${plate}` } },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (recentBooking) {
+      const make = recentBooking.vehicleMake.split(" - ").pop() || "";
+      const model = recentBooking.vehicleModel.split(" (Patente:")[0] || "";
+      
+      return {
+        found: false, // false porque aún no es cliente oficial del taller
+        client: {
+          id: "",
+          name: recentBooking.customerName,
+          rut: null,
+          phone: recentBooking.customerPhone,
+          email: recentBooking.customerEmail,
+        },
+        vehicle: {
+          id: "",
+          plate: plate,
+          make,
+          model,
+          color: null,
+        },
+      };
+    }
+    return { found: false };
+  }
 
   const open = await prisma.vehicleIntake.findFirst({
     where: { vehicleId: vehicle.id, status: "IN_SHOP" },
