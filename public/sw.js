@@ -9,7 +9,7 @@
  * Al cambiar la estrategia de caché, subir CACHE_VERSION.
  */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const STATIC_CACHE = `lubrimax-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `lubrimax-runtime-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -92,8 +92,12 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const fresh = await fetch(request);
-          const cache = await caches.open(RUNTIME_CACHE);
-          cache.put(request, fresh.clone());
+          // Clonar YA, en el mismo tick: si se clona después de un await, el
+          // navegador puede haber empezado a leer el cuerpo de `fresh`
+          // mientras tanto y el clone revienta con "Response body is
+          // already used".
+          const copy = fresh.clone();
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
           return fresh;
         } catch {
           const cached = await caches.match(request);
@@ -113,7 +117,10 @@ self.addEventListener("fetch", (event) => {
         const network = fetch(request)
           .then((res) => {
             if (res && res.ok) {
-              caches.open(STATIC_CACHE).then((cache) => cache.put(request, res.clone()));
+              // Mismo cuidado acá: clonar de inmediato, no dentro de un
+              // .then() posterior a otro await.
+              const copy = res.clone();
+              caches.open(STATIC_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
             }
             return res;
           })
