@@ -30,6 +30,8 @@ const ICONS = {
     "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-3.5-6",
   clientes:
     "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
+  estadisticas:
+    "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
   ingreso:
     "M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0",
   perfil: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
@@ -44,6 +46,7 @@ const DESTS: Dest[] = [
   { name: "Agenda", href: "/admin", icon: ICONS.agenda },
   { name: "Ingreso", href: "/admin/ingreso", icon: ICONS.ingreso },
   { name: "Clientes", href: "/admin/clientes", icon: ICONS.clientes },
+  { name: "Estadísticas", href: "/admin/estadisticas", icon: ICONS.estadisticas, adminOnly: true },
   { name: "Productos", href: "/admin/tienda", icon: ICONS.productos, adminOnly: true },
   { name: "Pedidos", href: "/admin/pedidos", icon: ICONS.pedidos, adminOnly: true },
   { name: "Catálogo", href: "/admin/servicios", icon: ICONS.catalogo, adminOnly: true },

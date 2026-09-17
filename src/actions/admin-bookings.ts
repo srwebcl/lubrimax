@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireStaff } from "@/lib/staff-session";
+import { sendEmail } from "@/lib/email";
 
 import { addMinutes, format } from "date-fns";
 
@@ -77,6 +78,34 @@ export async function updateBookingStatus(id: string, formData: FormData) {
     if (rescheduled) changes.push(`reagendada a ${newDate} ${newTime}`);
     if (changes.length > 0) {
       await logBookingActivity(id, session, "STATUS", changes.join("; "));
+      
+      // Enviar correo al cliente
+      if (currentBooking.customerEmail) {
+        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lubrimax.cl";
+        const dateStr = updateData.date ? format(updateData.date, "dd/MM/yyyy") : format(currentBooking.date, "dd/MM/yyyy");
+        const timeStr = updateData.startTime || currentBooking.startTime;
+        
+        let statusText = "actualizada";
+        if (status === "CONFIRMED") statusText = "confirmada";
+        if (status === "CANCELLED") statusText = "cancelada";
+
+        const subject = status === "CANCELLED" 
+          ? `Reserva Cancelada - LUBRIMAX`
+          : `Actualización de Reserva - LUBRIMAX`;
+
+        await sendEmail({
+          to: currentBooking.customerEmail,
+          subject,
+          html: (
+            `<h1>Hola ${currentBooking.customerName}</h1>
+             <p>Te informamos que tu reserva para el vehículo <strong>${currentBooking.vehicleMake} ${currentBooking.vehicleModel}</strong> ha sido <strong>${statusText}</strong>.</p>
+             ${status !== "CANCELLED" ? `<p>Tu cita quedó para el <strong>${dateStr}</strong> a las <strong>${timeStr}</strong> hrs.</p>` : ''}
+             ${rescheduled ? `<p><em>Nota: El horario de tu reserva fue reprogramado por la administración.</em></p>` : ''}
+             <p>Cualquier duda, puedes contactarnos respondiendo a este correo.</p>
+             <p>Saludos,<br>El equipo de LUBRIMAX</p>`
+          )
+        });
+      }
     }
 
     revalidatePath("/admin");
@@ -119,6 +148,28 @@ export async function updateWorkStatus(id: string, workStatus: string) {
         "WORK_STATUS",
         `${current.workStatus} -> ${workStatus}`
       );
+
+      // Si el trabajo acaba de terminar, notificar al cliente para que retire el auto
+      if (workStatus === "DONE") {
+        const bookingInfo = await prisma.booking.findUnique({
+          where: { id },
+          select: { customerEmail: true, customerName: true, vehicleMake: true, vehicleModel: true }
+        });
+        
+        if (bookingInfo?.customerEmail) {
+          await sendEmail({
+            to: bookingInfo.customerEmail,
+            subject: `¡Tu vehículo está listo! - LUBRIMAX`,
+            html: (
+              `<h1>Hola ${bookingInfo.customerName}</h1>
+               <p>Te informamos que los servicios en tu vehículo <strong>${bookingInfo.vehicleMake} ${bookingInfo.vehicleModel}</strong> han sido <strong>terminados</strong> exitosamente.</p>
+               <p>Ya puedes pasar a retirar tu auto por nuestras instalaciones en Av. Gabriela Mistral 3061.</p>
+               <p>¡Te esperamos!</p>
+               <p>Saludos,<br>El equipo de LUBRIMAX</p>`
+            )
+          });
+        }
+      }
     }
 
     revalidatePath("/admin");
