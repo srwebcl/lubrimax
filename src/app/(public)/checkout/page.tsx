@@ -8,6 +8,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { validateCoupon } from "@/actions/coupons";
 import { validateClubRut } from "@/actions/club-public";
+import { CLUB_ENABLED } from "@/lib/features";
 
 export default function CheckoutPage() {
   const { items, total, removeFromCart, updateQuantity, clearCart } = useCart();
@@ -322,8 +323,8 @@ export default function CheckoutPage() {
                 </div>
               </div>
               
-              {/* Club Lubrimax */}
-              {!discountPct && (
+              {/* Club Lubrimax (en stand by, ver src/lib/features.ts) */}
+              {CLUB_ENABLED && !discountPct && (
                 <div>
                   <label className="block text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-2 flex items-center justify-between">
                     <span>¿Eres Socio del Club?</span>
@@ -344,7 +345,7 @@ export default function CheckoutPage() {
                         const res = await validateClubRut(clubRut);
                         if(res.valid && res.discountPct) {
                           setDiscountPct(res.discountPct);
-                          setCouponMsg({ type: 'success', text: `¡Hola ${res.customerName}! Tienes -${res.discountPct}% Club.` });
+                          setCouponMsg({ type: 'success', text: `Membresía Club verificada: -${res.discountPct}%.` });
                         } else {
                           setCouponMsg({ type: 'error', text: res.error || "RUT inválido" });
                         }

@@ -6,6 +6,7 @@ import { useCart } from "@/components/providers/CartProvider";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { CLUB_ENABLED } from "@/lib/features";
 
 function PerfilContent() {
   const router = useRouter();
@@ -71,7 +72,8 @@ function PerfilContent() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* MEMBERSHIP CARD */}
+        {/* MEMBERSHIP CARD (oculta mientras el Club está en stand by) */}
+        {CLUB_ENABLED && (
         <div className="lg:col-span-1">
           <div className={`bg-gradient-to-br ${customer?.membership ? 'from-amber-600/20 to-black border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.1)]' : 'from-brand-surface to-black border-white/10'} border rounded-3xl p-8 relative overflow-hidden h-full flex flex-col`}>
             
@@ -106,8 +108,10 @@ function PerfilContent() {
           </div>
         </div>
 
+        )}
+
         {/* ORDER HISTORY */}
-        <div className="lg:col-span-2">
+        <div className={CLUB_ENABLED ? "lg:col-span-2" : "lg:col-span-3"}>
           <div className="bg-brand-surface/50 border border-white/10 rounded-3xl p-8 h-full">
             <h3 className="text-xl font-bold text-white uppercase tracking-widest mb-6">Historial de Compras</h3>
             

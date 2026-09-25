@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "LUBRIMAX — Panel",
     short_name: "Lubrimax",
     description:
-      "Panel de operaciones de LUBRIMAX: agenda de reservas y gestión para el equipo.",
+      "Panel de operaciones de LUBRIMAX: tablero del taller, agenda y gestión para el equipo.",
     id: "/admin",
     start_url: "/admin",
     scope: "/",
@@ -37,9 +37,9 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: "Agenda",
-        short_name: "Agenda",
-        description: "Ver la agenda de reservas",
+        name: "Taller",
+        short_name: "Taller",
+        description: "Tablero del taller: vehículos del día",
         url: "/admin",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },

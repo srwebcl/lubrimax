@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { WebpayPlus } from "transbank-sdk";
-import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
 import { verifyCustomerSessionToken } from "@/lib/customer-session";
@@ -8,8 +6,6 @@ import { storeCheckoutSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
 
 import { getWebpayTransaction } from "@/lib/webpay";
-
-const tx = getWebpayTransaction();
 
 // Recalcula el total desde los precios reales en la BD. Nunca confiar en el
 // monto/precio que envía el cliente: viene de localStorage y es manipulable.
@@ -50,6 +46,23 @@ async function resolveOrderItems(cartItems: { id: string; quantity: number }[]) 
     orderItems.push({ productId, quantity, price });
   }
 
+  // Stock: sumar por producto (varias variantes del mismo producto comparten
+  // el stock general, que es el que se descuenta al pagar).
+  const qtyByProduct = new Map<string, number>();
+  for (const item of orderItems) {
+    qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) ?? 0) + item.quantity);
+  }
+  for (const [productId, qty] of qtyByProduct) {
+    const product = productById.get(productId)!;
+    if (product.stock < qty) {
+      throw new Error(
+        product.stock > 0
+          ? `Solo quedan ${product.stock} unidades de "${product.name}".`
+          : `"${product.name}" está agotado.`
+      );
+    }
+  }
+
   return { orderItems, subtotal };
 }
 
@@ -65,11 +78,9 @@ async function resolveDiscount(couponCode: string | undefined, subtotal: number)
 
   if (!isValid) return { discountTotal: 0, appliedCode: null };
 
-  await prisma.discountCode.update({
-    where: { code: coupon.code },
-    data: { usedCount: { increment: 1 } },
-  });
-
+  // El uso del cupón se descuenta recién al confirmarse el pago (ver
+  // webpay/commit). Antes se sumaba aquí: iniciar checkouts sin pagar
+  // agotaba el cupón.
   return { discountTotal: Math.round(subtotal * (coupon.discountPct / 100)), appliedCode: coupon.code };
 }
 
@@ -124,6 +135,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Monto inválido." }, { status: 400 });
     }
 
+    // Validar la configuración de Webpay ANTES de crear la orden.
+    const webpay = getWebpayTransaction();
+
     // Crear la orden en la BD (PENDING)
     const order = await prisma.order.create({
       data: {
@@ -149,7 +163,7 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
     const returnUrl = `${baseUrl}/api/webpay/commit`;
 
-    const createResponse = await tx.create(buyOrder, sessionId, amount, returnUrl);
+    const createResponse = await webpay.create(buyOrder, sessionId, amount, returnUrl);
 
     // Guardar el token en la orden
     await prisma.order.update({

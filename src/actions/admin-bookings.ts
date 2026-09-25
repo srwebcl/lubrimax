@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireStaff } from "@/lib/staff-session";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, escapeHtml } from "@/lib/email";
 
 import { addMinutes, format } from "date-fns";
 
@@ -97,8 +97,8 @@ export async function updateBookingStatus(id: string, formData: FormData) {
           to: currentBooking.customerEmail,
           subject,
           html: (
-            `<h1>Hola ${currentBooking.customerName}</h1>
-             <p>Te informamos que tu reserva para el vehículo <strong>${currentBooking.vehicleMake} ${currentBooking.vehicleModel}</strong> ha sido <strong>${statusText}</strong>.</p>
+            `<h1>Hola ${escapeHtml(currentBooking.customerName)}</h1>
+             <p>Te informamos que tu reserva para el vehículo <strong>${escapeHtml(currentBooking.vehicleMake)} ${escapeHtml(currentBooking.vehicleModel)}</strong> ha sido <strong>${statusText}</strong>.</p>
              ${status !== "CANCELLED" ? `<p>Tu cita quedó para el <strong>${dateStr}</strong> a las <strong>${timeStr}</strong> hrs.</p>` : ''}
              ${rescheduled ? `<p><em>Nota: El horario de tu reserva fue reprogramado por la administración.</em></p>` : ''}
              <p>Cualquier duda, puedes contactarnos respondiendo a este correo.</p>
@@ -108,7 +108,7 @@ export async function updateBookingStatus(id: string, formData: FormData) {
       }
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     revalidatePath("/agendar");
 
     return { success: true };
@@ -161,8 +161,8 @@ export async function updateWorkStatus(id: string, workStatus: string) {
             to: bookingInfo.customerEmail,
             subject: `¡Tu vehículo está listo! - LUBRIMAX`,
             html: (
-              `<h1>Hola ${bookingInfo.customerName}</h1>
-               <p>Te informamos que los servicios en tu vehículo <strong>${bookingInfo.vehicleMake} ${bookingInfo.vehicleModel}</strong> han sido <strong>terminados</strong> exitosamente.</p>
+              `<h1>Hola ${escapeHtml(bookingInfo.customerName)}</h1>
+               <p>Te informamos que los servicios en tu vehículo <strong>${escapeHtml(bookingInfo.vehicleMake)} ${escapeHtml(bookingInfo.vehicleModel)}</strong> han sido <strong>terminados</strong> exitosamente.</p>
                <p>Ya puedes pasar a retirar tu auto por nuestras instalaciones en Av. Gabriela Mistral 3061.</p>
                <p>¡Te esperamos!</p>
                <p>Saludos,<br>El equipo de LUBRIMAX</p>`
@@ -172,7 +172,7 @@ export async function updateWorkStatus(id: string, workStatus: string) {
       }
     }
 
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true };
   } catch (error) {
     if (error instanceof Error && error.message === "No autorizado.") {

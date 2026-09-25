@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, escapeHtml } from "@/lib/email";
 import { revalidateTag } from "next/cache";
 import { getWebpayTransaction } from "@/lib/webpay";
-
-const tx = getWebpayTransaction();
 
 async function processPayment(tokenWs: string | null, tbkToken: string | null, abortToken: string | null) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -18,7 +16,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
   }
 
   try {
-    const commitResponse = await tx.commit(tokenWs);
+    const commitResponse = await getWebpayTransaction().commit(tokenWs);
 
     if (commitResponse.status === "AUTHORIZED") {
       const orderId = commitResponse.buy_order;
@@ -28,6 +26,12 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
         data: { status: "PAID", paymentId: tokenWs },
         include: { items: true, customer: true }
       });
+
+      if (order.discountCode) {
+        await prisma.discountCode
+          .update({ where: { code: order.discountCode }, data: { usedCount: { increment: 1 } } })
+          .catch((err) => console.error("No se pudo registrar el uso del cupón", order.discountCode, err));
+      }
 
       for (const item of order.items) {
         await prisma.product.update({
@@ -41,7 +45,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
         to: order.customer.email,
         subject: `Confirmación de Orden #${order.id.slice(-8).toUpperCase()} - Lubrimax`,
         html: (
-          `<h1>¡Gracias por tu compra, ${order.customer.name}!</h1>
+          `<h1>¡Gracias por tu compra, ${escapeHtml(order.customer.name)}!</h1>
            <p>Hemos recibido tu orden y estamos procesándola.</p>
            <p>Monto Pagado: $${order.total}</p>`
         )

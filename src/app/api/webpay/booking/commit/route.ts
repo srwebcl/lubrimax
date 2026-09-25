@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
-import { WebpayPlus } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
-import { format } from "date-fns";
+import { sendEmail, escapeHtml } from "@/lib/email";
 import { getWebpayTransaction } from "@/lib/webpay";
-
-const tx = getWebpayTransaction();
+import { getSettings } from "@/actions/admin-settings";
+import { computeAvailableSlots, getBlockingBookings } from "@/lib/availability";
 
 async function cancelAbandoned(buyOrder: string | null) {
   if (!buyOrder) return;
@@ -28,7 +26,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
   }
 
   try {
-    const commitResponse = await tx.commit(tokenWs);
+    const commitResponse = await getWebpayTransaction().commit(tokenWs);
     const bookingId = commitResponse.buy_order;
 
     const booking = await prisma.booking.findUnique({
@@ -41,13 +39,60 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
     }
 
     if (commitResponse.status === "AUTHORIZED") {
+      // Pago que llega para una reserva ya CANCELADA (abandono pasado el
+      // tiempo de retención, o cancelada por el admin): el horario pudo
+      // haberlo tomado otra persona. Solo se confirma si sigue libre; si no,
+      // se reversa el cobro en Transbank.
+      if (booking.status === "CANCELLED") {
+        const settings = await getSettings();
+        const day = booking.date.toISOString().substring(0, 10);
+        const duration = booking.services.reduce((sum, s) => sum + s.duration, 0);
+        const stillFree = await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtext(${"booking:" + day}))`;
+          const blocking = await getBlockingBookings(tx, day, booking.id);
+          const free = computeAvailableSlots(day, duration, settings, blocking, null)
+            .includes(booking.startTime);
+          if (free) {
+            await tx.booking.update({ where: { id: booking.id }, data: { status: "PENDING" } });
+          }
+          return free;
+        });
+
+        if (!stillFree) {
+          const refunded = await getWebpayTransaction()
+            .refund(tokenWs, commitResponse.amount)
+            .then(() => true)
+            .catch((err: unknown) => {
+              console.error("No se pudo reversar el pago de una reserva sin horario", booking.id, err);
+              return false;
+            });
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { paymentId: tokenWs, paymentStatus: refunded ? "REFUNDED" : booking.paymentType === "FULL" ? "PAID_FULL" : "PAID_RESERVATION" },
+          });
+          await sendEmail({
+            to: process.env.OWNER_EMAIL || "contacto@lubrimax.cl",
+            subject: `PAGO SOBRE RESERVA CANCELADA - ${booking.customerName}`,
+            html: `<p>Llegó un pago de $${commitResponse.amount} para la reserva ${booking.id}, que ya estaba cancelada y cuyo horario fue ocupado.</p>
+                   <p>${refunded ? "El pago se reversó automáticamente." : "<strong>No se pudo reversar automáticamente: revisar en Transbank y contactar al cliente.</strong>"}</p>`,
+          });
+          const reason = refunded
+            ? "El horario ya no estaba disponible. Reversamos tu pago."
+            : "El horario ya no estaba disponible. Te contactaremos para devolver tu pago.";
+          return NextResponse.redirect(`${baseUrl}/agendar?error=${encodeURIComponent(reason)}`);
+        }
+        booking.status = "PENDING";
+      }
+
       if (booking.status !== "CONFIRMED") {
         await prisma.booking.update({
           where: { id: booking.id },
           data: {
             status: "CONFIRMED",
             paymentStatus: booking.paymentType === "FULL" ? "PAID_FULL" : "PAID_RESERVATION",
-            paymentId: tokenWs
+            paymentId: tokenWs,
+            // Registro del pago: el saldo en el Tablero se calcula con esto.
+            payments: { create: { amount: commitResponse.amount, method: "WEBPAY" } },
           }
         });
 
@@ -62,10 +107,10 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
             subject: `NUEVA RESERVA - ${booking.customerName} - ${friendlyDate} ${booking.startTime}`,
             html: (
               `<h1>Nueva Reserva Pagada</h1>
-               <p><strong>Cliente:</strong> ${booking.customerName} (${booking.customerPhone})</p>
-               <p><strong>Vehículo:</strong> ${booking.vehicleMake} ${booking.vehicleModel}</p>
+               <p><strong>Cliente:</strong> ${escapeHtml(booking.customerName)} (${escapeHtml(booking.customerPhone)})</p>
+               <p><strong>Vehículo:</strong> ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
                <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${booking.startTime} a ${booking.endTime}</p>
-               <p><strong>Servicios:</strong> ${booking.services.map(s => s.name).join(' + ')}</p>
+               <p><strong>Servicios:</strong> ${escapeHtml(booking.services.map(s => s.name).join(' + '))}</p>
                <p><strong>Monto pagado (${paidLabel}):</strong> $${booking.amount?.toLocaleString("es-CL")}</p>
                <p><a href="${baseUrl}/admin">Ver en panel de administración</a></p>`
             )
@@ -78,10 +123,10 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
             to: booking.customerEmail,
             subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
             html: (
-              `<h1>¡Hola ${booking.customerName}!</h1>
-               <p>Tu reserva para <strong>${booking.services.map(s => s.name).join(' + ')}</strong> quedó confirmada.</p>
+              `<h1>¡Hola ${escapeHtml(booking.customerName)}!</h1>
+               <p>Tu reserva para <strong>${escapeHtml(booking.services.map(s => s.name).join(' + '))}</strong> quedó confirmada.</p>
                <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
-               <p>Vehículo: ${booking.vehicleMake} ${booking.vehicleModel}</p>
+               <p>Vehículo: ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
                <p>Pagaste ${paidLabel}: $${booking.amount?.toLocaleString("es-CL")}</p>
                <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
             )

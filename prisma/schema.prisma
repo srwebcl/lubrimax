@@ -46,7 +46,7 @@ model Booking {
   date          DateTime // Fecha específica de la reserva (sin hora, a las 00:00:00)
   startTime     String   // Formato "HH:mm" (ej: "14:00")
   endTime       String   // Formato "HH:mm" (ej: "20:00")
-  status        String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
+  status        String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED, NO_SHOW
   // Estado operativo del trabajo en taller. Campo SEPARADO de `status` a
   // propósito: `status` es el ciclo comercial/administrativo de la reserva
   // (lo maneja el admin), `workStatus` es el avance físico del trabajo que
@@ -57,6 +57,11 @@ model Booking {
   paymentType   String?  // RESERVATION o FULL: lo que el cliente eligió pagar en Webpay
   paymentId     String?  // Token de la transacción Webpay
   amount        Int?     // Monto efectivamente cobrado (calculado en servidor, nunca confiar en el cliente)
+  // Precio total del trabajo (web: total del servicio aunque se pague solo el
+  // abono; local: total cotizado al ingresar). El saldo es totalPrice menos
+  // la suma de `payments`. Null en reservas anteriores a este campo.
+  totalPrice    Int?
+  payments      BookingPayment[]
   customerName  String
   customerPhone String
   customerEmail String?
@@ -70,6 +75,22 @@ model Booking {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// Pagos de una reserva: el abono/total por Webpay y los cobros en el local
+// (efectivo, tarjeta, transferencia) que registra el personal al entregar.
+model BookingPayment {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount      Int
+  method      String   // WEBPAY, CASH, CARD, TRANSFER
+  staffUserId String?
+  staffName   String?  // Copia denormalizada, como en la bitácora
+  createdAt   DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([createdAt])
 }
 
 // ==========================================

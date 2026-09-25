@@ -20,3 +20,20 @@ export function formatPlate(raw: string): string {
   if (p.length >= 6) return `${p.slice(0, p.length - 2)}·${p.slice(-2)}`;
   return p;
 }
+
+/**
+ * Las reservas web guardan el vehículo como texto: vehicleMake =
+ * "<tipo> - <marca>" y vehicleModel = "<modelo> (Patente: <patente>)".
+ * Devuelve las partes limpias (patente normalizada, o "" si no viene).
+ */
+export function parseBookingVehicle(vehicleMake: string, vehicleModel: string) {
+  let plate = "";
+  let model = vehicleModel;
+  const match = vehicleModel.match(/\(Patente:\s*([^)]+)\)/i);
+  if (match) {
+    plate = normalizePlate(match[1]);
+    model = vehicleModel.replace(/\s*\(Patente:\s*[^)]+\)/i, "").trim();
+  }
+  const make = vehicleMake.includes(" - ") ? vehicleMake.split(" - ").pop() || vehicleMake : vehicleMake;
+  return { plate, make: make.trim(), model };
+}

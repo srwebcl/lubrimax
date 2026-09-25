@@ -236,6 +236,15 @@ const services = [
 ];
 
 async function main() {
+  // Este script BORRA TODAS LAS RESERVAS y el catálogo. Exige confirmación
+  // explícita para no ejecutarlo por accidente contra producción.
+  if (process.env.CONFIRM_WIPE_BOOKINGS !== "yes") {
+    console.error(
+      "Abortado: este script borra TODAS las reservas y servicios.\n" +
+        "Si de verdad quieres hacerlo, ejecútalo con CONFIRM_WIPE_BOOKINGS=yes."
+    );
+    process.exit(1);
+  }
   console.log("Iniciando volcado de servicios de prueba...");
   
   // Borrar todas las reservas para evitar conflictos de llave foránea

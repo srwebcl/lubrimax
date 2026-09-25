@@ -10,7 +10,7 @@ import { AnimatePresence, motion } from "framer-motion";
 
 /* ---------- clases compartidas ---------- */
 export const INPUT =
-  "w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[15px] text-white placeholder-gray-600 focus:border-brand-cyan focus:outline-none";
+  "w-full rounded-xl border border-white/10 bg-white/[0.02] shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] px-3.5 py-3 text-[15px] text-white placeholder-gray-600 focus:border-brand-cyan focus:bg-white/[0.05] focus:ring-1 focus:ring-brand-cyan/50 focus:outline-none transition-all duration-300";
 export const LABEL =
   "block text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1.5";
 export const CARD = "rounded-2xl border border-white/8 bg-brand-surface p-4";
@@ -70,7 +70,7 @@ export function PrimaryBtn({
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-1.5 h-11 px-5 rounded-xl bg-brand-cyan text-brand-pure text-sm font-bold disabled:opacity-50 ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 h-12 px-6 rounded-xl bg-gradient-to-r from-brand-cyan to-[#00b3cc] shadow-[0_0_15px_rgba(0,255,255,0.15)] text-black text-sm font-extrabold disabled:opacity-50 hover:shadow-[0_0_25px_rgba(0,255,255,0.4)] hover:-translate-y-0.5 transition-all duration-300 ${className}`}
     >
       {children}
     </button>
@@ -128,29 +128,29 @@ export function Sheet({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[70]">
+        <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center p-0 md:p-4 pointer-events-none">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/80 backdrop-blur-md pointer-events-auto"
           />
           <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 360, damping: 36 }}
-            className="absolute bottom-0 inset-x-0 mx-auto max-w-2xl bg-brand-surface border-t border-white/10 rounded-t-3xl max-h-[92dvh] flex flex-col pb-safe"
+            initial={{ y: 50, opacity: 0, scale: 0.95 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 50, opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            className="relative w-full max-w-2xl bg-gradient-to-b from-[#1a1a24] to-[#0a0a0f] border border-white/10 rounded-t-3xl md:rounded-3xl max-h-[92dvh] flex flex-col pb-safe shadow-[0_0_50px_rgba(0,0,0,0.5)] pointer-events-auto"
           >
-            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/8 shrink-0">
-              <div className="flex-1 flex justify-center absolute inset-x-0 -top-0 pt-2 pointer-events-none">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/10 shrink-0 bg-white/[0.02]">
+              <div className="flex-1 flex justify-center absolute inset-x-0 -top-0 pt-2 pointer-events-none md:hidden">
                 <span className="w-10 h-1.5 rounded-full bg-white/15" />
               </div>
-              <h2 className="text-base font-bold text-white pt-1">{title}</h2>
+              <h2 className="text-lg font-bold text-white tracking-tight pt-1">{title}</h2>
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-white/5 text-gray-400 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-white/10 text-gray-400 hover:text-white hover:bg-brand-cyan/20 transition-colors flex items-center justify-center"
                 aria-label="Cerrar"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -158,7 +158,7 @@ export function Sheet({
                 </svg>
               </button>
             </div>
-            <div className="overflow-y-auto overscroll-contain px-5 py-5 custom-scrollbar">
+            <div className="overflow-y-auto overscroll-contain px-6 py-6 custom-scrollbar">
               {children}
             </div>
           </motion.div>

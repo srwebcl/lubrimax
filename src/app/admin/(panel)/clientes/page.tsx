@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { formatPlate } from "@/lib/plate";
-import { Screen, PageHead, Empty } from "@/components/admin/kit";
+import { requireStaffPage } from "@/lib/staff-session";
+import { realBookingWhere } from "@/lib/booking-constants";
+import { parseBookingVehicle } from "@/lib/plate";
+import { phoneKey } from "@/lib/contact";
+import ClientManager, { type UnifiedClient } from "./ClientManager";
 
 export const metadata = {
   title: "Clientes | Lubrimax",
@@ -8,201 +11,104 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-type UnifiedClient = {
-  id: string;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  rut: string | null;
-  source: "Taller" | "Web";
-  vehicles: { plate: string; make: string; model: string }[];
-  date: Date;
-};
+// Tope de reservas web que se leen para armar el directorio (las más
+// recientes). Evita cargar la tabla completa en cada visita.
+const MAX_WEB_BOOKINGS = 3000;
 
 export default async function ClientesPage() {
-  const workshopClients = await prisma.workshopClient.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { vehicles: true },
-  });
+  await requireStaffPage();
 
-  const allBookings = await prisma.booking.findMany({
-    orderBy: { createdAt: "desc" }
-  });
+  const [workshopClients, webBookings] = await Promise.all([
+    prisma.workshopClient.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        rut: true,
+        createdAt: true,
+        vehicles: { select: { plate: true, make: true, model: true } },
+      },
+    }),
+    prisma.booking.findMany({
+      where: realBookingWhere(),
+      orderBy: { createdAt: "desc" },
+      take: MAX_WEB_BOOKINGS,
+      select: {
+        id: true,
+        customerName: true,
+        customerEmail: true,
+        customerPhone: true,
+        vehicleMake: true,
+        vehicleModel: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
-  const clientsMap = new Map<string, UnifiedClient>();
+  const clients: UnifiedClient[] = [];
+  // Índices para deduplicar: el mismo cliente puede aparecer con el correo,
+  // el teléfono (en distintos formatos) o la patente.
+  const byEmail = new Map<string, UnifiedClient>();
+  const byPhone = new Map<string, UnifiedClient>();
+  const byPlate = new Map<string, UnifiedClient>();
 
-  // 1. Agregar clientes del taller (tienen prioridad)
+  function index(c: UnifiedClient) {
+    if (c.email) byEmail.set(c.email.toLowerCase(), c);
+    const pk = phoneKey(c.phone);
+    if (pk) byPhone.set(pk, c);
+    for (const v of c.vehicles) if (v.plate) byPlate.set(v.plate, c);
+  }
+
+  // 1. Clientes del taller (tienen prioridad)
   for (const c of workshopClients) {
-    // Usar email o teléfono como llave principal de deduplicación
-    const key = c.email?.toLowerCase() || c.phone || c.id;
-    clientsMap.set(key, {
+    const client: UnifiedClient = {
       id: c.id,
       name: c.name,
       email: c.email,
       phone: c.phone,
       rut: c.rut,
       source: "Taller",
-      vehicles: c.vehicles.map(v => ({ plate: v.plate, make: v.make, model: v.model })),
-      date: c.createdAt
-    });
+      vehicles: c.vehicles,
+      date: c.createdAt,
+    };
+    clients.push(client);
+    index(client);
   }
 
-  // 2. Agregar clientes de reservas web que no estén ya en el taller
-  for (const b of allBookings) {
-    const key = b.customerEmail?.toLowerCase() || b.customerPhone || b.id;
-    if (!clientsMap.has(key)) {
-      
-      // Extraer patente si viene en el modelo (ej: "Focus (Patente: ABCD12)")
-      let plate = "";
-      let make = b.vehicleMake;
-      let model = b.vehicleModel;
-      
-      const patMatch = model.match(/\(Patente:\s*([^)]+)\)/i);
-      if (patMatch) {
-        plate = patMatch[1].trim();
-        model = model.replace(/\s*\(Patente:\s*[^)]+\)/i, "").trim();
-      }
-      
-      if (make.includes(" - ")) {
-        make = make.split(" - ").pop() || make;
-      }
+  // 2. Clientes de reservas web que no estén ya en el taller
+  for (const b of webBookings) {
+    const vehicle = parseBookingVehicle(b.vehicleMake, b.vehicleModel);
+    const existing =
+      (b.customerEmail && byEmail.get(b.customerEmail.toLowerCase())) ||
+      byPhone.get(phoneKey(b.customerPhone)) ||
+      (vehicle.plate && byPlate.get(vehicle.plate)) ||
+      undefined;
 
-      clientsMap.set(key, {
-        id: `web-${b.id}`,
-        name: b.customerName,
-        email: b.customerEmail,
-        phone: b.customerPhone,
-        rut: null,
-        source: "Web",
-        vehicles: [{ plate, make, model }],
-        date: b.createdAt
-      });
-    } else {
-      // Si el cliente ya existe, agregar el vehículo si no está
-      const existing = clientsMap.get(key)!;
-      let plate = "";
-      let make = b.vehicleMake;
-      let model = b.vehicleModel;
-      const patMatch = model.match(/\(Patente:\s*([^)]+)\)/i);
-      if (patMatch) {
-        plate = patMatch[1].trim();
-        model = model.replace(/\s*\(Patente:\s*[^)]+\)/i, "").trim();
+    if (existing) {
+      if (vehicle.plate && !existing.vehicles.some((v) => v.plate === vehicle.plate)) {
+        existing.vehicles.push(vehicle);
+        byPlate.set(vehicle.plate, existing);
       }
-      if (make.includes(" - ")) make = make.split(" - ").pop() || make;
-
-      if (plate && !existing.vehicles.find(v => v.plate.toUpperCase() === plate.toUpperCase())) {
-        existing.vehicles.push({ plate, make, model });
-      }
+      continue;
     }
+
+    const client: UnifiedClient = {
+      id: `web-${b.id}`,
+      name: b.customerName,
+      email: b.customerEmail,
+      phone: b.customerPhone,
+      rut: null,
+      source: "Web",
+      vehicles: [vehicle],
+      date: b.createdAt,
+    };
+    clients.push(client);
+    index(client);
   }
 
-  const clients = Array.from(clientsMap.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
+  clients.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  return (
-    <Screen size="xl">
-      <PageHead
-        title="Directorio de Clientes"
-        subtitle="Listado unificado de clientes registrados en el taller y por reservas web."
-      />
-
-      {clients.length === 0 ? (
-        <Empty>Aún no hay clientes registrados en el sistema.</Empty>
-      ) : (
-        <>
-          {/* Escritorio: listado tipo tabla */}
-          <div className="hidden md:block rounded-2xl border border-white/8 overflow-hidden">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-white/[0.03] text-left text-[11px] uppercase tracking-wider text-gray-500">
-                  <th className="py-3 pl-4 pr-3 font-semibold">Cliente</th>
-                  <th className="py-3 px-3 font-semibold">Contacto</th>
-                  <th className="py-3 px-3 font-semibold">Origen</th>
-                  <th className="py-3 pl-3 pr-4 font-semibold">Vehículos</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/6">
-                {clients.map((c) => (
-                  <tr key={c.id} className="hover:bg-white/[0.025] transition-colors">
-                    <td className="py-3 pl-4 pr-3 align-top">
-                      <div className="font-bold text-white text-base">{c.name}</div>
-                      {c.rut && <div className="text-xs text-gray-500 mt-0.5">RUT: {c.rut}</div>}
-                    </td>
-                    <td className="py-3 px-3 align-top text-gray-400 text-sm space-y-0.5">
-                      {c.phone && <div>{c.phone}</div>}
-                      {c.email && <div>{c.email}</div>}
-                    </td>
-                    <td className="py-3 px-3 align-top">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.source === 'Taller' ? 'bg-brand-cyan/20 text-brand-cyan' : 'bg-purple-500/20 text-purple-400'}`}>
-                        {c.source}
-                      </span>
-                    </td>
-                    <td className="py-3 pl-3 pr-4 align-top">
-                      {c.vehicles.length === 0 ? (
-                        <span className="text-xs text-gray-600">Sin vehículos</span>
-                      ) : (
-                        <div className="flex flex-col gap-1.5">
-                          {c.vehicles.map((v, i) => (
-                            <div key={i} className="flex items-center gap-2 text-xs">
-                              {v.plate ? (
-                                <span className="bg-white/10 text-white font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                  {formatPlate(v.plate)}
-                                </span>
-                              ) : null}
-                              <span className="text-gray-400">{v.make} {v.model}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Móvil: tarjetas */}
-          <ul className="md:hidden space-y-3">
-            {clients.map((c) => (
-              <li key={c.id} className="bg-brand-surface border border-white/5 p-4 rounded-2xl flex flex-col gap-3">
-                <div className="flex justify-between items-start gap-2">
-                  <div>
-                    <div className="font-bold text-white text-lg">{c.name}</div>
-                    {c.rut && <div className="text-xs text-gray-500">RUT: {c.rut}</div>}
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${c.source === 'Taller' ? 'bg-brand-cyan/20 text-brand-cyan' : 'bg-purple-500/20 text-purple-400'}`}>
-                    {c.source}
-                  </span>
-                </div>
-                
-                <div className="text-sm text-gray-400 space-y-0.5">
-                  {c.phone && <div>{c.phone}</div>}
-                  {c.email && <div>{c.email}</div>}
-                </div>
-
-                <div className="pt-2 border-t border-white/5">
-                  <div className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1.5">Vehículos</div>
-                  {c.vehicles.length === 0 ? (
-                    <div className="text-xs text-gray-600">Sin vehículos</div>
-                  ) : (
-                    <div className="flex flex-col gap-1.5">
-                      {c.vehicles.map((v, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs">
-                          {v.plate && (
-                            <span className="bg-white/10 text-white font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
-                              {formatPlate(v.plate)}
-                            </span>
-                          )}
-                          <span className="text-gray-400">{v.make} {v.model}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </Screen>
-  );
+  return <ClientManager initialClients={clients} />;
 }

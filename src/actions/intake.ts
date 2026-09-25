@@ -3,21 +3,16 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/staff-session";
-import { intakeSchema, flattenZodError } from "@/lib/validation";
+import { intakeSchema, manualIntakeServicesSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate } from "@/lib/plate";
+import { chileNow, bookingDateFromDay, addMinutesToTime } from "@/lib/chile-time";
+import { normalizeRut, formatPhone } from "@/lib/contact";
+
+/** Error de negocio con mensaje apto para mostrar al usuario. */
+class IntakeError extends Error {}
 
 function fail(error: string) {
   return { success: false as const, error };
-}
-
-/** Normaliza un RUT a "12345678-9" (sin puntos, con guion, K en mayúscula). */
-function normalizeRut(rut: string | undefined): string | undefined {
-  if (!rut) return undefined;
-  const clean = rut.replace(/[.\s]/g, "").toUpperCase();
-  const withDash = clean.includes("-")
-    ? clean
-    : `${clean.slice(0, -1)}-${clean.slice(-1)}`;
-  return withDash;
 }
 
 export type PlateLookup = {
@@ -128,10 +123,27 @@ export async function registerIntake(formData: FormData) {
 
   const d = parsed.data;
   if (!isValidPlate(d.plate)) return fail("Patente inválida.");
+  // La foto debe venir de nuestro bucket (la sube uploadFileToR2).
+  const r2Base = process.env.NEXT_PUBLIC_R2_DEV_URL;
+  if (d.photoUrl && !(r2Base ? d.photoUrl.startsWith(`${r2Base}/`) : d.photoUrl.startsWith("https://"))) {
+    return fail("Foto inválida.");
+  }
+
+  // Ingreso sin reserva web: se crea una cita interna con estos servicios.
+  let manual: { serviceIds: string[]; customServiceDetail?: string; customServicePrice: number } | null = null;
+  if (!d.bookingId) {
+    const manualParsed = manualIntakeServicesSchema.safeParse({
+      serviceIds: formData.getAll("serviceIds").map(String),
+      customServiceDetail: formData.get("customServiceDetail") || undefined,
+      customServicePrice: formData.get("customServicePrice") ?? "",
+    });
+    if (!manualParsed.success) return fail(flattenZodError(manualParsed.error));
+    manual = { ...manualParsed.data, serviceIds: [...new Set(manualParsed.data.serviceIds)] };
+  }
   const plate = normalizePlate(d.plate);
   const rut = normalizeRut(d.clientRut);
-  const email = d.clientEmail ? d.clientEmail : undefined;
-  const phone = d.clientPhone ? d.clientPhone : undefined;
+  const email = d.clientEmail ? d.clientEmail.toLowerCase() : undefined;
+  const phone = d.clientPhone ? formatPhone(d.clientPhone) || d.clientPhone : undefined;
 
   try {
     const result = await prisma.$transaction(async (tx) => {
@@ -198,11 +210,64 @@ export async function registerIntake(formData: FormData) {
         update: { make: d.make, model: d.model, color: d.color, clientId },
       });
 
-      // 3. Validar la reserva enlazada (si vino)
+      // 3. Validar la reserva enlazada (si vino) o Crear una nueva para ingresos manuales
       let bookingId: string | undefined;
+      
       if (d.bookingId) {
         const b = await tx.booking.findUnique({ where: { id: d.bookingId }, select: { id: true } });
-        bookingId = b?.id;
+        if (!b) throw new IntakeError("La reserva seleccionada ya no existe. Recarga la página.");
+        bookingId = b.id;
+      } else if (manual) {
+        // ES UN INGRESO MANUAL.
+        const { serviceIds, customServiceDetail } = manual;
+        const customPrice = customServiceDetail ? manual.customServicePrice : 0;
+        const selectedOptions = customServiceDetail
+          ? { customService: { detail: customServiceDetail, price: customPrice } }
+          : undefined;
+
+        // Buscar los servicios seleccionados para sumar su precio
+        const dbServices = await tx.service.findMany({
+          where: { id: { in: serviceIds } },
+          select: { id: true, priceAuto: true, duration: true }
+        });
+        if (dbServices.length !== serviceIds.length) {
+          throw new IntakeError("Alguno de los servicios ya no existe. Recarga la página.");
+        }
+
+        const catalogTotal = dbServices.reduce((acc, s) => acc + (s.priceAuto || 0), 0);
+        const totalAmount = catalogTotal + customPrice;
+
+        // Hora de Chile, no del servidor (UTC). `date` sigue la convención
+        // del resto de reservas: el día a las 00:00 UTC.
+        const { date: today, time: startTime } = chileNow();
+        const duration = dbServices.reduce((acc, s) => acc + s.duration, 0) || 60;
+        const endTime = addMinutesToTime(startTime, duration);
+
+        // Crear la reserva interna para que aparezca en la Agenda
+        const newBooking = await tx.booking.create({
+          data: {
+            date: bookingDateFromDay(today),
+            startTime,
+            endTime,
+            status: "CONFIRMED",
+            // Entra a la cola del Tablero ("En espera"); se inicia desde ahí.
+            workStatus: "PENDING",
+            paymentStatus: "PENDING",
+            amount: totalAmount,
+            totalPrice: totalAmount,
+            customerName: d.clientName,
+            customerPhone: phone || "",
+            customerEmail: email || null,
+            vehicleMake: d.make,
+            vehicleModel: `${d.model} (Patente: ${plate})`,
+            selectedOptions: selectedOptions,
+            services: {
+              connect: serviceIds.map(id => ({ id }))
+            }
+          }
+        });
+        
+        bookingId = newBooking.id;
       }
 
       // 4. Crear el ingreso
@@ -223,9 +288,10 @@ export async function registerIntake(formData: FormData) {
     });
 
     revalidatePath("/admin/ingreso");
-    revalidatePath("/admin");
+    revalidatePath("/admin", "layout");
     return { success: true as const, ...result };
   } catch (error) {
+    if (error instanceof IntakeError) return fail(error.message);
     if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
     console.error("registerIntake:", error);
     return fail("No se pudo registrar el ingreso.");

@@ -9,10 +9,12 @@
  * Al cambiar la estrategia de caché, subir CACHE_VERSION.
  */
 
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const STATIC_CACHE = `lubrimax-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `lubrimax-runtime-${CACHE_VERSION}`;
 const OFFLINE_URL = "/offline";
+// Tope de páginas guardadas para uso offline (se borran las más antiguas).
+const RUNTIME_MAX_ENTRIES = 40;
 
 // Recursos mínimos para que algo se vea sin red.
 const PRECACHE_URLS = [
@@ -62,6 +64,28 @@ self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
+// Tocar una notificación de reserva: enfocar el panel si ya está abierto, o
+// abrirlo (ver src/components/admin/BookingNotifier.tsx).
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/admin", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      const panel = wins.find((w) => new URL(w.url).pathname.startsWith("/admin"));
+      if (panel) {
+        return panel.focus().then((w) => (w && "navigate" in w ? w.navigate(target) : w));
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});
+
+// Borra las entradas más antiguas (orden de inserción) sobre el tope.
+async function trimCache(cache, max) {
+  const keys = await cache.keys();
+  await Promise.all(keys.slice(0, Math.max(0, keys.length - max)).map((k) => cache.delete(k)));
+}
+
 function isBypassed(url, request) {
   if (request.method !== "GET") return true;
   if (url.origin !== self.location.origin) return true;
@@ -76,7 +100,7 @@ function isStaticAsset(url) {
   return (
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/icons/") ||
-    /\.(?:css|js|woff2?|ttf|otf|png|jpe?g|webp|avif|gif|svg|ico|mp4)$/i.test(url.pathname)
+    /\.(?:css|js|woff2?|ttf|otf|png|jpe?g|webp|avif|gif|svg|ico)$/i.test(url.pathname)
   );
 }
 
@@ -92,12 +116,19 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const fresh = await fetch(request);
-          // Clonar YA, en el mismo tick: si se clona después de un await, el
-          // navegador puede haber empezado a leer el cuerpo de `fresh`
-          // mientras tanto y el clone revienta con "Response body is
-          // already used".
-          const copy = fresh.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+          // Solo respuestas OK y sin redirección: antes se guardaban también
+          // páginas de error (500) y se servían offline.
+          if (fresh.ok && !fresh.redirected) {
+            // Clonar YA, en el mismo tick: si se clona después de un await,
+            // el navegador puede haber empezado a leer el cuerpo de `fresh`
+            // mientras tanto y el clone revienta con "Response body is
+            // already used".
+            const copy = fresh.clone();
+            caches
+              .open(RUNTIME_CACHE)
+              .then((cache) => cache.put(request, copy).then(() => trimCache(cache, RUNTIME_MAX_ENTRIES)))
+              .catch(() => {});
+          }
           return fresh;
         } catch {
           const cached = await caches.match(request);

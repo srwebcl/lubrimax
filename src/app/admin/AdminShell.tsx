@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { logout } from "@/actions/auth";
+import BookingNotifier from "@/components/admin/BookingNotifier";
 
 type Role = "ADMIN" | "WORKER";
 
@@ -43,8 +44,10 @@ const ICONS = {
 
 // Todos los destinos del panel, en orden.
 const DESTS: Dest[] = [
-  { name: "Agenda", href: "/admin", icon: ICONS.agenda },
-  { name: "Ingreso", href: "/admin/ingreso", icon: ICONS.ingreso },
+  // "Taller" es el tablero operativo (inicio). El formulario de ingreso
+  // (/admin/ingreso) se abre desde ahí: "Llegó" / "Llegó sin reserva".
+  { name: "Taller", href: "/admin", icon: ICONS.ingreso },
+  { name: "Agenda", href: "/admin/agenda", icon: ICONS.agenda },
   { name: "Clientes", href: "/admin/clientes", icon: ICONS.clientes },
   { name: "Estadísticas", href: "/admin/estadisticas", icon: ICONS.estadisticas, adminOnly: true },
   { name: "Productos", href: "/admin/tienda", icon: ICONS.productos, adminOnly: true },
@@ -86,10 +89,10 @@ export default function AdminShell({
   const primary =
     role === "ADMIN"
       ? visible.filter((d) =>
-          ["/admin", "/admin/ingreso", "/admin/pedidos"].includes(d.href)
+          ["/admin", "/admin/agenda", "/admin/clientes"].includes(d.href)
         )
       : visible.filter((d) =>
-          ["/admin", "/admin/ingreso", "/admin/perfil"].includes(d.href)
+          ["/admin", "/admin/agenda", "/admin/clientes", "/admin/perfil"].includes(d.href)
         );
 
   const inSheet =
@@ -98,10 +101,13 @@ export default function AdminShell({
       : [];
 
   const isActive = (href: string) =>
-    href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+    href === "/admin"
+      ? pathname === "/admin" || pathname.startsWith("/admin/ingreso")
+      : pathname.startsWith(href);
 
   return (
     <div className="h-[100dvh] bg-brand-pure flex overflow-hidden">
+      <BookingNotifier />
       {/* ───────────── Sidebar (escritorio) ───────────── */}
       <aside className="w-60 h-full bg-brand-surface border-r border-white/5 hidden md:flex flex-col shrink-0">
         <div className="p-6 border-b border-white/5">

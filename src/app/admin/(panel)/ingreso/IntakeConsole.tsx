@@ -3,22 +3,9 @@
 import React, { useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { lookupByPlate, registerIntake, markDelivered, type PlateLookup } from "@/actions/intake";
+import { lookupByPlate, registerIntake, type PlateLookup } from "@/actions/intake";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { uploadFileToR2 } from "@/lib/uploadClient";
-
-type InShop = {
-  id: string;
-  plate: string;
-  make: string;
-  model: string;
-  clientName: string;
-  clientPhone: string | null;
-  photoUrl: string | null;
-  notes: string | null;
-  staffName: string | null;
-  createdAt: string;
-};
 
 type TodayBooking = {
   id: string;
@@ -28,27 +15,39 @@ type TodayBooking = {
   vehicleModel: string;
 };
 
+type Service = {
+  id: string;
+  name: string;
+  priceAuto: number | null;
+  category: string;
+};
+
 const field =
   "w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan";
 const label = "block text-[11px] uppercase tracking-widest text-gray-500 font-bold mb-1.5";
 
 export default function IntakeConsole({
-  inShop,
   todayBookings,
+  services = [],
+  initial,
 }: {
-  inShop: InShop[];
   todayBookings: TodayBooking[];
+  services?: Service[];
+  /** Llegada de una reserva desde el Tablero: datos precargados. */
+  initial?: { bookingId: string; plate: string; lookup: PlateLookup };
 }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<"search" | "form">("search");
-  const [plate, setPlate] = useState("");
-  const [lookup, setLookup] = useState<PlateLookup | null>(null);
+  const [phase, setPhase] = useState<"search" | "form">(initial?.plate ? "form" : "search");
+  const [plate, setPlate] = useState(initial?.plate ?? "");
+  const [lookup, setLookup] = useState<PlateLookup | null>(initial?.lookup ?? null);
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [selectedBookingId, setSelectedBookingId] = useState(initial?.bookingId ?? "");
 
   async function doSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +61,7 @@ export default function IntakeConsole({
     const res = await lookupByPlate(p);
     setLookup(res);
     setPlate(p);
+    setSelectedBookingId(initial?.bookingId ?? "");
     setPhase("form");
     setSearching(false);
   }
@@ -85,26 +85,28 @@ export default function IntakeConsole({
     setMsg(null);
     const fd = new FormData(e.currentTarget);
     fd.set("photoUrl", photoUrl);
+    
+    // Si no hay reserva seleccionada y no se seleccionaron servicios ni servicio personalizado
+    if (!selectedBookingId) {
+      const selectedServices = fd.getAll("serviceIds");
+      const customDetail = fd.get("customServiceDetail") as string;
+      if (selectedServices.length === 0 && !customDetail.trim()) {
+        setMsg({ type: "err", text: "Debes seleccionar al menos un servicio o ingresar uno personalizado." });
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const res = await registerIntake(fd);
     setSubmitting(false);
 
     if (res.success) {
-      setMsg({ type: "ok", text: `Ingreso registrado — ${formatPlate(res.plate)}` });
-      setPhase("search");
-      setPlate("");
-      setLookup(null);
-      setPhotoUrl("");
+      // De vuelta al Tablero: el auto aparece en "En espera".
+      router.push("/admin");
       router.refresh();
     } else {
       setMsg({ type: "err", text: res.error });
     }
-  }
-
-  async function deliver(id: string) {
-    if (!confirm("¿Marcar este vehículo como entregado?")) return;
-    const res = await markDelivered(id);
-    if (res.success) router.refresh();
-    else alert(res.error);
   }
 
   const c = lookup?.client;
@@ -166,6 +168,7 @@ export default function IntakeConsole({
                 setPhase("search");
                 setLookup(null);
                 setPhotoUrl("");
+                setSelectedBookingId("");
               }}
               className="text-xs font-semibold text-gray-400 bg-white/5 px-3 py-1.5 rounded-full"
             >
@@ -187,7 +190,7 @@ export default function IntakeConsole({
 
           {lookup?.openIntakeId && (
             <div className="text-xs font-semibold px-3 py-2 rounded-lg border bg-red-500/10 text-red-400 border-red-500/25">
-              Ojo: este vehículo ya figura EN EL TALLER (más abajo). Registrar de
+              Ojo: este vehículo ya figura EN EL TALLER (ver Tablero). Registrar de
               nuevo crea un segundo ingreso.
             </div>
           )}
@@ -231,6 +234,7 @@ export default function IntakeConsole({
               <input
                 name="clientPhone"
                 inputMode="tel"
+                required
                 defaultValue={c?.phone ?? ""}
                 placeholder="+56 9 …"
                 className={field}
@@ -257,9 +261,14 @@ export default function IntakeConsole({
               <input name="odometer" inputMode="numeric" placeholder="Opcional" className={field} />
             </div>
             <div>
-              <label className={label}>Reserva de hoy</label>
-              <select name="bookingId" defaultValue="" className={field}>
-                <option value="">Sin reserva</option>
+              <label className={label}>Vincular Reserva Web</label>
+              <select 
+                name="bookingId" 
+                value={selectedBookingId}
+                onChange={(e) => setSelectedBookingId(e.target.value)}
+                className={field}
+              >
+                <option value="">Sin reserva (Ingreso Presencial)</option>
                 {todayBookings.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.startTime} · {b.customerName} ({b.vehicleMake} {b.vehicleModel})
@@ -269,7 +278,59 @@ export default function IntakeConsole({
             </div>
           </div>
 
-          <div>
+          {/* SERVICIOS - Solo visible si NO hay una reserva web seleccionada */}
+          {!selectedBookingId && (
+            <div className="mt-4 p-4 border border-brand-cyan/30 bg-brand-cyan/5 rounded-2xl">
+              <h3 className="text-sm font-bold text-brand-cyan uppercase tracking-widest mb-3">
+                Cotización de Servicios
+              </h3>
+              <p className="text-xs text-gray-400 mb-4">
+                Al registrar este ingreso sin reserva web, se creará automáticamente una cita en la Agenda con los siguientes servicios.
+              </p>
+              
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 mb-4">
+                {services.map(s => (
+                  <label key={s.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-white/10">
+                    <input 
+                      type="checkbox" 
+                      name="serviceIds" 
+                      value={s.id} 
+                      className="w-4 h-4 rounded border-gray-600 text-brand-cyan focus:ring-brand-cyan bg-black"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-white truncate">{s.name}</div>
+                      <div className="text-[10px] text-gray-500 uppercase">{s.category}</div>
+                    </div>
+                    <div className="text-sm font-bold text-brand-cyan shrink-0">
+                      ${(s.priceAuto || 0).toLocaleString("es-CL")}
+                    </div>
+                  </label>
+                ))}
+              </div>
+
+              <div className="pt-4 border-t border-brand-cyan/20">
+                <label className={label}>Otro Servicio (Personalizado)</label>
+                <div className="grid grid-cols-[1fr_120px] gap-2 mt-2">
+                  <input 
+                    name="customServiceDetail" 
+                    maxLength={200}
+                    placeholder="Detalle del trabajo..." 
+                    className={`${field} py-2 text-sm`} 
+                  />
+                  <input 
+                    name="customServicePrice" 
+                    type="number" 
+                    min={0}
+                    step={1}
+                    placeholder="Precio ($)" 
+                    className={`${field} py-2 text-sm`} 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4">
             <label className={label}>Observaciones de recepción</label>
             <textarea
               name="notes"
@@ -338,47 +399,6 @@ export default function IntakeConsole({
         </form>
       )}
 
-      {/* ── En el taller ahora ── */}
-      <section>
-        <h2 className="text-sm font-bold text-white uppercase tracking-widest mb-3">
-          En el taller ahora
-          <span className="ml-2 text-xs text-gray-500">{inShop.length}</span>
-        </h2>
-        {inShop.length === 0 ? (
-          <p className="text-sm text-gray-500">No hay vehículos ingresados.</p>
-        ) : (
-          <ul className="space-y-2">
-            {inShop.map((i) => (
-              <li
-                key={i.id}
-                className="bg-brand-surface border border-white/8 rounded-2xl p-3 flex items-center gap-3"
-              >
-                {i.photoUrl ? (
-                  <div className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0">
-                    <Image src={i.photoUrl} alt="" fill className="object-cover" />
-                  </div>
-                ) : (
-                  <div className="w-14 h-14 rounded-lg bg-white/5 shrink-0 flex items-center justify-center text-gray-600 text-lg font-black">
-                    {i.make.charAt(0)}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-white">{formatPlate(i.plate)}</div>
-                  <div className="text-xs text-gray-400 truncate">
-                    {i.make} {i.model} · {i.clientName}
-                  </div>
-                </div>
-                <button
-                  onClick={() => deliver(i.id)}
-                  className="shrink-0 text-xs font-bold uppercase tracking-widest text-green-400 border border-green-500/25 bg-green-500/10 px-3 py-2 rounded-lg"
-                >
-                  Entregar
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

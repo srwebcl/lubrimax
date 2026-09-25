@@ -35,7 +35,7 @@ function LoginContent() {
       <div className="max-w-md w-full bg-brand-surface border border-white/10 rounded-2xl p-8 backdrop-blur-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white uppercase tracking-widest italic mb-2">Ingresa a tu cuenta</h1>
-          <p className="text-gray-400 text-sm">Gestiona tus compras, historial de reservas y beneficios del Club LUBRIMAX.</p>
+          <p className="text-gray-400 text-sm">Gestiona tus compras e historial de reservas.</p>
         </div>
 
         {error && (

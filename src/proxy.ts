@@ -20,6 +20,7 @@ const ADMIN_ONLY_PREFIXES = [
   '/admin/cupones',
   '/admin/configuracion',
   '/admin/usuarios',
+  '/admin/estadisticas',
 ];
 
 export async function proxy(request: NextRequest) {

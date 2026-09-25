@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { CLUB_ENABLED } from "@/lib/features";
 
 export default function Footer() {
   return (
@@ -51,11 +52,13 @@ export default function Footer() {
                   Contacto
                 </Link>
               </li>
-              <li>
-                <Link href="/club" className="text-amber-500/80 hover:text-amber-400 transition-colors text-sm uppercase tracking-wide">
-                  ★ Club VIP
-                </Link>
-              </li>
+              {CLUB_ENABLED && (
+                <li>
+                  <Link href="/club" className="text-amber-500/80 hover:text-amber-400 transition-colors text-sm uppercase tracking-wide">
+                    ★ Club VIP
+                  </Link>
+                </li>
+              )}
               <li>
                 <Link href="/agendar" className="text-gray-400 hover:text-brand-cyan transition-colors text-sm uppercase tracking-wide font-bold">
                   Agendar Cita

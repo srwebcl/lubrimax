@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { requireStaffPage } from "@/lib/staff-session";
+import { chileNow } from "@/lib/chile-time";
+import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/booking-money";
 
 export const metadata = {
   title: "Estadísticas | Lubrimax",
@@ -7,8 +10,12 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function EstadisticasPage() {
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  await requireStaffPage("ADMIN");
+
+  // Primer día del mes en Chile, en la convención de Booking.date (00:00 UTC).
+  const firstDayOfMonth = new Date(`${chileNow().date.slice(0, 7)}-01T00:00:00.000Z`);
+  // Para timestamps reales (createdAt de pagos): 00:00 de Chile ≈ 04:00 UTC.
+  const monthStartInstant = new Date(firstDayOfMonth.getTime() + 4 * 60 * 60 * 1000);
 
   // 1. Total de trabajos terminados este mes
   const completedJobsThisMonth = await prisma.booking.count({
@@ -18,18 +25,28 @@ export default async function EstadisticasPage() {
     }
   });
 
-  // 2. Ingresos proyectados vs pagados de las reservas (mes actual)
-  const bookingsThisMonth = await prisma.booking.findMany({
-    where: { date: { gte: firstDayOfMonth }, status: { not: "CANCELLED" } },
-    select: { amount: true, paymentStatus: true }
+  // 2. Ingresos del mes: pagos registrados (Webpay + cobros en el local).
+  const paymentsByMethod = await prisma.bookingPayment.groupBy({
+    by: ["method"],
+    where: { createdAt: { gte: monthStartInstant } },
+    _sum: { amount: true },
+  });
+  // Reservas web pagadas antes de que existiera el registro de pagos.
+  const legacyWebpay = await prisma.booking.aggregate({
+    where: {
+      createdAt: { gte: monthStartInstant },
+      paymentType: { not: null },
+      paymentStatus: { in: ["PAID_RESERVATION", "PAID_FULL"] },
+      payments: { none: {} },
+    },
+    _sum: { amount: true },
   });
 
-  let totalIncome = 0;
-  bookingsThisMonth.forEach(b => {
-    if (b.paymentStatus === "PAID_FULL" || b.paymentStatus === "PAID_RESERVATION") {
-      totalIncome += b.amount || 0;
-    }
-  });
+  const incomeByMethod = new Map<string, number>();
+  for (const p of paymentsByMethod) incomeByMethod.set(p.method, p._sum.amount ?? 0);
+  const legacy = legacyWebpay._sum.amount ?? 0;
+  if (legacy > 0) incomeByMethod.set("WEBPAY", (incomeByMethod.get("WEBPAY") ?? 0) + legacy);
+  const totalIncome = [...incomeByMethod.values()].reduce((a, b) => a + b, 0);
 
   // 3. Cantidad de autos físicos ingresados al taller
   const intakesThisMonth = await prisma.vehicleIntake.count({
@@ -51,11 +68,20 @@ export default async function EstadisticasPage() {
         </div>
 
         <div className="bg-brand-surface border border-white/5 rounded-2xl p-5 flex flex-col justify-center">
-          <div className="text-sm font-semibold text-gray-400 mb-1">Ingresos de Reservas</div>
+          <div className="text-sm font-semibold text-gray-400 mb-1">Ingresos del mes</div>
           <div className="text-3xl font-black text-green-400">
             ${totalIncome.toLocaleString("es-CL")}
           </div>
-          <div className="text-xs text-gray-600 mt-2">Abonado/Pagado vía Webpay</div>
+          <div className="text-xs text-gray-600 mt-2 space-y-0.5">
+            {incomeByMethod.size === 0
+              ? "Sin pagos registrados este mes"
+              : [...incomeByMethod].map(([method, amount]) => (
+                  <div key={method} className="flex justify-between gap-2">
+                    <span>{PAYMENT_METHODS[method as PaymentMethod] ?? method}</span>
+                    <span className="text-gray-400">${amount.toLocaleString("es-CL")}</span>
+                  </div>
+                ))}
+          </div>
         </div>
 
         <div className="bg-brand-surface border border-white/5 rounded-2xl p-5 flex flex-col justify-center">

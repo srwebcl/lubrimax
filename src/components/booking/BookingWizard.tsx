@@ -9,7 +9,8 @@ import { es } from "date-fns/locale";
 import { useSearchParams } from "next/navigation";
 import { getServices, getAvailableSlots, getBookingById } from "@/actions/booking";
 import { getSessionCustomer } from "@/actions/customer-auth";
-import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice, RESERVATION_PERCENT } from "@/lib/booking-constants";
+import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice } from "@/lib/booking-constants";
+import { CLUB_ENABLED } from "@/lib/features";
 
 // Miniaturas representativas + descripción de cada tipo de vehículo. El
 // texto de la descripción es el mismo que ya se usa en el tooltip de precios
@@ -163,14 +164,14 @@ export default function BookingWizard() {
     if (selectedDate && selectedServices.length > 0) {
       async function fetchSlots() {
         setIsLoadingSlots(true);
-        const slots = await getAvailableSlots(format(selectedDate!, "yyyy-MM-dd"), selectedServices);
+        const slots = await getAvailableSlots(format(selectedDate!, "yyyy-MM-dd"), selectedServices, selectedVariants);
         setAvailableSlots(slots);
         setSelectedSlot("");
         setIsLoadingSlots(false);
       }
       fetchSlots();
     }
-  }, [selectedDate, selectedServices]);
+  }, [selectedDate, selectedServices, selectedVariants]);
 
   const handleNext = () => setStep((s) => s + 1);
   const handlePrev = () => setStep((s) => s - 1);
@@ -197,14 +198,13 @@ export default function BookingWizard() {
   }, 0);
 
   // Aplicar descuento del club
-  const discountPercent = customerInfo?.membership?.discountPercent || 0;
+  const discountPercent = CLUB_ENABLED ? customerInfo?.membership?.discountPercent || 0 : 0;
   if (discountPercent > 0) {
     totalAmount = totalAmount - (totalAmount * (discountPercent / 100));
   }
 
-  const reservationAmount = Math.round(totalAmount * RESERVATION_PERCENT);
-
-  const handlePayment = async (type: 'RESERVATION' | 'FULL') => {
+  // La reserva web se paga siempre al 100% (sin abono).
+  const handlePayment = async () => {
     if (!formData.name || !formData.phone || !formData.plate || !formData.vehicleMake || !formData.vehicleModel) {
       alert("Por favor completa todos los datos obligatorios (Contacto y Vehículo).");
       return;
@@ -232,7 +232,6 @@ export default function BookingWizard() {
           customerName: formData.name,
           customerPhone: formData.phone,
           customerEmail: formData.email,
-          paymentType: type,
         }),
       });
 
@@ -688,12 +687,8 @@ export default function BookingWizard() {
                   </div>
 
                   <div className="border-t border-white/10 pt-4 mb-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-400 uppercase text-xs tracking-widest">Reserva (20%)</span>
-                      <span className="text-white font-bold">${reservationAmount.toLocaleString('es-CL')}</span>
-                    </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-brand-cyan uppercase text-xs font-bold tracking-widest">Total Servicio</span>
+                      <span className="text-brand-cyan uppercase text-xs font-bold tracking-widest">Total a pagar</span>
                       <span className="text-brand-cyan text-xl font-black">${totalAmount.toLocaleString('es-CL')}</span>
                     </div>
                   </div>
@@ -705,17 +700,12 @@ export default function BookingWizard() {
                   ) : (
                     <div className="space-y-3">
                       <button 
-                        onClick={() => handlePayment('RESERVATION')}
+                        onClick={handlePayment}
                         className="w-full bg-brand-chrome text-brand-pure py-3 px-2 rounded hover:bg-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(56,189,248,0.5)] flex flex-col sm:block items-center justify-center gap-1"
                       >
-                        <span>Pagar Reserva</span> <span className="opacity-75">(${reservationAmount.toLocaleString('es-CL')})</span>
+                        <span>Pagar y reservar</span> <span className="opacity-75">(${totalAmount.toLocaleString('es-CL')})</span>
                       </button>
-                      <button 
-                        onClick={() => handlePayment('FULL')}
-                        className="w-full bg-transparent border border-white/20 text-white py-3 px-2 rounded hover:border-brand-cyan hover:text-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-xs flex flex-col sm:block items-center justify-center gap-1"
-                      >
-                        <span>Pagar Total</span> <span className="opacity-75">(${totalAmount.toLocaleString('es-CL')})</span>
-                      </button>
+                      <p className="text-[10px] text-gray-500 text-center">Se paga el 100% del servicio para asegurar tu horario.</p>
                     </div>
                   )}
                   

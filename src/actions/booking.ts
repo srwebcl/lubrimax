@@ -1,11 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { addMinutes, format, isBefore, isAfter, isEqual } from "date-fns";
 import { unstable_cache } from "next/cache";
 
 import { getSettings } from "./admin-settings";
-import { PENDING_HOLD_MINUTES } from "@/lib/booking-constants";
+import { computeAvailableSlots, getBlockingBookings, totalDuration } from "@/lib/availability";
 
 async function fetchServices() {
   try {
@@ -34,109 +33,32 @@ export const getServices = unstable_cache(fetchServices, ["services"], {
 });
 
 /**
- * Calcula los bloques horarios disponibles para una fecha y servicio específico
+ * Calcula los bloques horarios disponibles para una fecha ("YYYY-MM-DD") y
+ * un conjunto de servicios. La misma regla se vuelve a aplicar al crear la
+ * reserva (ver src/lib/availability.ts).
  */
-export async function getAvailableSlots(dateString: string, serviceIds: string[]) {
+export async function getAvailableSlots(
+  dateString: string,
+  serviceIds: string[],
+  selectedVariants?: Record<string, string>
+) {
   try {
-    const services = await prisma.service.findMany({
-      where: { id: { in: serviceIds } }
-    });
-
-    if (services.length === 0) throw new Error("Servicios no encontrados");
-    const totalDuration = services.reduce((sum, s) => sum + s.duration, 0);
-
-    // Fecha consultada (asumimos formato YYYY-MM-DD)
-    const [year, month, day] = dateString.split("-").map(Number);
-    
-    const queryStart = new Date(`${dateString}T00:00:00.000Z`);
-    const queryEnd = new Date(`${dateString}T23:59:59.999Z`);
-    
-    // Obtener horarios de la BD
-    const settings = await getSettings();
-    const WORK_START_HOUR = settings.workStartHour;
-    const WORK_END_HOUR = settings.workEndHour;
-    const CONCURRENT_BAYS = settings.concurrentBays || 1;
-    const SLOT_INTERVAL = settings.slotInterval || 30;
-
-    // Obtener todas las reservas existentes para ese día. Las CONFIRMED (ya
-    // pagadas) siempre bloquean el horario; las PENDING (esperando el
-    // retorno de Webpay) lo bloquean solo mientras están "frescas" — pasado
-    // PENDING_HOLD_MINUTES se asumen abandonadas y el slot se libera solo,
-    // sin necesidad de un job de limpieza aparte.
-    const pendingCutoff = new Date(Date.now() - PENDING_HOLD_MINUTES * 60 * 1000);
-    const existingBookings = await prisma.booking.findMany({
-      where: {
-        date: {
-          gte: queryStart,
-          lte: queryEnd
-        },
-        OR: [
-          { status: "CONFIRMED" },
-          { status: "PENDING", createdAt: { gte: pendingCutoff } }
-        ]
-      }
-    });
-
-    // Generar todos los slots posibles
-    const availableSlots: string[] = [];
-    
-    let currentSlotTime = new Date(year, month - 1, day, WORK_START_HOUR, 0, 0, 0);
-    const endOfDayTime = new Date(year, month - 1, day, WORK_END_HOUR, 0, 0, 0);
-    const now = new Date(); // Para descartar horas pasadas de hoy
-
-    while (isBefore(currentSlotTime, endOfDayTime)) {
-      // Calcular a qué hora terminaría el servicio si empieza en este slot
-      const slotEndTime = addMinutes(currentSlotTime, totalDuration);
-
-      let effectiveSlotEnd = slotEndTime;
-      // Regla 1: Si el servicio termina después del horario de cierre, permitimos agendarlo
-      // SOLAMENTE si queda al menos 1 hora de trabajo hoy para recibirlo y empezar.
-      if (isAfter(slotEndTime, endOfDayTime)) {
-        effectiveSlotEnd = endOfDayTime;
-        if (endOfDayTime.getTime() - currentSlotTime.getTime() < 60 * 60 * 1000) {
-          currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
-          continue; // Pasamos al siguiente slot, no hay tiempo para empezar hoy
-        }
-      }
-
-      // Regla 2: Descartar horarios que no cumplen con la anticipación mínima
-      const advanceLimit = addMinutes(now, (settings.advanceBookingHours || 12) * 60);
-      
-      if (isBefore(currentSlotTime, advanceLimit)) {
-        currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
-        continue;
-      }
-
-      // Regla 3: Revisar colisiones con reservas existentes
-      let overlappingCount = 0;
-      
-      for (const booking of existingBookings) {
-        const [bHour, bMin] = booking.startTime.split(":").map(Number);
-        const [eHour, eMin] = booking.endTime.split(":").map(Number);
-        
-        const bookingStart = new Date(year, month - 1, day, bHour, bMin, 0, 0);
-        const bookingEnd = new Date(year, month - 1, day, eHour, eMin, 0, 0);
-
-        if (
-          (isBefore(currentSlotTime, bookingEnd) || isEqual(currentSlotTime, bookingEnd)) &&
-          (isAfter(effectiveSlotEnd, bookingStart) || isEqual(effectiveSlotEnd, bookingStart)) &&
-          !isEqual(currentSlotTime, bookingEnd) && 
-          !isEqual(effectiveSlotEnd, bookingStart)
-        ) {
-          overlappingCount++;
-        }
-      }
-
-      if (overlappingCount < CONCURRENT_BAYS) {
-        availableSlots.push(format(currentSlotTime, 'HH:mm'));
-      }
-
-      // Avanzar al siguiente bloque
-      currentSlotTime = addMinutes(currentSlotTime, SLOT_INTERVAL);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString) || !Array.isArray(serviceIds) || serviceIds.length === 0) {
+      return [];
     }
 
-    return availableSlots;
+    const services = await prisma.service.findMany({
+      where: { id: { in: serviceIds } },
+      select: { id: true, duration: true, variants: true },
+    });
+    if (services.length === 0) return [];
 
+    const [settings, bookings] = await Promise.all([
+      getSettings(),
+      getBlockingBookings(prisma, dateString),
+    ]);
+
+    return computeAvailableSlots(dateString, totalDuration(services, selectedVariants), settings, bookings);
   } catch (error) {
     console.error("Error calculating slots:", error);
     return [];

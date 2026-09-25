@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, escapeHtml } from "@/lib/email";
 import { requireAdmin } from "@/lib/staff-session";
 
 export async function getOrders() {
@@ -51,9 +51,9 @@ export async function updateOrderStatus(id: string, formData: FormData) {
         to: order.customer.email,
         subject: `Tu pedido ha sido enviado - Lubrimax`,
         html: (
-          `<h1>¡Buenas noticias, ${order.customer.name}!</h1>
+          `<h1>¡Buenas noticias, ${escapeHtml(order.customer.name)}!</h1>
            <p>Tu pedido #${order.id.slice(-8).toUpperCase()} ya está en camino.</p>
-           ${trackingCode ? `<p>Código de seguimiento: <strong>${trackingCode}</strong></p>` : ''}`
+           ${trackingCode ? `<p>Código de seguimiento: <strong>${escapeHtml(trackingCode)}</strong></p>` : ''}`
         )
       });
       if (!emailResult.success) {

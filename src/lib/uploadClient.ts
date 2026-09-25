@@ -11,7 +11,7 @@ import { getUploadUrl } from "@/actions/upload";
 
 export async function uploadFileToR2(file: File): Promise<string> {
   const contentType = file.type || "application/octet-stream";
-  const result = await getUploadUrl(file.name, contentType);
+  const result = await getUploadUrl(file.name, contentType, file.size);
 
   if ("error" in result) {
     throw new Error(result.error);

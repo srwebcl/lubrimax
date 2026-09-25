@@ -3,7 +3,24 @@ import { Resend } from 'resend';
 // Inicializa Resend solo si existe la API Key (para que no rompa en dev si no la hay)
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
-export async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
+/**
+ * Escapa texto para insertarlo en el HTML de un correo. Todo dato que venga
+ * del cliente (nombre, vehículo, etc.) debe pasar por acá: si no, alguien
+ * puede meter enlaces o HTML en correos que salen con nuestro remitente.
+ */
+export function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export async function sendEmail({ to, subject: rawSubject, html }: { to: string; subject: string; html: string }) {
+  // El asunto lleva datos del cliente: nada de saltos de línea.
+  const subject = rawSubject.replace(/[\r\n]+/g, " ").slice(0, 200);
+
   if (!resend) {
     console.warn("⚠️ [MOCK EMAIL] RESEND_API_KEY no configurada. Simulando envío a:", to, "| Asunto:", subject);
     return { success: true, mock: true };

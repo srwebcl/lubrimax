@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useCart } from '@/components/providers/CartProvider';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CLUB_ENABLED } from "@/lib/features";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -105,10 +106,12 @@ export default function Navbar() {
               Contacto
             </Link>
             
-            <Link href="/club" className="relative group/vip overflow-hidden px-5 py-2 rounded-full border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all duration-300 flex items-center shadow-[0_0_15px_rgba(245,158,11,0.15)] hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 font-bold uppercase tracking-widest text-sm drop-shadow-md">★ Club VIP</span>
-              <div className="absolute inset-0 bg-amber-400/20 blur-xl opacity-0 group-hover/vip:opacity-100 transition-opacity duration-500" />
-            </Link>
+            {CLUB_ENABLED && (
+              <Link href="/club" className="relative group/vip overflow-hidden px-5 py-2 rounded-full border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 hover:border-amber-500/50 transition-all duration-300 flex items-center shadow-[0_0_15px_rgba(245,158,11,0.15)] hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-500 font-bold uppercase tracking-widest text-sm drop-shadow-md">★ Club VIP</span>
+                <div className="absolute inset-0 bg-amber-400/20 blur-xl opacity-0 group-hover/vip:opacity-100 transition-opacity duration-500" />
+              </Link>
+            )}
           </div>
           
           {/* Botón CTA, Perfil y Menú Hamburguesa */}
@@ -186,9 +189,11 @@ export default function Navbar() {
             <Link href="/contacto" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-base font-medium text-brand-chrome hover:text-white hover:bg-white/5 rounded-md transition-colors">
               Contacto
             </Link>
-            <Link href="/club" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-base font-medium text-amber-500 hover:text-amber-400 hover:bg-white/5 rounded-md transition-colors">
-              ★ Club VIP
-            </Link>
+            {CLUB_ENABLED && (
+              <Link href="/club" onClick={() => setIsMobileMenuOpen(false)} className="block px-3 py-3 text-base font-medium text-amber-500 hover:text-amber-400 hover:bg-white/5 rounded-md transition-colors">
+                ★ Club VIP
+              </Link>
+            )}
           </div>
         </div>
       )}

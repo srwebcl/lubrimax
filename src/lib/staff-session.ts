@@ -13,6 +13,7 @@
 
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { StaffRole } from "@prisma/client";
 import { prisma } from "./prisma";
 import {
@@ -98,6 +99,19 @@ export async function requireRole(...roles: StaffRole[]): Promise<StaffSession> 
   if (!roles.includes(session.role)) {
     throw new Error("No autorizado.");
   }
+  return session;
+}
+
+/**
+ * Para páginas (Server Components) del panel. Los layouts NO se vuelven a
+ * ejecutar en navegaciones del lado del cliente, así que cada página que lee
+ * datos sensibles valida la sesión por su cuenta: sin sesión va al login y
+ * con un rol no permitido vuelve a la agenda.
+ */
+export async function requireStaffPage(...roles: StaffRole[]): Promise<StaffSession> {
+  const session = await verifyStaffSession();
+  if (!session) redirect("/admin/login");
+  if (roles.length > 0 && !roles.includes(session.role)) redirect("/admin");
   return session;
 }
 

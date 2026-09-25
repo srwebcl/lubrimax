@@ -83,6 +83,37 @@ export const intakeSchema = z.object({
   bookingId: z.string().trim().max(40).optional(),
 });
 
+// ── Edición de cliente del taller (ficha en /admin/clientes/[id]) ──
+export const updateClientSchema = z.object({
+  name: z.string().trim().min(2, "Nombre muy corto.").max(120),
+  email: z.union([z.email("Correo inválido."), z.literal("")]),
+  phone: z.string().trim().max(30),
+  rut: z.union([rutSchema, z.literal("")]),
+  vehicles: z
+    .array(
+      z.object({
+        plate: z.string().trim().max(10),
+        make: z.string().trim().min(1, "Falta la marca de un vehículo.").max(50),
+        model: z.string().trim().min(1, "Falta el modelo de un vehículo.").max(50),
+      })
+    )
+    .max(30),
+});
+
+// Servicios de un ingreso manual (sin reserva web): catálogo + uno personalizado.
+export const manualIntakeServicesSchema = z
+  .object({
+    serviceIds: z.array(z.string().min(1).max(40)).max(30),
+    customServiceDetail: z.string().trim().max(200).optional(),
+    customServicePrice: z
+      .union([z.coerce.number().int().min(0, "El precio no puede ser negativo.").max(20_000_000, "Precio fuera de rango."), z.literal("")])
+      .optional()
+      .transform((v) => (v === "" || v === undefined ? 0 : Number(v))),
+  })
+  .refine((v) => v.serviceIds.length > 0 || !!v.customServiceDetail, {
+    message: "Debes seleccionar al menos un servicio o ingresar uno personalizado.",
+  });
+
 export const bookingPaymentSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida."),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida."),
@@ -95,7 +126,9 @@ export const bookingPaymentSchema = z.object({
   customerPhone: z.string().trim().min(5, "Teléfono inválido.").max(30),
   customerEmail: z.union([z.email(), z.literal("")]).optional(),
   selectedVariants: z.record(z.string(), z.string()).optional(),
-  paymentType: z.enum(["RESERVATION", "FULL"], { error: "Tipo de pago inválido." }),
+  // Obsoleto: siempre se cobra el 100%. Se acepta para no romper versiones
+  // del wizard que el navegador tenga en caché, pero el servidor lo ignora.
+  paymentType: z.enum(["RESERVATION", "FULL"]).optional(),
 });
 
 export const storeCheckoutSchema = z.object({

@@ -14,8 +14,8 @@ import { createSignedToken, verifySignedToken } from "./signed-token";
 export type StaffRoleName = "ADMIN" | "WORKER";
 
 export const STAFF_SESSION_COOKIE = "lubrimax_staff_session";
-// 12 h absolutas: los trabajadores usan equipos compartidos del taller.
-export const STAFF_SESSION_MAX_AGE = 60 * 60 * 12;
+// 30 días: sesión persistente para evitar logins frecuentes.
+export const STAFF_SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
 export type StaffTokenPayload = {
   sub: string;

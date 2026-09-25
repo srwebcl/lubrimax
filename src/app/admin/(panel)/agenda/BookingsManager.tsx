@@ -56,6 +56,8 @@ function statusPill(status: string) {
   switch (status) {
     case "CONFIRMED":
       return { label: "Confirmada", cls: "bg-green-500/10 text-green-400 border-green-500/25" };
+    case "NO_SHOW":
+      return { label: "No se presentó", cls: "bg-orange-500/10 text-orange-400 border-orange-500/25" };
     case "CANCELLED":
       return { label: "Cancelada", cls: "bg-red-500/10 text-red-400 border-red-500/25" };
     case "PENDING":
@@ -302,6 +304,7 @@ export default function BookingsManager({
                       <option value="PENDING">Pendiente</option>
                       <option value="CONFIRMED">Confirmada</option>
                       <option value="CANCELLED">Cancelada</option>
+                      <option value="NO_SHOW">No se presentó</option>
                     </select>
                     <select
                       name="paymentStatus"

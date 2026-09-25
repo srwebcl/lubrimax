@@ -35,7 +35,7 @@ function RegisterContent() {
       <div className="max-w-md w-full bg-brand-surface border border-white/10 rounded-2xl p-8 backdrop-blur-md">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-white uppercase tracking-widest italic mb-2">Crear Cuenta</h1>
-          <p className="text-gray-400 text-sm">Únete para acceder al Club LUBRIMAX y gestionar tus reservas.</p>
+          <p className="text-gray-400 text-sm">Crea tu cuenta para gestionar tus compras y reservas.</p>
         </div>
 
         {error && (

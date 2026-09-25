@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
-import { WebpayPlus } from "transbank-sdk";
-import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from "transbank-sdk";
 import { prisma } from "@/lib/prisma";
-import { addMinutes, format } from "date-fns";
-import { getExactPrice, RESERVATION_PERCENT } from "@/lib/booking-constants";
+import { getExactPrice } from "@/lib/booking-constants";
 import { getSessionCustomer } from "@/actions/customer-auth";
+import { getSettings } from "@/actions/admin-settings";
 import { bookingPaymentSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, escapeHtml } from "@/lib/email";
+import {
+  computeAvailableSlots,
+  computeEndTime,
+  getBlockingBookings,
+  totalDuration,
+} from "@/lib/availability";
+import { bookingDateFromDay } from "@/lib/chile-time";
+import { formatPhone } from "@/lib/contact";
+import { normalizePlate } from "@/lib/plate";
 
 import { getWebpayTransaction } from "@/lib/webpay";
+import { CLUB_ENABLED } from "@/lib/features";
 
 // Interruptor TEMPORAL para probar el agendamiento en producción sin pasar
 // por Webpay/Transbank de verdad. Se activa poniendo BOOKING_FREE_MODE=true
@@ -19,47 +27,45 @@ import { getWebpayTransaction } from "@/lib/webpay";
 // nada; apagarlo apenas termine la prueba.
 const FREE_MODE = process.env.BOOKING_FREE_MODE === "true";
 
-const tx = getWebpayTransaction();
+class SlotTakenError extends Error {}
 
-// Recalcula la disponibilidad del horario contra la BD (misma regla que
-// getAvailableSlots en actions/booking.ts, inline aquí para no importar un
-// "use server" module dentro de un Route Handler).
-async function isSlotStillAvailable(dateString: string, startTime: string, serviceDuration: number) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  const queryStart = new Date(`${dateString}T00:00:00.000Z`);
-  const queryEnd = new Date(`${dateString}T23:59:59.999Z`);
-  const pendingCutoff = new Date(Date.now() - 20 * 60 * 1000);
+type ServiceWithVariants = {
+  id: string;
+  variants: unknown;
+  priceAuto: number | null;
+  priceSuv2: number | null;
+  priceSuv3: number | null;
+};
 
-  const [sHour, sMin] = startTime.split(":").map(Number);
-  const slotStart = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-  let slotEnd = addMinutes(slotStart, serviceDuration);
-  const endOfDay = new Date(year, month - 1, day, 18, 0, 0, 0); // Asumimos cierre 18:00
-  if (slotEnd > endOfDay) {
-    slotEnd = endOfDay;
-  }
-
-  // Chequeo de colisión contra todas las reservas activas del día.
-  const existing = await prisma.booking.findMany({
-    where: {
-      date: { gte: queryStart, lte: queryEnd },
-      OR: [
-        { status: "CONFIRMED" },
-        { status: "PENDING", createdAt: { gte: pendingCutoff } }
-      ]
+/** Precio del servicio para el tipo de vehículo, usando la variante elegida si existe. */
+function servicePrice(s: ServiceWithVariants, vehicleType: string, selectedVariants?: Record<string, string>) {
+  const chosen = selectedVariants?.[s.id];
+  if (chosen) {
+    let variants: unknown = s.variants;
+    if (typeof variants === "string") {
+      try {
+        variants = JSON.parse(variants);
+      } catch {
+        variants = [];
+      }
     }
-  });
-
-  for (const booking of existing) {
-    const [bHour, bMin] = booking.startTime.split(":").map(Number);
-    const [eHour, eMin] = booking.endTime.split(":").map(Number);
-    const bookingStart = new Date(year, month - 1, day, bHour, bMin, 0, 0);
-    const bookingEnd = new Date(year, month - 1, day, eHour, eMin, 0, 0);
-
-    if (slotStart < bookingEnd && slotEnd > bookingStart) {
-      return false;
+    const variant = Array.isArray(variants)
+      ? (variants as { name?: string; priceAuto?: number; priceSuv2?: number; priceSuv3?: number }[]).find(
+          (v) => v.name === chosen
+        )
+      : undefined;
+    if (variant) {
+      return getExactPrice(
+        {
+          priceAuto: variant.priceAuto ?? null,
+          priceSuv2: variant.priceSuv2 ?? null,
+          priceSuv3: variant.priceSuv3 ?? null,
+        },
+        vehicleType
+      );
     }
   }
-  return true;
+  return getExactPrice(s, vehicleType);
 }
 
 export async function POST(request: Request) {
@@ -77,106 +83,122 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: flattenZodError(parsed.error) }, { status: 400 });
     }
-    const { date, startTime, serviceIds, selectedVariants, vehicleType, plate, make, model, customerName, customerPhone, customerEmail, paymentType } = parsed.data;
+    const { date, startTime, serviceIds, selectedVariants, vehicleType, plate, make, model, customerName, customerPhone, customerEmail } = parsed.data;
+    // Política: quien reserva por la web paga el 100% del servicio. No hay
+    // abono parcial (se ignora cualquier paymentType que mande el navegador).
+    const paymentType = "FULL";
 
-    const services = await prisma.service.findMany({ where: { id: { in: serviceIds } } });
-    if (services.length === 0) {
-      return NextResponse.json({ error: "Servicios no encontrados." }, { status: 404 });
-    }
-
-    const totalDuration = services.reduce((sum, s) => {
-      let duration = s.duration;
-      if (s.variants && selectedVariants && selectedVariants[s.id]) {
-        const variantsArr = Array.isArray(s.variants) ? s.variants : typeof s.variants === 'string' ? JSON.parse(s.variants) : [];
-        const selectedVariant = variantsArr.find((v: any) => v.name === selectedVariants[s.id]);
-        if (selectedVariant && selectedVariant.duration) {
-          duration = selectedVariant.duration;
-        }
-      }
-      return sum + duration;
-    }, 0);
-    const stillAvailable = await isSlotStillAvailable(date, startTime, totalDuration);
-    if (!stillAvailable) {
-      return NextResponse.json({ error: "El horario seleccionado ya no está disponible." }, { status: 409 });
+    const uniqueServiceIds = [...new Set(serviceIds)];
+    const services = await prisma.service.findMany({ where: { id: { in: uniqueServiceIds } } });
+    if (services.length !== uniqueServiceIds.length) {
+      return NextResponse.json({ error: "Alguno de los servicios no existe." }, { status: 404 });
     }
 
     // Precio calculado 100% en servidor: nunca confiar en el monto que
-    // pudiera mandar el cliente. Descuento de Club Lubrimax leído desde la
-    // sesión de cookie (no desde el body).
-    let totalAmount = services.reduce((sum, s) => {
-      let source = s;
-      if (s.variants && selectedVariants && selectedVariants[s.id]) {
-        const variantsArr = Array.isArray(s.variants) ? s.variants : typeof s.variants === 'string' ? JSON.parse(s.variants) : [];
-        const selectedVariant = variantsArr.find((v: any) => v.name === selectedVariants[s.id]);
-        if (selectedVariant) source = selectedVariant as any;
-      }
-      return sum + getExactPrice(source as any, vehicleType);
-    }, 0);
+    // pudiera mandar el cliente. Un servicio sin precio para este tipo de
+    // vehículo (ej. "a cotizar") no se puede reservar online: antes sumaba
+    // $0 y abarataba el total.
+    const prices = services.map((s) => servicePrice(s, vehicleType, selectedVariants));
+    if (!FREE_MODE && prices.some((p) => p <= 0)) {
+      return NextResponse.json(
+        { error: "Uno de los servicios elegidos no tiene precio online para tu vehículo. Contáctanos para cotizarlo." },
+        { status: 400 }
+      );
+    }
+    let totalAmount = prices.reduce((sum, p) => sum + p, 0);
+
+    // Descuento de Club Lubrimax leído desde la sesión (no desde el body),
+    // y solo si la membresía está activa y vigente.
     const customer = await getSessionCustomer();
-    const discountPercent = customer?.membership?.discountPercent || 0;
+    const membership = customer?.membership;
+    const membershipValid =
+      CLUB_ENABLED &&
+      !!membership &&
+      membership.isActive &&
+      (!customer.membershipUntil || customer.membershipUntil > new Date());
+    const discountPercent = membershipValid ? membership.discountPercent : 0;
     if (discountPercent > 0) {
       totalAmount = Math.round(totalAmount - totalAmount * (discountPercent / 100));
     }
-    const reservationAmount = Math.round(totalAmount * RESERVATION_PERCENT);
-    const amount = paymentType === "FULL" ? totalAmount : reservationAmount;
+    const amount = totalAmount;
 
     if (amount <= 0 && !FREE_MODE) {
       return NextResponse.json({ error: "Monto inválido para este servicio." }, { status: 400 });
     }
 
-    const [year, month, day] = date.split("-").map(Number);
-    const [sHour, sMin] = startTime.split(":").map(Number);
-    const start = new Date(year, month - 1, day, sHour, sMin, 0, 0);
-    const endOfDay = new Date(year, month - 1, day, 18, 0, 0, 0);
-
-    let end = addMinutes(start, totalDuration);
-    if (end > endOfDay) {
-      end = endOfDay; // Tope al final del día para evitar wrap-arounds de Date
-    }
-    const endTimeStr = format(end, "HH:mm");
+    const settings = await getSettings();
+    const duration = totalDuration(services, selectedVariants);
+    const endTimeStr = computeEndTime(startTime, duration, settings);
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-    // ── Modo de prueba: confirma la reserva al toque, sin cobrar ni tocar
-    // Webpay. Precio real habría sido `amount`, pero queda en 0 para que se
-    // note en la agenda que fue una reserva de prueba.
-    if (FREE_MODE) {
-      const freeBooking = await prisma.booking.create({
+    // Validar la configuración de Webpay ANTES de bloquear el horario.
+    const webpay = FREE_MODE ? null : getWebpayTransaction();
+
+    // Verificación de disponibilidad + creación en una sola transacción, con
+    // un lock por día: dos personas pagando el mismo horario a la vez ya no
+    // pueden quedar ambas confirmadas. La regla es la misma que muestra el
+    // wizard (horario de atención, anticipación mínima, bahías, fecha pasada).
+    const booking = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(hashtext(${"booking:" + date}))`;
+
+      const blocking = await getBlockingBookings(tx, date);
+      const slots = computeAvailableSlots(date, duration, settings, blocking);
+      if (!slots.includes(startTime)) throw new SlotTakenError();
+
+      return tx.booking.create({
         data: {
-          date: new Date(`${date}T00:00:00.000Z`),
+          date: bookingDateFromDay(date),
           startTime,
           endTime: endTimeStr,
           customerName,
-          customerPhone,
-          customerEmail: customerEmail || null,
+          // Teléfono y patente normalizados: así el CRM y la búsqueda por
+          // patente en Ingreso los encuentran sin importar cómo se tipearon.
+          customerPhone: formatPhone(customerPhone) || customerPhone,
+          customerEmail: customerEmail ? customerEmail.toLowerCase() : null,
           vehicleMake: `${vehicleType} - ${make}`,
-          vehicleModel: `${model} (Patente: ${plate})`,
-          services: { connect: serviceIds.map(id => ({ id })) },
+          vehicleModel: `${model} (Patente: ${normalizePlate(plate) || plate})`,
+          services: { connect: uniqueServiceIds.map((id) => ({ id })) },
           selectedOptions: selectedVariants ?? undefined,
-          status: "CONFIRMED",
-          paymentStatus: "PAID_FULL",
+          totalPrice: totalAmount,
+          ...(FREE_MODE
+            ? {
+                // Modo de prueba: confirma al toque, sin cobrar ni tocar
+                // Webpay. Monto 0 para que se note en la agenda.
+                status: "CONFIRMED",
+                paymentStatus: "PAID_FULL",
+                paymentId: "FREE_TEST",
+                amount: 0,
+              }
+            : {
+                // PENDING bloquea el horario mientras el cliente paga. Si el
+                // pago se abandona, se libera solo pasados PENDING_HOLD_MINUTES.
+                status: "PENDING",
+                paymentStatus: "PENDING",
+                amount,
+              }),
           paymentType,
-          paymentId: "FREE_TEST",
-          amount: 0,
         },
-        include: { services: { select: { name: true } } }
+        include: { services: { select: { name: true } } },
       });
-      bookingId = freeBooking.id;
+    });
+    bookingId = booking.id;
 
-      if (freeBooking.customerEmail) {
-        const [y, m, d] = freeBooking.date.toISOString().substring(0, 10).split("-");
+    if (FREE_MODE) {
+      if (booking.customerEmail) {
+        const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
         const friendlyDate = `${d}/${m}/${y}`;
 
         const ownerEmail = process.env.OWNER_EMAIL || "contacto@lubrimax.cl";
         const adminEmailResult = await sendEmail({
           to: ownerEmail,
-          subject: `NUEVA RESERVA (MODO PRUEBA) - ${freeBooking.customerName} - ${friendlyDate} ${freeBooking.startTime}`,
+          subject: `NUEVA RESERVA (MODO PRUEBA) - ${booking.customerName} - ${friendlyDate} ${booking.startTime}`,
           html: (
             `<h1>Nueva Reserva (Modo Prueba)</h1>
-             <p><strong>Cliente:</strong> ${freeBooking.customerName} (${freeBooking.customerPhone})</p>
-             <p><strong>Vehículo:</strong> ${freeBooking.vehicleMake} ${freeBooking.vehicleModel}</p>
-             <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${freeBooking.startTime} a ${freeBooking.endTime}</p>
-             <p><strong>Servicios:</strong> ${freeBooking.services.map(s => s.name).join(' + ')}</p>
+             <p><strong>Cliente:</strong> ${escapeHtml(booking.customerName)} (${escapeHtml(booking.customerPhone)})</p>
+             <p><strong>Vehículo:</strong> ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
+             <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${booking.startTime} a ${booking.endTime}</p>
+             <p><strong>Servicios:</strong> ${escapeHtml(booking.services.map(s => s.name).join(' + '))}</p>
              <p><em>Esta reserva fue realizada en modo de prueba sin cobro.</em></p>
              <p><a href="${baseUrl}/admin">Ver en panel de administración</a></p>`
           )
@@ -186,54 +208,30 @@ export async function POST(request: Request) {
         }
 
         const emailResult = await sendEmail({
-          to: freeBooking.customerEmail,
+          to: booking.customerEmail,
           subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
           html: (
-            `<h1>¡Hola ${freeBooking.customerName}!</h1>
-             <p>Tu reserva para <strong>${freeBooking.services.map(s => s.name).join(' + ')}</strong> quedó confirmada.</p>
-             <p>Fecha: ${friendlyDate}<br/>Hora: ${freeBooking.startTime} - ${freeBooking.endTime}</p>
-             <p>Vehículo: ${freeBooking.vehicleMake} ${freeBooking.vehicleModel}</p>
+            `<h1>¡Hola ${escapeHtml(booking.customerName)}!</h1>
+             <p>Tu reserva para <strong>${escapeHtml(booking.services.map(s => s.name).join(' + '))}</strong> quedó confirmada.</p>
+             <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
+             <p>Vehículo: ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
              <p><em>Reserva de prueba, sin costo.</em></p>
              <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
           )
         });
         if (!emailResult.success) {
-          console.error("No se pudo enviar el correo de confirmación (modo gratis)", freeBooking.id, emailResult.error);
+          console.error("No se pudo enviar el correo de confirmación (modo gratis)", booking.id, emailResult.error);
         }
       }
 
       return NextResponse.json({
         free: true,
-        redirectUrl: `${baseUrl}/agendar?success=true&booking=${freeBooking.id}`,
+        redirectUrl: `${baseUrl}/agendar?success=true&booking=${booking.id}`,
       });
     }
 
-    // Reservamos el horario como PENDING antes de ir a Webpay para evitar
-    // que otro cliente lo tome mientras este paga. Si el pago se abandona,
-    // isSlotStillAvailable/getAvailableSlots lo liberan solos pasados 20 min.
-    const booking = await prisma.booking.create({
-      data: {
-        date: new Date(`${date}T00:00:00.000Z`),
-        startTime,
-        endTime: endTimeStr,
-        customerName,
-        customerPhone,
-        customerEmail: customerEmail || null,
-        vehicleMake: `${vehicleType} - ${make}`,
-        vehicleModel: `${model} (Patente: ${plate})`,
-        services: { connect: serviceIds.map(id => ({ id })) },
-        selectedOptions: selectedVariants ?? undefined,
-        status: "PENDING",
-        paymentStatus: "PENDING",
-        paymentType,
-        amount,
-      }
-    });
-    bookingId = booking.id;
-
     const returnUrl = `${baseUrl}/api/webpay/booking/commit`;
-
-    const createResponse = await tx.create(booking.id, booking.id, amount, returnUrl);
+    const createResponse = await webpay!.create(booking.id, booking.id, amount, returnUrl);
 
     await prisma.booking.update({
       where: { id: booking.id },
@@ -241,7 +239,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ token: createResponse.token, url: createResponse.url });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof SlotTakenError) {
+      return NextResponse.json({ error: "El horario seleccionado ya no está disponible." }, { status: 409 });
+    }
+
     console.error("Webpay Booking Create Error:", error);
 
     // No dejar el horario bloqueado si Transbank falló después de crear la reserva.

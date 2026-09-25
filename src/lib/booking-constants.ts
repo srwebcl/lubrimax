@@ -23,7 +23,9 @@ export function getExactPrice(service: PriceableService, vehicleType: string): n
   return service.priceAuto || 0;
 }
 
-// Porcentaje de la reserva (seña) sobre el total del servicio.
+// Porcentaje del antiguo abono (seña). Ya NO se cobra abono: la reserva web
+// se paga al 100%. Solo se usa para estimar el total de reservas antiguas
+// pagadas con abono (ver booking-money.ts).
 export const RESERVATION_PERCENT = 0.2;
 
 // Minutos que una reserva PENDING (esperando el retorno de Webpay) sigue
@@ -31,3 +33,20 @@ export const RESERVATION_PERCENT = 0.2;
 // slot vuelve a quedar disponible. Debe ser mayor al timeout del formulario
 // de pago de Transbank (10 min en integración, 4 min en producción).
 export const PENDING_HOLD_MINUTES = 20;
+
+/**
+ * Filtro Prisma de reservas "reales" para historial y CRM: excluye las
+ * canceladas y los pagos abandonados (PENDING sin pagar pasado el tiempo de
+ * retención). Sin esto, quien abandonaba el pago figuraba como cliente con
+ * visitas y montos.
+ */
+export function realBookingWhere(now = Date.now()) {
+  return {
+    status: { notIn: ["CANCELLED", "NO_SHOW"] },
+    NOT: {
+      status: "PENDING",
+      paymentStatus: "PENDING",
+      createdAt: { lt: new Date(now - PENDING_HOLD_MINUTES * 60 * 1000) },
+    },
+  };
+}
