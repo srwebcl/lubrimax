@@ -23,7 +23,13 @@ import { chileNow, chileTodayRange } from "@/lib/chile-time";
 import { computeAvailableSlots, getBlockingBookings } from "@/lib/availability";
 import { bookingMoney, paymentStatusFor, LOCAL_PAYMENT_METHODS } from "@/lib/booking-money";
 import { parseBookingVehicle } from "@/lib/plate";
-import { bookingServiceNames } from "@/lib/booking-services";
+import {
+  bookingServiceNames,
+  evaluatedItems,
+  localBookingTotal,
+  readLocalOptions,
+  type PricingItem,
+} from "@/lib/booking-services";
 import { flattenZodError } from "@/lib/validation";
 
 /** Minutos de tolerancia antes de marcar una reserva como atrasada. */
@@ -49,6 +55,11 @@ export type BoardCard = {
   arrivedAt: string | null;
   deliveredAt: string | null;
   money: { total: number; paid: number; balance: number } | null;
+  /**
+   * Ítems con precio definido en el local (servicios "a evaluar" y el
+   * personalizado). Solo en reservas locales; se ajustan con "Precio".
+   */
+  pricing: PricingItem[];
 };
 
 export type BoardData = {
@@ -67,7 +78,7 @@ function toMinutes(time: string) {
 }
 
 const bookingInclude = {
-  services: { select: { name: true } },
+  services: { select: { id: true, name: true, priceAuto: true } },
   payments: { select: { amount: true, method: true } },
 } as const;
 
@@ -84,9 +95,14 @@ type BoardBooking = {
   paymentStatus: string;
   amount: number | null;
   totalPrice: number | null;
-  services: { name: string }[];
+  services: { id: string; name: string; priceAuto: number | null }[];
   payments: { amount: number; method: string }[];
 };
+
+/** Precios ajustables: solo reservas locales (las web vienen pagadas al 100%). */
+function pricingFor(b: BoardBooking | null): PricingItem[] {
+  return b && !b.paymentType ? evaluatedItems(b) : [];
+}
 
 
 export async function getBoard(): Promise<BoardData> {
@@ -144,6 +160,7 @@ export async function getBoard(): Promise<BoardData> {
       arrivedAt: intake.createdAt.toISOString(),
       deliveredAt: intake.deliveredAt?.toISOString() ?? null,
       money: b ? bookingMoney(b) : null,
+      pricing: pricingFor(b),
     };
   }
 
@@ -193,6 +210,7 @@ export async function getBoard(): Promise<BoardData> {
       arrivedAt: null,
       deliveredAt: null,
       money: bookingMoney(b),
+      pricing: pricingFor(b),
     });
   }
 
@@ -329,5 +347,91 @@ export async function deliverVehicle(input: unknown) {
     if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
     console.error("deliverVehicle:", error);
     return fail("No se pudo registrar la entrega.");
+  }
+}
+
+const pricesSchema = z.object({
+  bookingId: z.string().min(1).max(40),
+  /** key (serviceId o "custom") -> precio; null = volver a "por evaluar". */
+  prices: z.record(
+    z.string().max(40),
+    z.number().int().min(0, "El precio no puede ser negativo.").max(20_000_000, "Precio fuera de rango.").nullable()
+  ),
+});
+
+/**
+ * Ajusta los precios "a evaluar" (servicios sin precio de catálogo y el
+ * personalizado) de una reserva LOCAL, y recalcula su total. Pensado para
+ * cuando la evaluación termina después del ingreso, antes de cobrar.
+ */
+export async function updateEvaluatedPrices(input: unknown) {
+  try {
+    const session = await requireStaff();
+
+    const parsed = pricesSchema.safeParse(input);
+    if (!parsed.success) return fail(flattenZodError(parsed.error));
+    const { bookingId, prices } = parsed.data;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({ where: { id: bookingId }, include: bookingInclude });
+      if (!booking) return fail("Reserva no encontrada.");
+      if (booking.paymentType) return fail("Las reservas web se pagan al reservar; su precio no se ajusta aquí.");
+
+      const allowed = new Set(evaluatedItems(booking).map((i) => i.key));
+      const opts = readLocalOptions(booking.selectedOptions);
+      const manualPrices = { ...(opts.manualPrices ?? {}) };
+      const customService = opts.customService ? { ...opts.customService } : undefined;
+
+      const before = evaluatedItems(booking);
+      for (const [key, price] of Object.entries(prices)) {
+        if (!allowed.has(key)) return fail("Uno de los servicios no admite precio manual.");
+        if (key === "custom") {
+          if (customService) customService.price = price ?? 0;
+        } else if (price === null) {
+          delete manualPrices[key];
+        } else {
+          manualPrices[key] = price;
+        }
+      }
+
+      const selectedOptions = {
+        ...opts,
+        ...(customService ? { customService } : {}),
+        manualPrices,
+      };
+      const total = localBookingTotal({ services: booking.services, selectedOptions });
+      const { paid } = bookingMoney({ ...booking, totalPrice: total });
+      if (paid > total) {
+        return fail(`El total ($${total.toLocaleString("es-CL")}) no puede quedar bajo lo ya cobrado ($${paid.toLocaleString("es-CL")}).`);
+      }
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { selectedOptions, totalPrice: total, amount: total, paymentStatus: paymentStatusFor(total, paid) },
+      });
+
+      const after = evaluatedItems({ services: booking.services, selectedOptions });
+      const changes = after
+        .filter((a) => before.find((b) => b.key === a.key)?.price !== a.price)
+        .map((a) => `${a.name}: ${a.price === null ? "por evaluar" : "$" + a.price}`);
+      await tx.bookingActivityLog.create({
+        data: {
+          bookingId,
+          staffUserId: session.userId,
+          staffName: session.name,
+          action: "PRICE",
+          detail: `${changes.join("; ") || "sin cambios"} → total $${total}`,
+        },
+      });
+
+      return { success: true as const, total };
+    });
+
+    if (result.success) revalidatePath("/admin", "layout");
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
+    console.error("updateEvaluatedPrices:", error);
+    return fail("No se pudo actualizar el precio.");
   }
 }

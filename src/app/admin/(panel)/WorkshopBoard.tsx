@@ -5,7 +5,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { updateWorkStatus } from "@/actions/admin-bookings";
-import { deliverVehicle, markNoShow, type BoardCard, type BoardData, type BoardStage } from "@/actions/workshop";
+import {
+  deliverVehicle,
+  markNoShow,
+  updateEvaluatedPrices,
+  type BoardCard,
+  type BoardData,
+  type BoardStage,
+} from "@/actions/workshop";
 import { LOCAL_PAYMENT_METHODS, PAYMENT_METHODS } from "@/lib/booking-money";
 import { formatPlate } from "@/lib/plate";
 import { INPUT, LABEL, Msg, PrimaryBtn, Sheet } from "@/components/admin/kit";
@@ -28,6 +35,7 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [delivering, setDelivering] = useState<BoardCard | null>(null);
+  const [pricing, setPricing] = useState<BoardCard | null>(null);
   const [showDelivered, setShowDelivered] = useState(false);
 
   // Refresco automático: puede haber otro teléfono moviendo tarjetas.
@@ -110,6 +118,7 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
                           run(c.key, () => markNoShow(c.bookingId!));
                         }}
                         onDeliver={() => setDelivering(c)}
+                        onPrice={() => setPricing(c)}
                       />
                     </li>
                   ))}
@@ -153,6 +162,19 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
           setDelivering(null);
           startTransition(() => router.refresh());
         }}
+        onAdjustPrice={(c) => {
+          setDelivering(null);
+          setPricing(c);
+        }}
+      />
+
+      <PriceSheet
+        card={pricing}
+        onClose={() => setPricing(null)}
+        onDone={() => {
+          setPricing(null);
+          startTransition(() => router.refresh());
+        }}
       />
     </div>
   );
@@ -174,6 +196,7 @@ function Card({
   onFinish,
   onNoShow,
   onDeliver,
+  onPrice,
 }: {
   card: BoardCard;
   busy: boolean;
@@ -181,8 +204,11 @@ function Card({
   onFinish: () => void;
   onNoShow: () => void;
   onDeliver: () => void;
+  onPrice: () => void;
 }) {
   const btn = "flex-1 h-10 rounded-xl text-xs font-extrabold uppercase tracking-wider disabled:opacity-50";
+  const pendingPrices = c.pricing.filter((i) => i.price === null).length;
+  const canPrice = c.pricing.length > 0 && c.stage !== "ARRIVING" && c.stage !== "DELIVERED";
 
   return (
     <div className={`rounded-2xl border bg-brand-surface p-3 space-y-2.5 ${c.late ? "border-red-500/40" : "border-white/8"}`}>
@@ -203,6 +229,9 @@ function Card({
               {c.source === "WEB" ? "WEB" : "LOCAL"}
             </span>
             {c.late && <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">ATRASADO</span>}
+            {pendingPrices > 0 && (
+              <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">POR EVALUAR</span>
+            )}
           </div>
           <div className="text-xs text-gray-400 truncate">{c.vehicle}</div>
           <div className="text-xs text-gray-300 truncate">{c.customerName}</div>
@@ -231,6 +260,16 @@ function Card({
       {c.notes && <p className="text-[11px] text-gray-500 italic line-clamp-2">“{c.notes}”</p>}
 
       <div className="flex gap-2">
+        {canPrice && (
+          <button
+            onClick={onPrice}
+            className={`h-10 shrink-0 px-3 rounded-xl border text-[11px] font-bold ${
+              pendingPrices > 0 ? "bg-amber-500/10 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-gray-300"
+            }`}
+          >
+            $ Precio
+          </button>
+        )}
         {c.customerPhone && (
           <a
             href={`tel:${c.customerPhone.replace(/\s/g, "")}`}
@@ -278,7 +317,17 @@ function Card({
   );
 }
 
-function DeliverSheet({ card, onClose, onDone }: { card: BoardCard | null; onClose: () => void; onDone: () => void }) {
+function DeliverSheet({
+  card,
+  onClose,
+  onDone,
+  onAdjustPrice,
+}: {
+  card: BoardCard | null;
+  onClose: () => void;
+  onDone: () => void;
+  onAdjustPrice: (card: BoardCard) => void;
+}) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<(typeof LOCAL_PAYMENT_METHODS)[number]>("CASH");
   const [saving, setSaving] = useState(false);
@@ -322,6 +371,15 @@ function DeliverSheet({ card, onClose, onDone }: { card: BoardCard | null; onClo
           <div className="text-sm text-gray-300">
             {card.customerName} · <span className="text-gray-500">{card.vehicle}</span>
           </div>
+
+          {card.pricing.some((i) => i.price === null) && (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-center justify-between gap-3">
+              <span>Hay servicios por evaluar sin precio: el total está incompleto.</span>
+              <button onClick={() => onAdjustPrice(card)} className="shrink-0 font-bold underline">
+                Ajustar precio
+              </button>
+            </div>
+          )}
 
           {card.money ? (
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -393,6 +451,74 @@ function DeliverSheet({ card, onClose, onDone }: { card: BoardCard | null; onClo
               {saving ? "Guardando…" : "Confirmar entrega"}
             </PrimaryBtn>
           )}
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+function PriceSheet({ card, onClose, onDone }: { card: BoardCard | null; onClose: () => void; onDone: () => void }) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Al abrir con otra tarjeta, cargar los precios actuales.
+  const [lastKey, setLastKey] = useState<string | null>(null);
+  if (card && card.key !== lastKey) {
+    setLastKey(card.key);
+    setValues(Object.fromEntries(card.pricing.map((i) => [i.key, i.price === null ? "" : String(i.price)])));
+    setError(null);
+  }
+
+  const catalog = card?.money ? card.money.total - card.pricing.reduce((s, i) => s + (i.price ?? 0), 0) : 0;
+  const preview = catalog + Object.values(values).reduce((s, v) => s + (Number(v) || 0), 0);
+
+  async function save() {
+    if (!card?.bookingId) return;
+    const prices: Record<string, number | null> = {};
+    for (const [key, v] of Object.entries(values)) {
+      if (v.trim() === "") prices[key] = null;
+      else if (!Number.isInteger(Number(v)) || Number(v) < 0) return setError("Ingresa montos enteros, sin puntos.");
+      else prices[key] = Number(v);
+    }
+    setSaving(true);
+    setError(null);
+    const res = await updateEvaluatedPrices({ bookingId: card.bookingId, prices });
+    setSaving(false);
+    if (res.success) onDone();
+    else setError(res.error);
+  }
+
+  return (
+    <Sheet open={!!card} onClose={onClose} title={card ? `Precio ${card.plate ? formatPlate(card.plate) : ""}` : ""}>
+      {card && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400">
+            Servicios cuyo precio depende de la evaluación. Déjalo vacío si aún no está evaluado.
+          </p>
+          {card.pricing.map((i) => (
+            <div key={i.key}>
+              <label className={LABEL}>{i.name}</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={values[i.key] ?? ""}
+                onChange={(e) => setValues((p) => ({ ...p, [i.key]: e.target.value }))}
+                placeholder="Por evaluar"
+                className={INPUT}
+              />
+            </div>
+          ))}
+          <div className="flex justify-between items-center text-sm border-t border-white/10 pt-3">
+            <span className="text-gray-400 uppercase text-xs tracking-widest">Nuevo total</span>
+            <span className="text-white font-black">{clp(preview)}</span>
+          </div>
+          {error && <Msg kind="err">{error}</Msg>}
+          <PrimaryBtn onClick={save} disabled={saving} className="w-full">
+            {saving ? "Guardando…" : "Guardar precio"}
+          </PrimaryBtn>
         </div>
       )}
     </Sheet>
