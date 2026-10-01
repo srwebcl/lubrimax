@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 //  - "Llegó" en una reserva web → /admin/ingreso?reserva=<id> (datos precargados)
 //  - "Nuevo ingreso"            → /admin/ingreso (búsqueda por patente)
 export default async function IntakePage(props: { searchParams: Promise<{ reserva?: string }> }) {
-  await requireStaffPage();
+  await requireStaffPage("intake");
   const { reserva } = await props.searchParams;
 
   // "Hoy" en Chile: el servidor corre en UTC y desde las 20/21 h ya sería mañana.

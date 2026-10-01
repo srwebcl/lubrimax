@@ -28,17 +28,29 @@ para dejarlo en producción.
    cada acción. **Esta es la línea de defensa real.**
 
 ### Matriz de acceso
-| Sección | Admin | Trabajador |
+El ADMIN tiene todo. Al TRABAJADOR el admin le habilita cada función por
+separado en **Usuarios → Permisos** (`StaffUser.permissions`, catálogo en
+`src/lib/permissions.ts`). Por defecto, todas activadas. Los cambios aplican
+al instante, sin cerrar la sesión del trabajador.
+
+| Función | Admin | Trabajador |
 |---|---|---|
-| Taller (`/admin`): recibir, iniciar, terminar, cobrar y entregar, "no vino" | ✅ | ✅ |
-| Ingreso de vehículos (`/admin/ingreso`, se abre desde el Taller) | ✅ | ✅ |
-| Agenda (`/admin/agenda`) + marcar avance de trabajo | ✅ | ✅ |
-| Clientes (`/admin/clientes`): ver y editar fichas | ✅ | ✅ |
-| Mi perfil / cambiar mi contraseña | ✅ | ✅ |
+| Taller (`/admin`): ver el tablero | ✅ | ✅ siempre |
+| Registrar ingresos ("Nuevo ingreso", "Llegó") | ✅ | Habilitable |
+| Iniciar y terminar trabajos | ✅ | Habilitable |
+| Entregar vehículos | ✅ | Habilitable |
+| Cobrar en el local (al entregar o después) | ✅ | Habilitable |
+| Ajustar precios a evaluar | ✅ | Habilitable |
+| Marcar "No vino" | ✅ | Habilitable |
+| Ver la Agenda (`/admin/agenda`) | ✅ | Habilitable |
+| Ver clientes / Editar clientes | ✅ | Habilitable (editar implica ver) |
+| Mi perfil / cambiar mi contraseña | ✅ | ✅ siempre |
 | Reagendar / estado de pago / estado de reserva (desde la Agenda) | ✅ | ❌ |
-| Estadísticas | ✅ | ❌ |
-| Catálogo, categorías, club, pedidos, tienda, cupones, ajustes | ✅ | ❌ |
+| Estadísticas, catálogo, categorías, club, pedidos, tienda, cupones, ajustes | ✅ | ❌ |
 | Usuarios del panel (`/admin/usuarios`) | ✅ | ❌ |
+
+Cada función se impone en tres capas: Server Action (`requirePermission`),
+página (`requireStaffPage("<permiso>")`) e interfaz (botones y menú).
 
 ### Tablero del Taller (`/admin`)
 Punto único donde se gestionan todos los vehículos del día, lleguen con

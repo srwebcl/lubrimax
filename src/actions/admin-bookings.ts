@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireRole, requireStaff } from "@/lib/staff-session";
+import { requireRole, requirePermission } from "@/lib/staff-session";
 import { sendEmail, escapeHtml } from "@/lib/email";
 
 import { addMinutes, format } from "date-fns";
@@ -128,7 +128,7 @@ export async function updateBookingStatus(id: string, formData: FormData) {
  */
 export async function updateWorkStatus(id: string, workStatus: string) {
   try {
-    const session = await requireStaff();
+    const session = await requirePermission("work");
 
     if (!WORK_STATUSES.includes(workStatus as WorkStatus)) {
       return { success: false, error: "Estado de trabajo inválido." };

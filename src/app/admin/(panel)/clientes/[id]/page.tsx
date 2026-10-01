@@ -5,6 +5,7 @@ import { Screen } from "@/components/admin/kit";
 import { formatPlate, parseBookingVehicle } from "@/lib/plate";
 import Link from "next/link";
 import ClientProfileForm from "./ClientProfileForm";
+import { can } from "@/lib/permissions";
 import { getClientHistory } from "@/actions/admin-clients";
 
 export const metadata = {
@@ -12,7 +13,7 @@ export const metadata = {
 };
 
 export default async function ClientProfilePage(props: { params: Promise<{ id: string }> }) {
-  await requireStaffPage();
+  const session = await requireStaffPage("clients_view");
   const params = await props.params;
   const id = params.id;
   
@@ -104,7 +105,7 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
               </svg>
               Datos del Cliente
             </h2>
-            <ClientProfileForm initialData={clientData} />
+            <ClientProfileForm initialData={clientData} readOnly={!can(session, "clients_edit")} />
           </div>
         </div>
 

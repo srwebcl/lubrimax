@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireStaff } from "@/lib/staff-session";
+import { requirePermission } from "@/lib/staff-session";
 import { intakeSchema, manualIntakeServicesSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate, parseBookingVehicle } from "@/lib/plate";
 import { chileNow, bookingDateFromDay, addMinutesToTime } from "@/lib/chile-time";
@@ -34,7 +34,7 @@ export type PlateLookup = {
 
 /** Busca un vehículo por patente. Devuelve datos del cliente si existe. */
 export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
-  await requireStaff();
+  await requirePermission("intake");
 
   if (!isValidPlate(plateRaw)) {
     return { found: false };
@@ -129,7 +129,12 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
  * el vehículo (por patente) y crea el evento de ingreso.
  */
 export async function registerIntake(formData: FormData) {
-  const session = await requireStaff();
+  let session;
+  try {
+    session = await requirePermission("intake");
+  } catch {
+    return fail("No tienes permiso para registrar ingresos.");
+  }
 
   const parsed = intakeSchema.safeParse({
     plate: formData.get("plate"),

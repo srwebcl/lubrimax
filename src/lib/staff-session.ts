@@ -16,6 +16,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { StaffRole } from "@prisma/client";
 import { prisma } from "./prisma";
+import { ALL_WORKER_PERMISSIONS, can, normalizePermissions, type Permission } from "./permissions";
 import {
   STAFF_SESSION_COOKIE,
   STAFF_SESSION_MAX_AGE,
@@ -29,6 +30,8 @@ export type StaffSession = {
   userId: string;
   name: string;
   role: StaffRole;
+  /** Funciones habilitadas (solo relevante para WORKER; el ADMIN tiene todo). */
+  permissions: Permission[];
 };
 
 /** Firma y setea la cookie de sesión. Usar tras un login exitoso. */
@@ -66,13 +69,18 @@ export const verifyStaffSession = cache(async (): Promise<StaffSession | null> =
   try {
     const user = await prisma.staffUser.findUnique({
       where: { id: payload.sub },
-      select: { id: true, name: true, role: true, isActive: true, sessionEpoch: true },
+      select: { id: true, name: true, role: true, isActive: true, sessionEpoch: true, permissions: true },
     });
 
     if (!user || !user.isActive) return null;
     if (user.sessionEpoch !== payload.epoch) return null;
 
-    return { userId: user.id, name: user.name, role: user.role };
+    return {
+      userId: user.id,
+      name: user.name,
+      role: user.role,
+      permissions: user.role === "ADMIN" ? ALL_WORKER_PERMISSIONS : normalizePermissions(user.permissions),
+    };
   } catch (error) {
     console.error("verifyStaffSession: error consultando la BD", error);
     return null;
@@ -103,15 +111,30 @@ export async function requireRole(...roles: StaffRole[]): Promise<StaffSession> 
 }
 
 /**
+ * Exige una función concreta (ver src/lib/permissions.ts). El ADMIN pasa
+ * siempre; el TRABAJADOR solo si el admin se la habilitó.
+ */
+export async function requirePermission(permission: Permission): Promise<StaffSession> {
+  const session = await requireStaff();
+  if (!can(session, permission)) {
+    throw new Error("No autorizado.");
+  }
+  return session;
+}
+
+/**
  * Para páginas (Server Components) del panel. Los layouts NO se vuelven a
  * ejecutar en navegaciones del lado del cliente, así que cada página que lee
  * datos sensibles valida la sesión por su cuenta: sin sesión va al login y
  * con un rol no permitido vuelve a la agenda.
  */
-export async function requireStaffPage(...roles: StaffRole[]): Promise<StaffSession> {
+export async function requireStaffPage(...required: (StaffRole | Permission)[]): Promise<StaffSession> {
   const session = await verifyStaffSession();
   if (!session) redirect("/admin/login");
+  const roles = required.filter((r): r is StaffRole => r === "ADMIN" || r === "WORKER");
+  const permissions = required.filter((r): r is Permission => r !== "ADMIN" && r !== "WORKER");
   if (roles.length > 0 && !roles.includes(session.role)) redirect("/admin");
+  if (permissions.some((p) => !can(session, p))) redirect("/admin");
   return session;
 }
 

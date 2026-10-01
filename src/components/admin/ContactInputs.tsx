@@ -5,7 +5,7 @@
 // (src/lib/contact.ts), esto solo evita errores de tipeo en el momento.
 
 import React, { useState } from "react";
-import { formatRut, isValidRut, titleCase } from "@/lib/contact";
+import { formatRut, isValidRut, mobileDigits, mobileFromDigits, titleCase } from "@/lib/contact";
 
 type BaseProps = { name: string; className: string; required?: boolean };
 
@@ -26,13 +26,6 @@ export function NameInput({ name, className, required, defaultValue = "", placeh
   );
 }
 
-/** Los 8 dígitos tras el "9" de un celular chileno, si los hay. */
-function mobileDigits(phone: string | null | undefined) {
-  const digits = (phone ?? "").replace(/\D/g, "");
-  const nine = digits.length >= 9 ? digits.slice(-9) : "";
-  return nine.startsWith("9") ? nine.slice(1) : "";
-}
-
 /**
  * Celular: "+56 9" fijo; solo se escriben los 8 dígitos restantes. Envía
  * "+56 9 XXXX XXXX" en un campo oculto con el `name` dado.
@@ -40,7 +33,7 @@ function mobileDigits(phone: string | null | undefined) {
 export function PhoneInput({ name, className, required, defaultValue }: BaseProps & { defaultValue?: string | null }) {
   const [digits, setDigits] = useState(mobileDigits(defaultValue));
   const shown = digits.length > 4 ? `${digits.slice(0, 4)} ${digits.slice(4)}` : digits;
-  const full = digits ? `+56 9 ${digits.slice(0, 4)} ${digits.slice(4)}` : "";
+  const full = digits ? mobileFromDigits(digits) : "";
   return (
     <div className={`${className} flex items-center gap-2 focus-within:border-brand-cyan`}>
       <span className="text-gray-400 font-semibold shrink-0 select-none">+56 9</span>

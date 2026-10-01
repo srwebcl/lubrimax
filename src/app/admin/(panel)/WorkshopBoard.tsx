@@ -8,6 +8,7 @@ import { updateWorkStatus } from "@/actions/admin-bookings";
 import {
   deliverVehicle,
   markNoShow,
+  registerPayment,
   updateEvaluatedPrices,
   type BoardCard,
   type BoardData,
@@ -30,12 +31,22 @@ const clp = (n: number) => `$${n.toLocaleString("es-CL")}`;
 const hhmm = (iso: string) =>
   new Date(iso).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "America/Santiago" });
 
-export default function WorkshopBoard({ board }: { board: BoardData }) {
+export type BoardAllowed = {
+  intake: boolean;
+  work: boolean;
+  deliver: boolean;
+  charge: boolean;
+  pricing: boolean;
+  noshow: boolean;
+};
+
+export default function WorkshopBoard({ board, allowed }: { board: BoardData; allowed: BoardAllowed }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [delivering, setDelivering] = useState<BoardCard | null>(null);
   const [pricing, setPricing] = useState<BoardCard | null>(null);
+  const [charging, setCharging] = useState<BoardCard | null>(null);
   const [showDelivered, setShowDelivered] = useState(false);
 
   // Refresco automático: puede haber otro teléfono moviendo tarjetas.
@@ -69,12 +80,14 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
           </h1>
           <p className="text-sm text-gray-500">Todos los vehículos del día, con o sin reserva.</p>
         </div>
-        <Link
-          href="/admin/ingreso"
-          className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-brand-cyan text-black text-sm font-extrabold shadow-[0_0_15px_rgba(0,255,255,0.15)]"
-        >
-          <span className="text-lg leading-none">+</span> Nuevo ingreso
-        </Link>
+        {allowed.intake && (
+          <Link
+            href="/admin/ingreso"
+            className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-brand-cyan text-black text-sm font-extrabold shadow-[0_0_15px_rgba(0,255,255,0.15)]"
+          >
+            <span className="text-lg leading-none">+</span> Nuevo ingreso
+          </Link>
+        )}
       </header>
 
       <div className="grid grid-cols-3 gap-2">
@@ -105,6 +118,7 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
                     <li key={c.key}>
                       <Card
                         card={c}
+                        allowed={allowed}
                         busy={busy === c.key}
                         onStart={() => c.bookingId && run(c.key, () => updateWorkStatus(c.bookingId!, "IN_PROGRESS"))}
                         onFinish={() => {
@@ -147,6 +161,14 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
                   {c.money && c.money.balance > 0 && (
                     <span className="text-[11px] font-bold text-red-400">Saldo {clp(c.money.balance)}</span>
                   )}
+                  {c.money && c.money.balance > 0 && c.bookingId && allowed.charge && (
+                    <button
+                      onClick={() => setCharging(c)}
+                      className="text-[11px] font-bold px-2 py-1 rounded-lg bg-green-500/15 text-green-400 border border-green-500/25"
+                    >
+                      Cobrar
+                    </button>
+                  )}
                   {c.deliveredAt && <span className="text-xs text-gray-500">{hhmm(c.deliveredAt)}</span>}
                 </li>
               ))}
@@ -157,6 +179,8 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
 
       <DeliverSheet
         card={delivering}
+        canCharge={allowed.charge}
+        canPrice={allowed.pricing}
         onClose={() => setDelivering(null)}
         onDone={() => {
           setDelivering(null);
@@ -165,6 +189,15 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
         onAdjustPrice={(c) => {
           setDelivering(null);
           setPricing(c);
+        }}
+      />
+
+      <ChargeSheet
+        card={charging}
+        onClose={() => setCharging(null)}
+        onDone={() => {
+          setCharging(null);
+          startTransition(() => router.refresh());
         }}
       />
 
@@ -197,8 +230,10 @@ function Card({
   onNoShow,
   onDeliver,
   onPrice,
+  allowed,
 }: {
   card: BoardCard;
+  allowed: BoardAllowed;
   busy: boolean;
   onStart: () => void;
   onFinish: () => void;
@@ -208,7 +243,7 @@ function Card({
 }) {
   const btn = "flex-1 h-10 rounded-xl text-xs font-extrabold uppercase tracking-wider disabled:opacity-50";
   const pendingPrices = c.pricing.filter((i) => i.price === null).length;
-  const canPrice = c.pricing.length > 0 && c.stage !== "ARRIVING" && c.stage !== "DELIVERED";
+  const canPrice = allowed.pricing && c.pricing.length > 0 && c.stage !== "ARRIVING" && c.stage !== "DELIVERED";
 
   return (
     <div className={`rounded-2xl border bg-brand-surface p-3 space-y-2.5 ${c.late ? "border-red-500/40" : "border-white/8"}`}>
@@ -284,32 +319,39 @@ function Card({
 
         {c.stage === "ARRIVING" && c.bookingId && (
           <>
-            <Link href={`/admin/ingreso?reserva=${c.bookingId}`} className={`${btn} bg-sky-500 text-black inline-flex items-center justify-center`}>
-              Llegó
-            </Link>
-            <button onClick={onNoShow} disabled={busy} className={`${btn} flex-none px-3 bg-white/5 text-gray-400 border border-white/10`}>
-              No vino
-            </button>
+            {allowed.intake && (
+              <Link href={`/admin/ingreso?reserva=${c.bookingId}`} className={`${btn} bg-sky-500 text-black inline-flex items-center justify-center`}>
+                Llegó
+              </Link>
+            )}
+            {allowed.noshow && (
+              <button onClick={onNoShow} disabled={busy} className={`${btn} flex-none px-3 bg-white/5 text-gray-400 border border-white/10`}>
+                No vino
+              </button>
+            )}
           </>
         )}
-        {c.stage === "WAITING" && (
+        {c.stage === "WAITING" && allowed.work && (
           <button onClick={onStart} disabled={busy} className={`${btn} bg-amber-400 text-black`}>
             {busy ? "…" : "Iniciar"}
           </button>
         )}
         {c.stage === "IN_PROGRESS" &&
           (c.bookingId ? (
+            allowed.work && 
             <button onClick={onFinish} disabled={busy} className={`${btn} bg-brand-cyan text-black`}>
               {busy ? "…" : "Terminar"}
             </button>
           ) : (
-            <button onClick={onDeliver} disabled={busy} className={`${btn} bg-green-500 text-black`}>
-              Entregar
-            </button>
+            allowed.deliver && (
+              <button onClick={onDeliver} disabled={busy} className={`${btn} bg-green-500 text-black`}>
+                Entregar
+              </button>
+            )
           ))}
-        {c.stage === "READY" && (
+        {c.stage === "READY" && allowed.deliver && (
           <button onClick={onDeliver} disabled={busy} className={`${btn} bg-green-500 text-black`}>
-            {c.money && c.money.balance > 0 ? "Cobrar y entregar" : "Entregar"}
+            {c.money && c.money.balance > 0 && allowed.charge ? "Cobrar y entregar" : "Entregar"}
           </button>
         )}
       </div>
@@ -319,11 +361,15 @@ function Card({
 
 function DeliverSheet({
   card,
+  canCharge,
+  canPrice,
   onClose,
   onDone,
   onAdjustPrice,
 }: {
   card: BoardCard | null;
+  canCharge: boolean;
+  canPrice: boolean;
   onClose: () => void;
   onDone: () => void;
   onAdjustPrice: (card: BoardCard) => void;
@@ -333,7 +379,9 @@ function DeliverSheet({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const balance = card?.money?.balance ?? 0;
+  const owed = card?.money?.balance ?? 0;
+  // Sin permiso de cobro: se puede entregar, pero el saldo queda pendiente.
+  const balance = canCharge ? owed : 0;
 
   // Al abrir con otra tarjeta, proponer cobrar el saldo completo.
   const [lastKey, setLastKey] = useState<string | null>(null);
@@ -375,9 +423,11 @@ function DeliverSheet({
           {card.pricing.some((i) => i.price === null) && (
             <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-center justify-between gap-3">
               <span>Hay servicios por evaluar sin precio: el total está incompleto.</span>
-              <button onClick={() => onAdjustPrice(card)} className="shrink-0 font-bold underline">
-                Ajustar precio
-              </button>
+              {canPrice && (
+                <button onClick={() => onAdjustPrice(card)} className="shrink-0 font-bold underline">
+                  Ajustar precio
+                </button>
+              )}
             </div>
           )}
 
@@ -393,11 +443,17 @@ function DeliverSheet({
               </div>
               <div className="rounded-xl bg-white/[0.03] border border-white/8 p-2">
                 <div className="text-[10px] uppercase tracking-widest text-gray-500">Saldo</div>
-                <div className={`font-black ${balance > 0 ? "text-amber-400" : "text-white"}`}>{clp(balance)}</div>
+                <div className={`font-black ${owed > 0 ? "text-amber-400" : "text-white"}`}>{clp(owed)}</div>
               </div>
             </div>
           ) : (
             <p className="text-xs text-gray-500">Ingreso sin reserva asociada: no hay monto que cobrar desde aquí.</p>
+          )}
+
+          {!canCharge && owed > 0 && (
+            <p className="text-xs text-amber-300">
+              Queda un saldo de {clp(owed)}. No tienes habilitado registrar cobros: lo registra el administrador.
+            </p>
           )}
 
           {balance > 0 && (
@@ -518,6 +574,75 @@ function PriceSheet({ card, onClose, onDone }: { card: BoardCard | null; onClose
           {error && <Msg kind="err">{error}</Msg>}
           <PrimaryBtn onClick={save} disabled={saving} className="w-full">
             {saving ? "Guardando…" : "Guardar precio"}
+          </PrimaryBtn>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+/** Cobro de un saldo pendiente después de la entrega. */
+function ChargeSheet({ card, onClose, onDone }: { card: BoardCard | null; onClose: () => void; onDone: () => void }) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<(typeof LOCAL_PAYMENT_METHODS)[number]>("CASH");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const balance = card?.money?.balance ?? 0;
+
+  const [lastKey, setLastKey] = useState<string | null>(null);
+  if (card && card.key !== lastKey) {
+    setLastKey(card.key);
+    setAmount(String(balance));
+    setMethod("CASH");
+    setError(null);
+  }
+
+  async function save() {
+    if (!card?.bookingId) return;
+    const value = Number(amount);
+    if (!Number.isInteger(value) || value <= 0) return setError("Ingresa un monto válido.");
+    setSaving(true);
+    setError(null);
+    const res = await registerPayment({ bookingId: card.bookingId, amount: value, method });
+    setSaving(false);
+    if (res.success) onDone();
+    else setError(res.error);
+  }
+
+  return (
+    <Sheet open={!!card} onClose={onClose} title={card ? `Cobrar ${card.plate ? formatPlate(card.plate) : ""}` : ""}>
+      {card && (
+        <div className="space-y-4">
+          <div className="text-sm text-gray-300">
+            {card.customerName} · saldo pendiente <span className="font-bold text-amber-400">{clp(balance)}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {LOCAL_PAYMENT_METHODS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                className={`h-11 rounded-xl text-xs font-bold border ${
+                  method === m ? "bg-brand-cyan text-black border-brand-cyan" : "bg-white/5 text-gray-300 border-white/10"
+                }`}
+              >
+                {PAYMENT_METHODS[m]}
+              </button>
+            ))}
+          </div>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={balance}
+            step={1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className={INPUT}
+          />
+          {error && <Msg kind="err">{error}</Msg>}
+          <PrimaryBtn onClick={save} disabled={saving} className="w-full">
+            {saving ? "Guardando…" : "Registrar cobro"}
           </PrimaryBtn>
         </div>
       )}

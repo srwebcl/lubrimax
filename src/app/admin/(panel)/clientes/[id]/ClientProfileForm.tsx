@@ -7,7 +7,7 @@ import { Field, INPUT, PrimaryBtn, Msg } from "@/components/admin/kit";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { NameInput, PhoneInput, RutInput } from "@/components/admin/ContactInputs";
 
-export default function ClientProfileForm({ initialData }: { initialData: any }) {
+export default function ClientProfileForm({ initialData, readOnly = false }: { initialData: any; readOnly?: boolean }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -64,6 +64,8 @@ export default function ClientProfileForm({ initialData }: { initialData: any })
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Sin permiso de edición: todo deshabilitado (el servidor igual lo bloquea). */}
+      <fieldset disabled={readOnly} className="space-y-4 disabled:opacity-80">
       <Field label="Nombre Completo">
         <NameInput name="name" required defaultValue={initialData.name} className={INPUT} />
       </Field>
@@ -140,9 +142,14 @@ export default function ClientProfileForm({ initialData }: { initialData: any })
 
       {message && <Msg kind={message.type === "success" ? "ok" : "err"}>{message.text}</Msg>}
       
-      <PrimaryBtn type="submit" disabled={saving} className="w-full mt-2">
-        {saving ? "Guardando cambios..." : (initialData.id.startsWith("web-") ? "Guardar y Consolidar" : "Guardar Cambios")}
-      </PrimaryBtn>
+      </fieldset>
+      {readOnly ? (
+        <p className="text-xs text-gray-500 text-center">Solo lectura: no tienes habilitado editar clientes.</p>
+      ) : (
+        <PrimaryBtn type="submit" disabled={saving} className="w-full mt-2">
+          {saving ? "Guardando cambios..." : (initialData.id.startsWith("web-") ? "Guardar y Consolidar" : "Guardar Cambios")}
+        </PrimaryBtn>
+      )}
     </form>
   );
 }

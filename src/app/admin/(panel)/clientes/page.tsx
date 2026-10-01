@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const MAX_WEB_BOOKINGS = 3000;
 
 export default async function ClientesPage() {
-  await requireStaffPage();
+  await requireStaffPage("clients_view");
 
   const [workshopClients, webBookings] = await Promise.all([
     prisma.workshopClient.findMany({

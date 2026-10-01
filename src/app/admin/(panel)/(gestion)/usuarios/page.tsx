@@ -12,7 +12,7 @@ export default async function StaffUsersPage() {
     <Screen size="lg">
       <PageHead
         title="Usuarios"
-        subtitle="Accesos del panel: crea trabajadores, cambia roles, resetea contraseñas."
+        subtitle="Accesos del panel: crea trabajadores, define qué funciones pueden usar, cambia roles y resetea contraseñas."
       />
       <UsersManager
         initialUsers={users.map((u) => ({

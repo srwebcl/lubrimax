@@ -17,7 +17,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireStaff } from "@/lib/staff-session";
+import { requirePermission, requireStaff } from "@/lib/staff-session";
+import { can } from "@/lib/permissions";
 import { getSettings } from "./admin-settings";
 import { chileNow, chileTodayRange } from "@/lib/chile-time";
 import { computeAvailableSlots, getBlockingBookings } from "@/lib/availability";
@@ -234,7 +235,7 @@ export async function getBoard(): Promise<BoardData> {
 /** Reserva que no llegó: libera el cupo. Solo si aún no tiene ingreso. */
 export async function markNoShow(bookingId: string) {
   try {
-    const session = await requireStaff();
+    const session = await requirePermission("noshow");
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -276,11 +277,12 @@ const deliverSchema = z.object({
  */
 export async function deliverVehicle(input: unknown) {
   try {
-    const session = await requireStaff();
+    const session = await requirePermission("deliver");
 
     const parsed = deliverSchema.safeParse(input);
     if (!parsed.success) return fail(flattenZodError(parsed.error));
     const { intakeId, payment } = parsed.data;
+    if (payment && !can(session, "charge")) return fail("No tienes permiso para registrar cobros.");
 
     const result = await prisma.$transaction(async (tx) => {
       const intake = await tx.vehicleIntake.findUnique({
@@ -366,7 +368,7 @@ const pricesSchema = z.object({
  */
 export async function updateEvaluatedPrices(input: unknown) {
   try {
-    const session = await requireStaff();
+    const session = await requirePermission("pricing");
 
     const parsed = pricesSchema.safeParse(input);
     if (!parsed.success) return fail(flattenZodError(parsed.error));
@@ -433,5 +435,64 @@ export async function updateEvaluatedPrices(input: unknown) {
     if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
     console.error("updateEvaluatedPrices:", error);
     return fail("No se pudo actualizar el precio.");
+  }
+}
+
+const paymentSchema = z.object({
+  bookingId: z.string().min(1).max(40),
+  amount: z.number().int().positive("El monto debe ser mayor a 0.").max(20_000_000),
+  method: z.enum(LOCAL_PAYMENT_METHODS, { error: "Medio de pago inválido." }),
+});
+
+/**
+ * Registra un cobro en el local sin entregar (ej. un saldo que quedó
+ * pendiente al entregar un auto). No permite cobrar más que el saldo.
+ */
+export async function registerPayment(input: unknown) {
+  try {
+    const session = await requirePermission("charge");
+
+    const parsed = paymentSchema.safeParse(input);
+    if (!parsed.success) return fail(flattenZodError(parsed.error));
+    const { bookingId, amount, method } = parsed.data;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: { payments: { select: { amount: true, method: true } } },
+      });
+      if (!booking) return fail("Reserva no encontrada.");
+
+      const money = bookingMoney(booking);
+      if (amount > money.balance) {
+        return fail(`El cobro supera el saldo pendiente ($${money.balance.toLocaleString("es-CL")}).`);
+      }
+      const paid = money.paid + amount;
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: {
+          paymentStatus: paymentStatusFor(money.total, paid),
+          payments: { create: { amount, method, staffUserId: session.userId, staffName: session.name } },
+        },
+      });
+      await tx.bookingActivityLog.create({
+        data: {
+          bookingId,
+          staffUserId: session.userId,
+          staffName: session.name,
+          action: "PAYMENT",
+          detail: `Cobro $${amount} (${method}); saldo $${Math.max(money.total - paid, 0)}`,
+        },
+      });
+      return { success: true as const };
+    });
+
+    if (result.success) revalidatePath("/admin", "layout");
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
+    console.error("registerPayment:", error);
+    return fail("No se pudo registrar el cobro.");
   }
 }

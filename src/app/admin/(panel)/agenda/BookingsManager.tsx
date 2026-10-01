@@ -70,9 +70,12 @@ function statusPill(status: string) {
 export default function BookingsManager({
   initialBookings,
   role,
+  canWork = true,
 }: {
   initialBookings: Booking[];
   role: Role;
+  /** Puede marcar el avance (permiso "Iniciar y terminar trabajos"). */
+  canWork?: boolean;
 }) {
   const isAdmin = role === "ADMIN";
   const [bookings, setBookings] = useState(initialBookings);
@@ -270,7 +273,8 @@ export default function BookingsManager({
                         return (
                           <button
                             key={s.value}
-                            disabled={busy === b.id}
+                            disabled={busy === b.id || !canWork}
+                            title={canWork ? undefined : "No tienes habilitado marcar el avance"}
                             onClick={() => setWork(b.id, s.value)}
                             className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 ${
                               active

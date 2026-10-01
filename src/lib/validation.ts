@@ -131,7 +131,7 @@ export const bookingPaymentSchema = z.object({
   make: z.string().trim().min(1, "Falta la marca.").max(50),
   model: z.string().trim().min(1, "Falta el modelo.").max(50),
   customerName: z.string().trim().min(2, "Falta el nombre.").max(200),
-  customerPhone: z.string().trim().min(5, "Teléfono inválido.").max(30),
+  customerPhone: z.string().trim().refine(isChileMobile, "Celular inválido: debe ser +56 9 XXXX XXXX."),
   customerEmail: z.union([z.email(), z.literal("")]).optional(),
   selectedVariants: z.record(z.string(), z.string()).optional(),
   // Obsoleto: siempre se cobra el 100%. Se acepta para no romper versiones

@@ -15,6 +15,8 @@ import {
   flattenZodError,
 } from "@/lib/validation";
 
+import { normalizePermissions } from "@/lib/permissions";
+
 const BCRYPT_ROUNDS = 12;
 
 function fail(error: string) {
@@ -36,6 +38,7 @@ export async function getStaffUsers() {
         name: true,
         role: true,
         isActive: true,
+        permissions: true,
         lastLoginAt: true,
         createdAt: true,
       },
@@ -239,5 +242,35 @@ export async function changeMyPassword(formData: FormData) {
     if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
     console.error("changeMyPassword:", error);
     return fail("No se pudo cambiar la contraseña.");
+  }
+}
+
+/**
+ * Funciones habilitadas para un TRABAJADOR (ver src/lib/permissions.ts).
+ * Aplica al instante (se leen de la BD en cada request); no cierra su sesión.
+ */
+export async function updateStaffPermissions(id: string, permissions: string[]) {
+  try {
+    await requireRole("ADMIN");
+
+    if (!Array.isArray(permissions) || permissions.some((p) => typeof p !== "string")) {
+      return fail("Permisos inválidos.");
+    }
+
+    const target = await prisma.staffUser.findUnique({ where: { id }, select: { role: true } });
+    if (!target) return fail("Usuario no encontrado.");
+    if (target.role !== "WORKER") return fail("El administrador siempre tiene todos los permisos.");
+
+    await prisma.staffUser.update({
+      where: { id },
+      data: { permissions: normalizePermissions(permissions) },
+    });
+
+    revalidatePath("/admin", "layout");
+    return ok();
+  } catch (error) {
+    if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
+    console.error("updateStaffPermissions:", error);
+    return fail("No se pudieron guardar los permisos.");
   }
 }

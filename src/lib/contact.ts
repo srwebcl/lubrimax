@@ -42,6 +42,18 @@ export function normalizeRut(rut: string | null | undefined): string | undefined
 /** Celular chileno con formato final "+56 9 XXXX XXXX". */
 export const CHILE_MOBILE_REGEX = /^\+56 9 \d{4} \d{4}$/;
 
+/** Los 8 dígitos tras el "9" de un celular chileno ("" si no lo es). */
+export function mobileDigits(phone: string | null | undefined) {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  const nine = digits.length >= 9 ? digits.slice(-9) : "";
+  return nine.startsWith("9") ? nine.slice(1) : "";
+}
+
+/** 8 dígitos locales -> "+56 9 XXXX XXXX". */
+export function mobileFromDigits(digits: string) {
+  return `+56 9 ${digits.slice(0, 4)} ${digits.slice(4)}`;
+}
+
 export function isChileMobile(phone: string | null | undefined) {
   return CHILE_MOBILE_REGEX.test(formatPhone(phone));
 }

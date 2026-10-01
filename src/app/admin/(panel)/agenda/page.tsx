@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireStaffPage } from "@/lib/staff-session";
+import { can } from "@/lib/permissions";
 import BookingsManager from "./BookingsManager";
 import { chileTodayRange } from "@/lib/chile-time";
 import { customServiceDetail } from "@/lib/booking-services";
@@ -22,7 +23,8 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const { role } = await requireStaffPage();
+  const session = await requireStaffPage("agenda");
+  const { role } = session;
 
   // Ventana acotada: antes se cargaban TODAS las reservas históricas en cada
   // visita (y se mandaban al navegador), lo que crece sin límite. Se muestran
@@ -58,6 +60,7 @@ export default async function AdminDashboard() {
       </header>
       <BookingsManager
         role={role}
+        canWork={can(session, "work")}
         initialBookings={bookings.map((b) => {
           const srvs = b.services.map((s) => ({ name: s.name, duration: s.duration }));
           // Servicio personalizado del ingreso sin reserva.

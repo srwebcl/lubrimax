@@ -18,7 +18,7 @@ export default async function PanelLayout({
   if (!session) redirect("/admin/login");
 
   return (
-    <AdminShell role={session.role} staffName={session.name}>
+    <AdminShell role={session.role} staffName={session.name} permissions={session.permissions}>
       {children}
     </AdminShell>
   );

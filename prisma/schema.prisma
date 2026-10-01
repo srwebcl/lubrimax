@@ -181,6 +181,9 @@ model StaffUser {
   // la BD en cada request sensible.
   sessionEpoch Int       @default(0)
   lastLoginAt  DateTime?
+  // Funciones habilitadas para un TRABAJADOR (el admin tiene todo). Ver
+  // src/lib/permissions.ts. Por defecto, todas.
+  permissions  String[]  @default(["intake", "work", "deliver", "charge", "pricing", "noshow", "agenda", "clients_view", "clients_edit"])
 
   activity     BookingActivityLog[]
 

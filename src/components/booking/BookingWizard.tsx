@@ -11,6 +11,7 @@ import { getServices, getAvailableSlots, getBookingById } from "@/actions/bookin
 import { getSessionCustomer } from "@/actions/customer-auth";
 import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice } from "@/lib/booking-constants";
 import { CLUB_ENABLED } from "@/lib/features";
+import { mobileDigits, mobileFromDigits } from "@/lib/contact";
 
 // Miniaturas representativas + descripción de cada tipo de vehículo. El
 // texto de la descripción es el mismo que ya se usa en el tooltip de precios
@@ -125,7 +126,7 @@ export default function BookingWizard() {
           ...prev,
           name: session.name,
           email: session.email,
-          phone: session.phone || ""
+          phone: mobileDigits(session.phone)
         }));
       }
       setLoading(false);
@@ -205,6 +206,10 @@ export default function BookingWizard() {
 
   // La reserva web se paga siempre al 100% (sin abono).
   const handlePayment = async () => {
+    if (formData.phone.length !== 8) {
+      alert("Ingresa los 8 dígitos de tu celular (+56 9 XXXX XXXX).");
+      return;
+    }
     if (!formData.name || !formData.phone || !formData.plate || !formData.vehicleMake || !formData.vehicleModel) {
       alert("Por favor completa todos los datos obligatorios (Contacto y Vehículo).");
       return;
@@ -230,7 +235,7 @@ export default function BookingWizard() {
           make: formData.vehicleMake,
           model: formData.vehicleModel,
           customerName: formData.name,
-          customerPhone: formData.phone,
+          customerPhone: mobileFromDigits(formData.phone),
           customerEmail: formData.email,
         }),
       });
@@ -624,7 +629,22 @@ export default function BookingWizard() {
                   {/* Fila 3: Teléfono */}
                   <div>
                     <label className="block text-gray-400 text-xs uppercase tracking-widest mb-2 font-semibold">Teléfono</label>
-                    <input required type="text" placeholder="Ej: +56912345678" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-brand-cyan/30 focus:border-brand-cyan transition-all placeholder-gray-600" />
+                    {/* Celular chileno: "+56 9" fijo, solo los 8 dígitos restantes. */}
+                    <div className="w-full flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-4 py-3.5 focus-within:ring-2 focus-within:ring-brand-cyan/30 focus-within:border-brand-cyan transition-all">
+                      <span className="text-gray-400 font-semibold shrink-0 select-none">+56 9</span>
+                      <input
+                        required
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        pattern="\d{4} \d{4}"
+                        title="Ingresa los 8 dígitos de tu celular"
+                        placeholder="1234 5678"
+                        value={formData.phone.length > 4 ? `${formData.phone.slice(0, 4)} ${formData.phone.slice(4)}` : formData.phone}
+                        onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 8)})}
+                        className="w-full min-w-0 bg-transparent text-white focus:outline-none placeholder-gray-600"
+                      />
+                    </div>
                   </div>
 
                   {/* Fila 4: Marca del Vehículo */}

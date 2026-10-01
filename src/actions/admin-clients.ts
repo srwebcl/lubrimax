@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { requireStaff } from "@/lib/staff-session";
+import { requirePermission } from "@/lib/staff-session";
 import { updateClientSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate, formatPlate, parseBookingVehicle } from "@/lib/plate";
 import { titleCase, formatPhone, normalizeRut, phoneKey } from "@/lib/contact";
@@ -28,7 +28,7 @@ function fail(error: string) {
  */
 export async function updateClient(id: string, input: unknown) {
   try {
-    const session = await requireStaff();
+    const session = await requirePermission("clients_edit");
 
     const parsed = updateClientSchema.safeParse(input);
     if (!parsed.success) return fail(flattenZodError(parsed.error));
@@ -200,7 +200,7 @@ function bookingItem(b: BookingWithServices, type: string): ClientHistoryItem {
  */
 export async function getClientHistory(clientId: string): Promise<ClientHistoryItem[]> {
   try {
-    await requireStaff();
+    await requirePermission("clients_view");
 
     const bookingInclude = { services: { select: { name: true } } } as const;
 

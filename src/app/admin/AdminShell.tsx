@@ -7,10 +7,11 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { logout } from "@/actions/auth";
 import BookingNotifier from "@/components/admin/BookingNotifier";
+import type { Permission } from "@/lib/permissions";
 
 type Role = "ADMIN" | "WORKER";
 
-type Dest = { name: string; href: string; icon: string; adminOnly?: boolean };
+type Dest = { name: string; href: string; icon: string; adminOnly?: boolean; permission?: Permission };
 
 const ICONS = {
   agenda:
@@ -47,8 +48,8 @@ const DESTS: Dest[] = [
   // "Taller" es el tablero operativo (inicio). El formulario de ingreso
   // (/admin/ingreso) se abre desde ahí: "Llegó" / "Nuevo ingreso".
   { name: "Taller", href: "/admin", icon: ICONS.ingreso },
-  { name: "Agenda", href: "/admin/agenda", icon: ICONS.agenda },
-  { name: "Clientes", href: "/admin/clientes", icon: ICONS.clientes },
+  { name: "Agenda", href: "/admin/agenda", icon: ICONS.agenda, permission: "agenda" },
+  { name: "Clientes", href: "/admin/clientes", icon: ICONS.clientes, permission: "clients_view" },
   { name: "Estadísticas", href: "/admin/estadisticas", icon: ICONS.estadisticas, adminOnly: true },
   { name: "Productos", href: "/admin/tienda", icon: ICONS.productos, adminOnly: true },
   { name: "Pedidos", href: "/admin/pedidos", icon: ICONS.pedidos, adminOnly: true },
@@ -72,16 +73,21 @@ function Icon({ d, className = "w-6 h-6" }: { d: string; className?: string }) {
 export default function AdminShell({
   role,
   staffName,
+  permissions,
   children,
 }: {
   role: Role;
   staffName: string;
+  permissions: Permission[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  const visible = DESTS.filter((d) => role === "ADMIN" || !d.adminOnly);
+  // Trabajador: sin secciones de admin y solo lo que el admin le habilitó.
+  const visible = DESTS.filter(
+    (d) => role === "ADMIN" || (!d.adminOnly && (!d.permission || permissions.includes(d.permission)))
+  );
   const initial = staffName.trim().charAt(0).toUpperCase() || "?";
   const roleLabel = role === "ADMIN" ? "Administrador" : "Trabajador";
 
