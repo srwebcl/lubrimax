@@ -58,6 +58,7 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
         ? known
         : {
             found: false,
+            source: "WEB" as const,
             client: {
               id: "",
               name: preBooking.customerName,

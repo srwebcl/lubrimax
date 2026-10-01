@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/staff-session";
 import { intakeSchema, manualIntakeServicesSchema, flattenZodError } from "@/lib/validation";
-import { normalizePlate, isValidPlate } from "@/lib/plate";
+import { normalizePlate, isValidPlate, parseBookingVehicle } from "@/lib/plate";
 import { chileNow, bookingDateFromDay, addMinutesToTime } from "@/lib/chile-time";
 import { normalizeRut, formatPhone } from "@/lib/contact";
 
@@ -16,7 +16,14 @@ function fail(error: string) {
 }
 
 export type PlateLookup = {
+  /** true si la patente ya es un vehículo del taller (tabla Vehicle). */
   found: boolean;
+  /**
+   * De dónde salen los datos precargados: "WORKSHOP" = cliente del taller,
+   * "WEB" = solo conocido por una reserva web (se consolida al registrar),
+   * ausente = patente nueva.
+   */
+  source?: "WORKSHOP" | "WEB";
   client?: { id: string; name: string; rut: string | null; phone: string | null; email: string | null };
   vehicle?: { id: string; plate: string; make: string; model: string; color: string | null };
   openIntakeId?: string; // si ya hay un ingreso "en taller" para este vehículo
@@ -41,18 +48,22 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
   });
 
   if (!vehicle) {
-    // Buscar en reservas recientes si no existe en la BD maestra de vehículos
-    const recentBooking = await prisma.booking.findFirst({
-      where: { vehicleModel: { contains: `Patente: ${plate}` } },
-      orderBy: { createdAt: "desc" }
-    });
+    // No es vehículo del taller: buscarlo en reservas web. La patente se
+    // compara NORMALIZADA en SQL: reservas antiguas la guardaron tal como la
+    // tipeó el cliente ("Jybg-69") y un `contains` exacto no las encontraba.
+    const [match] = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Booking"
+      WHERE upper(regexp_replace(substring("vehicleModel" from 'Patente:[[:space:]]*([^)]+)'), '[^A-Za-z0-9]', '', 'g')) = ${plate}
+      ORDER BY "createdAt" DESC
+      LIMIT 1`;
+    const recentBooking = match ? await prisma.booking.findUnique({ where: { id: match.id } }) : null;
 
     if (recentBooking) {
-      const make = recentBooking.vehicleMake.split(" - ").pop() || "";
-      const model = recentBooking.vehicleModel.split(" (Patente:")[0] || "";
-      
+      const { make, model } = parseBookingVehicle(recentBooking.vehicleMake, recentBooking.vehicleModel);
+
       return {
-        found: false, // false porque aún no es cliente oficial del taller
+        found: false, // aún no es cliente oficial del taller
+        source: "WEB",
         client: {
           id: "",
           name: recentBooking.customerName,
@@ -79,6 +90,7 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
 
   return {
     found: true,
+    source: "WORKSHOP",
     client: {
       id: vehicle.client.id,
       name: vehicle.client.name,
@@ -130,12 +142,24 @@ export async function registerIntake(formData: FormData) {
   }
 
   // Ingreso sin reserva web: se crea una cita interna con estos servicios.
-  let manual: { serviceIds: string[]; customServiceDetail?: string; customServicePrice: number } | null = null;
+  let manual: {
+    serviceIds: string[];
+    customServiceDetail?: string;
+    customServicePrice: number;
+    manualPrices: Record<string, number>;
+  } | null = null;
   if (!d.bookingId) {
+    // Precios manuales: campos "manualPrice:<serviceId>" con valor no vacío.
+    const manualPrices: Record<string, number> = {};
+    for (const [key, value] of formData.entries()) {
+      if (!key.startsWith("manualPrice:") || typeof value !== "string" || value.trim() === "") continue;
+      manualPrices[key.slice("manualPrice:".length)] = Number(value);
+    }
     const manualParsed = manualIntakeServicesSchema.safeParse({
       serviceIds: formData.getAll("serviceIds").map(String),
       customServiceDetail: formData.get("customServiceDetail") || undefined,
       customServicePrice: formData.get("customServicePrice") ?? "",
+      manualPrices,
     });
     if (!manualParsed.success) return fail(flattenZodError(manualParsed.error));
     manual = { ...manualParsed.data, serviceIds: [...new Set(manualParsed.data.serviceIds)] };
@@ -221,9 +245,6 @@ export async function registerIntake(formData: FormData) {
         // ES UN INGRESO MANUAL.
         const { serviceIds, customServiceDetail } = manual;
         const customPrice = customServiceDetail ? manual.customServicePrice : 0;
-        const selectedOptions = customServiceDetail
-          ? { customService: { detail: customServiceDetail, price: customPrice } }
-          : undefined;
 
         // Buscar los servicios seleccionados para sumar su precio
         const dbServices = await tx.service.findMany({
@@ -234,8 +255,23 @@ export async function registerIntake(formData: FormData) {
           throw new IntakeError("Alguno de los servicios ya no existe. Recarga la página.");
         }
 
-        const catalogTotal = dbServices.reduce((acc, s) => acc + (s.priceAuto || 0), 0);
+        // Servicios sin precio de catálogo ("a evaluar"): se usa el precio
+        // manual ingresado en la recepción, si lo hay. Solo se aceptan para
+        // esos servicios; un servicio con precio de catálogo no se pisa.
+        const manualPrices: Record<string, number> = {};
+        for (const s of dbServices) {
+          if (!s.priceAuto && manual.manualPrices[s.id] !== undefined) manualPrices[s.id] = manual.manualPrices[s.id];
+        }
+        const catalogTotal = dbServices.reduce((acc, s) => acc + (s.priceAuto || manualPrices[s.id] || 0), 0);
         const totalAmount = catalogTotal + customPrice;
+
+        const selectedOptions =
+          customServiceDetail || Object.keys(manualPrices).length > 0
+            ? {
+                ...(customServiceDetail ? { customService: { detail: customServiceDetail, price: customPrice } } : {}),
+                ...(Object.keys(manualPrices).length > 0 ? { manualPrices } : {}),
+              }
+            : undefined;
 
         // Hora de Chile, no del servidor (UTC). `date` sigue la convención
         // del resto de reservas: el día a las 00:00 UTC.

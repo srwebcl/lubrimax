@@ -109,6 +109,11 @@ export const manualIntakeServicesSchema = z
       .union([z.coerce.number().int().min(0, "El precio no puede ser negativo.").max(20_000_000, "Precio fuera de rango."), z.literal("")])
       .optional()
       .transform((v) => (v === "" || v === undefined ? 0 : Number(v))),
+    // Precio manual de servicios sin precio de catálogo ("a evaluar", ej.
+    // mecánica). serviceId -> precio. Vacío = aún por evaluar.
+    manualPrices: z
+      .record(z.string().max(40), z.number().int().min(0, "El precio no puede ser negativo.").max(20_000_000, "Precio fuera de rango."))
+      .default({}),
   })
   .refine((v) => v.serviceIds.length > 0 || !!v.customServiceDetail, {
     message: "Debes seleccionar al menos un servicio o ingresar uno personalizado.",

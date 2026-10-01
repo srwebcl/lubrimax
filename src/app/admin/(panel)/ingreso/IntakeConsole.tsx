@@ -48,6 +48,27 @@ export default function IntakeConsole({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [selectedBookingId, setSelectedBookingId] = useState(initial?.bookingId ?? "");
+  const [checkedServices, setCheckedServices] = useState<Set<string>>(new Set());
+  const [manualPrices, setManualPrices] = useState<Record<string, string>>({});
+
+  function toggleService(id: string) {
+    setCheckedServices((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Total estimado de los servicios marcados (catálogo + precios manuales).
+  let estimatedTotal = 0;
+  let pendingEvaluation = 0;
+  for (const s of services) {
+    if (!checkedServices.has(s.id)) continue;
+    if (s.priceAuto) estimatedTotal += s.priceAuto;
+    else if (manualPrices[s.id]) estimatedTotal += Number(manualPrices[s.id]) || 0;
+    else pendingEvaluation++;
+  }
 
   async function doSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +83,8 @@ export default function IntakeConsole({
     setLookup(res);
     setPlate(p);
     setSelectedBookingId(initial?.bookingId ?? "");
+    setCheckedServices(new Set());
+    setManualPrices({});
     setPhase("form");
     setSearching(false);
   }
@@ -112,6 +135,7 @@ export default function IntakeConsole({
   const c = lookup?.client;
   const v = lookup?.vehicle;
   const known = lookup?.found;
+  const fromWeb = lookup?.source === "WEB";
 
   return (
     <div className="space-y-6">
@@ -169,6 +193,8 @@ export default function IntakeConsole({
                 setLookup(null);
                 setPhotoUrl("");
                 setSelectedBookingId("");
+                setCheckedServices(new Set());
+                setManualPrices({});
               }}
               className="text-xs font-semibold text-gray-400 bg-white/5 px-3 py-1.5 rounded-full"
             >
@@ -180,12 +206,16 @@ export default function IntakeConsole({
             className={`text-xs font-semibold px-3 py-2 rounded-lg border ${
               known
                 ? "bg-green-500/10 text-green-400 border-green-500/25"
-                : "bg-amber-500/10 text-amber-400 border-amber-500/25"
+                : fromWeb
+                  ? "bg-sky-500/10 text-sky-400 border-sky-500/25"
+                  : "bg-amber-500/10 text-amber-400 border-amber-500/25"
             }`}
           >
             {known
-              ? "Cliente ya registrado — revisá los datos y confirmá."
-              : "Patente nueva — completá los datos del cliente."}
+              ? "Cliente ya registrado — revisa los datos y confirma."
+              : fromWeb
+                ? "Cliente conocido por una reserva web — revisa sus datos; al registrar queda como cliente del taller."
+                : "Patente nueva — completa los datos del cliente."}
           </div>
 
           {lookup?.openIntakeId && (
@@ -288,25 +318,62 @@ export default function IntakeConsole({
                 Al registrar este ingreso sin reserva web, se creará automáticamente una cita en la Agenda con los siguientes servicios.
               </p>
               
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-2 mb-4">
-                {services.map(s => (
-                  <label key={s.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-white/10">
-                    <input 
-                      type="checkbox" 
-                      name="serviceIds" 
-                      value={s.id} 
-                      className="w-4 h-4 rounded border-gray-600 text-brand-cyan focus:ring-brand-cyan bg-black"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-white truncate">{s.name}</div>
-                      <div className="text-[10px] text-gray-500 uppercase">{s.category}</div>
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-2 mb-4">
+                {services.map(s => {
+                  const checked = checkedServices.has(s.id);
+                  // Sin precio de catálogo (ej. mecánica): el precio depende de
+                  // la evaluación y se ingresa a mano al seleccionarlo.
+                  const toEvaluate = !s.priceAuto;
+                  return (
+                    <div key={s.id} className={`rounded-lg border transition-colors ${checked ? "border-brand-cyan/30 bg-white/[0.03]" : "border-transparent"}`}>
+                      <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          name="serviceIds" 
+                          value={s.id} 
+                          checked={checked}
+                          onChange={() => toggleService(s.id)}
+                          className="w-4 h-4 rounded border-gray-600 text-brand-cyan focus:ring-brand-cyan bg-black"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">{s.name}</div>
+                          <div className="text-[10px] text-gray-500 uppercase">{s.category}</div>
+                        </div>
+                        <div className={`text-sm font-bold shrink-0 ${toEvaluate ? "text-amber-400" : "text-brand-cyan"}`}>
+                          {toEvaluate ? "A evaluar" : `$${s.priceAuto!.toLocaleString("es-CL")}`}
+                        </div>
+                      </label>
+                      {checked && toEvaluate && (
+                        <div className="px-2 pb-2 pl-9">
+                          <input
+                            name={`manualPrice:${s.id}`}
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            step={1}
+                            value={manualPrices[s.id] ?? ""}
+                            onChange={(e) => setManualPrices((p) => ({ ...p, [s.id]: e.target.value }))}
+                            placeholder="Precio según evaluación ($) — opcional"
+                            className={`${field} py-2 text-sm`}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <div className="text-sm font-bold text-brand-cyan shrink-0">
-                      ${(s.priceAuto || 0).toLocaleString("es-CL")}
-                    </div>
-                  </label>
-                ))}
+                  );
+                })}
               </div>
+
+              {checkedServices.size > 0 && (
+                <div className="flex justify-between items-center text-xs mb-4 px-1">
+                  <span className="text-gray-400 uppercase tracking-widest">Total servicios</span>
+                  <span className="text-white font-bold">
+                    ${estimatedTotal.toLocaleString("es-CL")}
+                    {pendingEvaluation > 0 && (
+                      <span className="text-amber-400 font-semibold"> + {pendingEvaluation} por evaluar</span>
+                    )}
+                  </span>
+                </div>
+              )}
 
               <div className="pt-4 border-t border-brand-cyan/20">
                 <label className={label}>Otro Servicio (Personalizado)</label>

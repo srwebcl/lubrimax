@@ -146,8 +146,11 @@ export default function BookingsManager({
 
   return (
     <div>
-      {/* Filtro segmentado — pegajoso bajo el header */}
-      <div className="sticky top-[calc(3.5rem_+_env(safe-area-inset-top))] md:top-14 z-30 -mx-3 sm:mx-0 px-3 sm:px-0 py-2.5 bg-brand-pure/85 backdrop-blur-md">
+      {/* Filtro segmentado — pegajoso arriba del área con scroll. El scroll
+          ocurre dentro de <main> (AdminShell), que ya empieza bajo el header:
+          por eso top-0. Con un offset extra quedaba un hueco por donde las
+          tarjetas se veían pasar antes de esconderse bajo la barra. */}
+      <div className="sticky top-0 z-30 -mx-3 sm:mx-0 px-3 sm:px-0 py-2.5 bg-brand-pure/85 backdrop-blur-md">
         <div className="flex gap-1 p-1 bg-white/5 rounded-full">
           {FILTERS.map((f) => {
             const active = filter === f.key;
