@@ -8,6 +8,7 @@ import { updateClientSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate, formatPlate, parseBookingVehicle } from "@/lib/plate";
 import { titleCase, formatPhone, normalizeRut, phoneKey } from "@/lib/contact";
 import { realBookingWhere } from "@/lib/booking-constants";
+import { bookingServiceNames } from "@/lib/booking-services";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
 class ClientError extends Error {}
@@ -177,13 +178,6 @@ type BookingWithServices = {
   services: { name: string }[];
 };
 
-/** Servicios de una reserva, incluyendo el servicio personalizado del ingreso manual. */
-function bookingServices(b: Pick<BookingWithServices, "services" | "selectedOptions">) {
-  const names = b.services.map((s) => s.name);
-  const custom = (b.selectedOptions as { customService?: { detail?: string } } | null)?.customService?.detail;
-  if (custom) names.push(`[Personalizado] ${custom}`);
-  return names;
-}
 
 function bookingItem(b: BookingWithServices, type: string): ClientHistoryItem {
   const v = parseBookingVehicle(b.vehicleMake, b.vehicleModel);
@@ -193,7 +187,7 @@ function bookingItem(b: BookingWithServices, type: string): ClientHistoryItem {
     type,
     plate: v.plate,
     vehicle: `${v.make} ${v.model}`.trim(),
-    services: bookingServices(b),
+    services: bookingServiceNames(b),
     amount: b.amount,
     notes: null,
     odometer: null,
@@ -263,7 +257,7 @@ export async function getClientHistory(clientId: string): Promise<ClientHistoryI
           type: "Ingreso a Taller",
           plate: v.plate,
           vehicle: `${v.make} ${v.model}`,
-          services: linked ? bookingServices(linked) : ["Ingreso Manual (Sin Reserva)"],
+          services: linked ? bookingServiceNames(linked) : ["Ingreso Manual (Sin Reserva)"],
           amount: linked?.amount ?? null,
           notes: intake.notes,
           odometer: intake.odometer,

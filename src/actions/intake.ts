@@ -298,41 +298,4 @@ export async function registerIntake(formData: FormData) {
   }
 }
 
-/** Vehículos actualmente en el taller (ingresos con estado IN_SHOP). */
-export async function getShopStatus() {
-  await requireStaff();
-  const intakes = await prisma.vehicleIntake.findMany({
-    where: { status: "IN_SHOP" },
-    orderBy: { createdAt: "desc" },
-    include: { vehicle: { include: { client: true } } },
-  });
-  return intakes.map((i) => ({
-    id: i.id,
-    plate: i.vehicle.plate,
-    make: i.vehicle.make,
-    model: i.vehicle.model,
-    clientName: i.vehicle.client.name,
-    clientPhone: i.vehicle.client.phone,
-    photoUrl: i.photoUrl,
-    notes: i.notes,
-    staffName: i.createdByStaffName,
-    createdAt: i.createdAt.toISOString(),
-  }));
-}
-
-/** Marca un ingreso como entregado (el auto sale del taller). */
-export async function markDelivered(intakeId: string) {
-  try {
-    await requireStaff();
-    await prisma.vehicleIntake.update({
-      where: { id: intakeId },
-      data: { status: "DELIVERED", deliveredAt: new Date() },
-    });
-    revalidatePath("/admin/ingreso");
-    return { success: true as const };
-  } catch (error) {
-    if (error instanceof Error && error.message === "No autorizado.") return fail("No autorizado.");
-    console.error("markDelivered:", error);
-    return fail("No se pudo marcar como entregado.");
-  }
-}
+// La entrega del vehículo (con cobro) vive en actions/workshop.ts (deliverVehicle).

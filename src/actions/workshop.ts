@@ -23,6 +23,7 @@ import { chileNow, chileTodayRange } from "@/lib/chile-time";
 import { computeAvailableSlots, getBlockingBookings } from "@/lib/availability";
 import { bookingMoney, paymentStatusFor, LOCAL_PAYMENT_METHODS } from "@/lib/booking-money";
 import { parseBookingVehicle } from "@/lib/plate";
+import { bookingServiceNames } from "@/lib/booking-services";
 import { flattenZodError } from "@/lib/validation";
 
 /** Minutos de tolerancia antes de marcar una reserva como atrasada. */
@@ -87,12 +88,6 @@ type BoardBooking = {
   payments: { amount: number; method: string }[];
 };
 
-function serviceNames(b: BoardBooking) {
-  const names = b.services.map((s) => s.name);
-  const custom = (b.selectedOptions as { customService?: { detail?: string } } | null)?.customService?.detail;
-  if (custom) names.push(`[Personalizado] ${custom}`);
-  return names;
-}
 
 export async function getBoard(): Promise<BoardData> {
   await requireStaff();
@@ -143,7 +138,7 @@ export async function getBoard(): Promise<BoardData> {
       vehicle: `${intake.vehicle.make} ${intake.vehicle.model}`,
       customerName: intake.vehicle.client.name,
       customerPhone: intake.vehicle.client.phone,
-      services: b ? serviceNames(b) : [],
+      services: b ? bookingServiceNames(b) : [],
       photoUrl: intake.photoUrl,
       notes: intake.notes,
       arrivedAt: intake.createdAt.toISOString(),
@@ -192,7 +187,7 @@ export async function getBoard(): Promise<BoardData> {
       vehicle: `${v.make} ${v.model}`.trim(),
       customerName: b.customerName,
       customerPhone: b.customerPhone,
-      services: serviceNames(b),
+      services: bookingServiceNames(b),
       photoUrl: null,
       notes: null,
       arrivedAt: null,

@@ -5,7 +5,6 @@ import { getSessionCustomer } from "@/actions/customer-auth";
 import { getSettings } from "@/actions/admin-settings";
 import { bookingPaymentSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
-import { sendEmail, escapeHtml } from "@/lib/email";
 import {
   computeAvailableSlots,
   computeEndTime,
@@ -18,14 +17,6 @@ import { normalizePlate } from "@/lib/plate";
 
 import { getWebpayTransaction } from "@/lib/webpay";
 import { CLUB_ENABLED } from "@/lib/features";
-
-// Interruptor TEMPORAL para probar el agendamiento en producción sin pasar
-// por Webpay/Transbank de verdad. Se activa poniendo BOOKING_FREE_MODE=true
-// en las variables de entorno (Vercel) y se desactiva sacando esa variable
-// (o poniéndola en "false") — no requiere otro cambio de código. Mientras
-// está prendido, TODAS las reservas quedan confirmadas gratis, sin cobrar
-// nada; apagarlo apenas termine la prueba.
-const FREE_MODE = process.env.BOOKING_FREE_MODE === "true";
 
 class SlotTakenError extends Error {}
 
@@ -99,7 +90,7 @@ export async function POST(request: Request) {
     // vehículo (ej. "a cotizar") no se puede reservar online: antes sumaba
     // $0 y abarataba el total.
     const prices = services.map((s) => servicePrice(s, vehicleType, selectedVariants));
-    if (!FREE_MODE && prices.some((p) => p <= 0)) {
+    if (prices.some((p) => p <= 0)) {
       return NextResponse.json(
         { error: "Uno de los servicios elegidos no tiene precio online para tu vehículo. Contáctanos para cotizarlo." },
         { status: 400 }
@@ -122,7 +113,7 @@ export async function POST(request: Request) {
     }
     const amount = totalAmount;
 
-    if (amount <= 0 && !FREE_MODE) {
+    if (amount <= 0) {
       return NextResponse.json({ error: "Monto inválido para este servicio." }, { status: 400 });
     }
 
@@ -133,7 +124,7 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     // Validar la configuración de Webpay ANTES de bloquear el horario.
-    const webpay = FREE_MODE ? null : getWebpayTransaction();
+    const webpay = getWebpayTransaction();
 
     // Verificación de disponibilidad + creación en una sola transacción, con
     // un lock por día: dos personas pagando el mismo horario a la vez ya no
@@ -161,77 +152,19 @@ export async function POST(request: Request) {
           services: { connect: uniqueServiceIds.map((id) => ({ id })) },
           selectedOptions: selectedVariants ?? undefined,
           totalPrice: totalAmount,
-          ...(FREE_MODE
-            ? {
-                // Modo de prueba: confirma al toque, sin cobrar ni tocar
-                // Webpay. Monto 0 para que se note en la agenda.
-                status: "CONFIRMED",
-                paymentStatus: "PAID_FULL",
-                paymentId: "FREE_TEST",
-                amount: 0,
-              }
-            : {
-                // PENDING bloquea el horario mientras el cliente paga. Si el
-                // pago se abandona, se libera solo pasados PENDING_HOLD_MINUTES.
-                status: "PENDING",
-                paymentStatus: "PENDING",
-                amount,
-              }),
+          // PENDING bloquea el horario mientras el cliente paga. Si el pago
+          // se abandona, se libera solo pasados PENDING_HOLD_MINUTES.
+          status: "PENDING",
+          paymentStatus: "PENDING",
+          amount,
           paymentType,
         },
-        include: { services: { select: { name: true } } },
       });
     });
     bookingId = booking.id;
 
-    if (FREE_MODE) {
-      if (booking.customerEmail) {
-        const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
-        const friendlyDate = `${d}/${m}/${y}`;
-
-        const ownerEmail = process.env.OWNER_EMAIL || "contacto@lubrimax.cl";
-        const adminEmailResult = await sendEmail({
-          to: ownerEmail,
-          subject: `NUEVA RESERVA (MODO PRUEBA) - ${booking.customerName} - ${friendlyDate} ${booking.startTime}`,
-          html: (
-            `<h1>Nueva Reserva (Modo Prueba)</h1>
-             <p><strong>Cliente:</strong> ${escapeHtml(booking.customerName)} (${escapeHtml(booking.customerPhone)})</p>
-             <p><strong>Vehículo:</strong> ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
-             <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${booking.startTime} a ${booking.endTime}</p>
-             <p><strong>Servicios:</strong> ${escapeHtml(booking.services.map(s => s.name).join(' + '))}</p>
-             <p><em>Esta reserva fue realizada en modo de prueba sin cobro.</em></p>
-             <p><a href="${baseUrl}/admin">Ver en panel de administración</a></p>`
-          )
-        });
-        if (!adminEmailResult.success) {
-          console.error("No se pudo notificar al administrador:", adminEmailResult.error);
-        }
-
-        const emailResult = await sendEmail({
-          to: booking.customerEmail,
-          subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
-          html: (
-            `<h1>¡Hola ${escapeHtml(booking.customerName)}!</h1>
-             <p>Tu reserva para <strong>${escapeHtml(booking.services.map(s => s.name).join(' + '))}</strong> quedó confirmada.</p>
-             <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
-             <p>Vehículo: ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
-             <p><em>Reserva de prueba, sin costo.</em></p>
-             <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
-          )
-        });
-        if (!emailResult.success) {
-          console.error("No se pudo enviar el correo de confirmación (modo gratis)", booking.id, emailResult.error);
-        }
-      }
-
-      return NextResponse.json({
-        free: true,
-        redirectUrl: `${baseUrl}/agendar?success=true&booking=${booking.id}`,
-      });
-    }
-
     const returnUrl = `${baseUrl}/api/webpay/booking/commit`;
-    const createResponse = await webpay!.create(booking.id, booking.id, amount, returnUrl);
+    const createResponse = await webpay.create(booking.id, booking.id, amount, returnUrl);
 
     await prisma.booking.update({
       where: { id: booking.id },

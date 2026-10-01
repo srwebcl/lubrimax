@@ -14,7 +14,9 @@ para dejarlo en producción.
   `userId`, `role` y `epoch`. En cada request sensible se revalida contra la
   BD: si el usuario está desactivado o su `sessionEpoch` cambió, la sesión
   cae al instante.
-- Duración de sesión: **12 h** (equipos compartidos del taller).
+- Duración de sesión: **30 días** (decisión del negocio: el panel lo usan
+  solo 2 personas). Para cerrar sesiones a distancia: Usuarios → "Forzar
+  cierre de sesión".
 - `SameSite=Strict`, `HttpOnly`, `Secure` en producción.
 
 ### Autorización (defensa en profundidad)
@@ -28,11 +30,37 @@ para dejarlo en producción.
 ### Matriz de acceso
 | Sección | Admin | Trabajador |
 |---|---|---|
-| Agenda (`/admin`) + marcar avance de trabajo | ✅ | ✅ |
+| Taller (`/admin`): recibir, iniciar, terminar, cobrar y entregar, "no vino" | ✅ | ✅ |
+| Ingreso de vehículos (`/admin/ingreso`, se abre desde el Taller) | ✅ | ✅ |
+| Agenda (`/admin/agenda`) + marcar avance de trabajo | ✅ | ✅ |
+| Clientes (`/admin/clientes`): ver y editar fichas | ✅ | ✅ |
 | Mi perfil / cambiar mi contraseña | ✅ | ✅ |
-| Reagendar / estado de pago / estado de reserva | ✅ | ❌ |
+| Reagendar / estado de pago / estado de reserva (desde la Agenda) | ✅ | ❌ |
+| Estadísticas | ✅ | ❌ |
 | Catálogo, categorías, club, pedidos, tienda, cupones, ajustes | ✅ | ❌ |
 | Usuarios del panel (`/admin/usuarios`) | ✅ | ❌ |
+
+### Tablero del Taller (`/admin`)
+Punto único donde se gestionan todos los vehículos del día, lleguen con
+reserva web o directo al local (`src/actions/workshop.ts`):
+
+`Por llegar` → `En espera` → `En proceso` → `Listo para retirar` → `Entregado`
+
+- Cada vehículo es una `Booking` (el ingreso sin reserva crea una) más su
+  `VehicleIntake`. El estado se deriva de `workStatus` + estado del ingreso.
+- "No vino" deja la reserva en `NO_SHOW` (libera el cupo). Una reserva se
+  marca ATRASADA 30 min después de su hora.
+- La reserva web se paga **100% por Webpay** (sin abono). El cobro en el
+  local (efectivo/tarjeta/transferencia) se registra al entregar.
+- Pagos: `model BookingPayment` + `Booking.totalPrice`; saldo y totales en
+  `src/lib/booking-money.ts`.
+- Horas y "hoy" siempre en `America/Santiago` (`src/lib/chile-time.ts`);
+  disponibilidad única en `src/lib/availability.ts`.
+
+### Club LUBRIMAX: en stand by
+`CLUB_ENABLED = false` en `src/lib/features.ts`: oculto en la web pública,
+`/club` responde 404 y no se aplican descuentos. El panel `/admin/club`
+sigue disponible para preparar membresías.
 
 ### Datos nuevos (schema)
 - `enum StaffRole { ADMIN WORKER }`
@@ -185,8 +213,13 @@ Una vez que entras bien con tu cuenta nueva, en Vercel puedes **eliminar**
 ## Checklist de pruebas (post-deploy)
 
 - [ ] Login admin con correo/clave → ve todo el menú.
-- [ ] Login trabajador → solo ve "Agenda"; `/admin/servicios` a mano lo
-      redirige a `/admin`.
+- [ ] Login trabajador → ve Taller, Agenda, Clientes y Perfil; `/admin/servicios`
+  o `/admin/estadisticas` a mano lo devuelven a `/admin`.
+- [ ] Taller: reserva web → "Llegó" (datos precargados) → Iniciar → Terminar →
+  Entregar. Llegó sin reserva → aparece en "En espera". Cobro en el local
+  queda en Estadísticas por medio de pago.
+- [ ] En el teléfono: subir foto en el ingreso y recibir el aviso de una
+  reserva pagada (con el panel abierto).
 - [ ] Trabajador marca "En proceso" / "Terminado" en una reserva → persiste.
 - [ ] Admin reagenda una reserva → queda registro en `BookingActivityLog`.
 - [ ] `/admin/usuarios`: crear, editar rol, resetear clave, forzar logout.

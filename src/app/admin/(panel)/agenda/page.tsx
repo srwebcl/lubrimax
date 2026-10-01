@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStaffPage } from "@/lib/staff-session";
 import BookingsManager from "./BookingsManager";
 import { chileTodayRange } from "@/lib/chile-time";
+import { customServiceDetail } from "@/lib/booking-services";
 
 const AGENDA_PAST_DAYS = 60;
 const AGENDA_MAX_ROWS = 500;
@@ -59,12 +60,9 @@ export default async function AdminDashboard() {
         role={role}
         initialBookings={bookings.map((b) => {
           const srvs = b.services.map((s) => ({ name: s.name, duration: s.duration }));
-          
-          // Inject custom service into the list so it displays in the UI
-          const opts = b.selectedOptions as any;
-          if (opts?.customService?.detail) {
-            srvs.push({ name: `[Personalizado] ${opts.customService.detail}`, duration: 0 });
-          }
+          // Servicio personalizado del ingreso sin reserva.
+          const custom = customServiceDetail(b.selectedOptions);
+          if (custom) srvs.push({ name: `[Personalizado] ${custom}`, duration: 0 });
 
           return {
             id: b.id,
