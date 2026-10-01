@@ -216,7 +216,7 @@ Una vez que entras bien con tu cuenta nueva, en Vercel puedes **eliminar**
 - [ ] Login trabajador → ve Taller, Agenda, Clientes y Perfil; `/admin/servicios`
   o `/admin/estadisticas` a mano lo devuelven a `/admin`.
 - [ ] Taller: reserva web → "Llegó" (datos precargados) → Iniciar → Terminar →
-  Entregar. Llegó sin reserva → aparece en "En espera". Cobro en el local
+  Entregar. Nuevo ingreso → aparece en "En espera". Cobro en el local
   queda en Estadísticas por medio de pago.
 - [ ] En el teléfono: subir foto en el ingreso y recibir el aviso de una
   reserva pagada (con el panel abierto).

@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { formatPlate } from "@/lib/plate";
-import { formatPhone, titleCase } from "@/lib/contact";
+import { formatPhone, formatRut, titleCase } from "@/lib/contact";
 import { Screen, PageHead, Empty } from "@/components/admin/kit";
 
 export type UnifiedClient = {
@@ -22,7 +22,7 @@ export default function ClientManager({ initialClients }: { initialClients: Unif
 
   const filteredClients = initialClients.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (c.rut && c.rut.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (c.rut && c.rut.replace(/[^0-9kK]/g, "").toLowerCase().includes(searchTerm.replace(/[^0-9kK]/g, "").toLowerCase()) && searchTerm.replace(/[^0-9kK]/g, "") !== "") ||
     (c.phone && c.phone.includes(searchTerm)) ||
     (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     c.vehicles.some(v => v.plate.toLowerCase().includes(searchTerm.toLowerCase()) || v.make.toLowerCase().includes(searchTerm.toLowerCase()) || v.model.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -85,7 +85,7 @@ export default function ClientManager({ initialClients }: { initialClients: Unif
                     <td className="py-4 pl-4 pr-3 align-middle">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-base whitespace-nowrap">{titleCase(c.name)}</span>
-                        {c.rut && <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-md whitespace-nowrap">{c.rut}</span>}
+                        {c.rut && <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-md whitespace-nowrap">{formatRut(c.rut)}</span>}
                       </div>
                     </td>
                     <td className="py-4 px-3 align-middle text-gray-400 text-sm">
@@ -115,7 +115,7 @@ export default function ClientManager({ initialClients }: { initialClients: Unif
                 <div className="flex justify-between items-start gap-2">
                   <div>
                     <div className="font-bold text-white text-lg">{titleCase(c.name)}</div>
-                    {c.rut && <div className="text-xs text-gray-500">RUT: {c.rut}</div>}
+                    {c.rut && <div className="text-xs text-gray-500">RUT: {formatRut(c.rut)}</div>}
                   </div>
                 </div>
                 

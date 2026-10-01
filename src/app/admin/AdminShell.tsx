@@ -45,7 +45,7 @@ const ICONS = {
 // Todos los destinos del panel, en orden.
 const DESTS: Dest[] = [
   // "Taller" es el tablero operativo (inicio). El formulario de ingreso
-  // (/admin/ingreso) se abre desde ahí: "Llegó" / "Llegó sin reserva".
+  // (/admin/ingreso) se abre desde ahí: "Llegó" / "Nuevo ingreso".
   { name: "Taller", href: "/admin", icon: ICONS.ingreso },
   { name: "Agenda", href: "/admin/agenda", icon: ICONS.agenda },
   { name: "Clientes", href: "/admin/clientes", icon: ICONS.clientes },

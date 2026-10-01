@@ -6,7 +6,7 @@ import { requireStaff } from "@/lib/staff-session";
 import { intakeSchema, manualIntakeServicesSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate, parseBookingVehicle } from "@/lib/plate";
 import { chileNow, bookingDateFromDay, addMinutesToTime } from "@/lib/chile-time";
-import { normalizeRut, formatPhone } from "@/lib/contact";
+import { normalizeRut, formatPhone, titleCase } from "@/lib/contact";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
 class IntakeError extends Error {}
@@ -27,6 +27,8 @@ export type PlateLookup = {
   client?: { id: string; name: string; rut: string | null; phone: string | null; email: string | null };
   vehicle?: { id: string; plate: string; make: string; model: string; color: string | null };
   openIntakeId?: string; // si ya hay un ingreso "en taller" para este vehículo
+  /** Último kilometraje registrado para este vehículo (cualquier visita). */
+  lastOdometer?: { km: number; date: string } | null;
   lastVisit?: string | null;
 };
 
@@ -83,10 +85,19 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
     return { found: false };
   }
 
-  const open = await prisma.vehicleIntake.findFirst({
-    where: { vehicleId: vehicle.id, status: "IN_SHOP" },
-    select: { id: true },
-  });
+  const [open, lastWithKm] = await Promise.all([
+    prisma.vehicleIntake.findFirst({
+      where: { vehicleId: vehicle.id, status: "IN_SHOP" },
+      select: { id: true },
+    }),
+    // Cada visita guarda su propio kilometraje (historial); acá solo se
+    // trae el último para mostrarlo y compararlo en el nuevo ingreso.
+    prisma.vehicleIntake.findFirst({
+      where: { vehicleId: vehicle.id, odometer: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { odometer: true, createdAt: true },
+    }),
+  ]);
 
   return {
     found: true,
@@ -106,6 +117,9 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
       color: vehicle.color,
     },
     openIntakeId: open?.id,
+    lastOdometer: lastWithKm?.odometer != null
+      ? { km: lastWithKm.odometer, date: lastWithKm.createdAt.toISOString() }
+      : null,
     lastVisit: vehicle.intakes[0]?.createdAt.toISOString() ?? null,
   };
 }
@@ -124,8 +138,8 @@ export async function registerIntake(formData: FormData) {
     color: formData.get("color") || undefined,
     clientName: formData.get("clientName"),
     clientRut: formData.get("clientRut") || "",
-    clientPhone: formData.get("clientPhone") || undefined,
-    clientEmail: formData.get("clientEmail") || "",
+    clientPhone: formData.get("clientPhone") ?? "",
+    clientEmail: formData.get("clientEmail") ?? "",
     odometer: formData.get("odometer") || "",
     notes: formData.get("notes") || undefined,
     photoUrl: formData.get("photoUrl") || "",
@@ -166,8 +180,10 @@ export async function registerIntake(formData: FormData) {
   }
   const plate = normalizePlate(d.plate);
   const rut = normalizeRut(d.clientRut);
-  const email = d.clientEmail ? d.clientEmail.toLowerCase() : undefined;
-  const phone = d.clientPhone ? formatPhone(d.clientPhone) || d.clientPhone : undefined;
+  const email = d.clientEmail.toLowerCase();
+  const phone = formatPhone(d.clientPhone);
+  // "Nombre Apellido", sin importar cómo se tipeó.
+  d.clientName = titleCase(d.clientName);
 
   try {
     const result = await prisma.$transaction(async (tx) => {

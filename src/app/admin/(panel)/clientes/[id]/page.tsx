@@ -210,7 +210,7 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
                             {h.odometer && (
                               <div>
                                 <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Kilometraje</div>
-                                <div className="text-xs text-gray-300 font-mono">{h.odometer} km</div>
+                                <div className="text-xs text-gray-300 font-mono">{h.odometer.toLocaleString("es-CL")} km</div>
                               </div>
                             )}
                             {h.notes && (

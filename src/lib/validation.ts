@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { VEHICLE_TYPES } from "./booking-constants";
+import { isChileMobile, isValidRut } from "./contact";
 
 export const loginCustomerSchema = z.object({
   email: z.email("Correo inválido."),
@@ -56,8 +57,10 @@ export const rutSchema = z
   .regex(/^\d{1,2}\.?\d{3}\.?\d{3}-?[\dkK]$/, "RUT inválido.");
 
 // ── Recepción de vehículos (trabajador) ──
-const optionalRut = z
-  .union([rutSchema, z.literal("")])
+// RUT chileno con dígito verificador correcto (acepta con o sin puntos/guion).
+const chileRut = z.string().trim().refine(isValidRut, "RUT inválido: revisa el dígito verificador.");
+const optionalChileRut = z
+  .union([chileRut, z.literal("")])
   .optional()
   .transform((v) => (v ? v : undefined));
 
@@ -71,9 +74,9 @@ export const intakeSchema = z.object({
   model: z.string().trim().min(1, "Falta el modelo.").max(50),
   color: z.string().trim().max(30).optional(),
   clientName: z.string().trim().min(2, "Falta el nombre del cliente.").max(120),
-  clientRut: optionalRut,
-  clientPhone: z.string().trim().max(30).optional(),
-  clientEmail: z.union([z.email("Correo inválido."), z.literal("")]).optional(),
+  clientRut: optionalChileRut,
+  clientPhone: z.string().trim().refine(isChileMobile, "Celular inválido: debe ser +56 9 XXXX XXXX."),
+  clientEmail: z.email("Correo obligatorio y válido."),
   odometer: z
     .union([z.coerce.number().int().min(0).max(2_000_000), z.literal("")])
     .optional()
@@ -87,8 +90,8 @@ export const intakeSchema = z.object({
 export const updateClientSchema = z.object({
   name: z.string().trim().min(2, "Nombre muy corto.").max(120),
   email: z.union([z.email("Correo inválido."), z.literal("")]),
-  phone: z.string().trim().max(30),
-  rut: z.union([rutSchema, z.literal("")]),
+  phone: z.union([z.string().trim().refine(isChileMobile, "Celular inválido: debe ser +56 9 XXXX XXXX."), z.literal("")]),
+  rut: z.union([chileRut, z.literal("")]),
   vehicles: z
     .array(
       z.object({

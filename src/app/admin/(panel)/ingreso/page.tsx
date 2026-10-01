@@ -5,12 +5,12 @@ import IntakeConsole from "./IntakeConsole";
 import { chileTodayRange } from "@/lib/chile-time";
 import { parseBookingVehicle } from "@/lib/plate";
 
-export const metadata = { title: "Ingreso de vehículos | Lubrimax" };
+export const metadata = { title: "Nuevo ingreso | Lubrimax" };
 export const dynamic = "force-dynamic";
 
 // Formulario de recepción. Se llega desde el Tablero del Taller:
 //  - "Llegó" en una reserva web → /admin/ingreso?reserva=<id> (datos precargados)
-//  - "Llegó sin reserva"        → /admin/ingreso (búsqueda por patente)
+//  - "Nuevo ingreso"            → /admin/ingreso (búsqueda por patente)
 export default async function IntakePage(props: { searchParams: Promise<{ reserva?: string }> }) {
   await requireStaffPage();
   const { reserva } = await props.searchParams;
@@ -18,7 +18,7 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
   // "Hoy" en Chile: el servidor corre en UTC y desde las 20/21 h ya sería mañana.
   const { start, end } = chileTodayRange();
 
-  const [todayBookings, services, preBooking] = await Promise.all([
+  const [todayBookings, rawServices, preBooking] = await Promise.all([
     // Reservas de hoy que todavía no llegan (para vincular a mano).
     prisma.booking.findMany({
       where: { date: { gte: start, lt: end }, status: "CONFIRMED", intakes: { none: {} } },
@@ -27,7 +27,7 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
     }),
     prisma.service.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, priceAuto: true, category: true },
+      select: { id: true, name: true, priceAuto: true, category: true, serviceCategory: { select: { name: true } } },
     }),
     reserva
       ? prisma.booking.findFirst({
@@ -44,6 +44,22 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
         })
       : null,
   ]);
+
+  // Orden de la lista de servicios: por categoría y nombre, con MECÁNICA al
+  // final (su precio depende de la evaluación).
+  const isMechanic = (category: string) =>
+    category.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").startsWith("mecanic");
+  const services = rawServices
+    .map((s) => {
+      const category = s.serviceCategory?.name ?? s.category;
+      return { id: s.id, name: s.name, priceAuto: s.priceAuto, category, isMechanic: isMechanic(category) };
+    })
+    .sort(
+      (a, b) =>
+        Number(a.isMechanic) - Number(b.isMechanic) ||
+        a.category.localeCompare(b.category, "es") ||
+        a.name.localeCompare(b.name, "es")
+    );
 
   // Llegada de una reserva: se precarga la patente y, si el vehículo ya es
   // conocido, sus datos; si no, los de la reserva.
@@ -76,7 +92,7 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
     <div className="px-4 sm:px-6 py-4 max-w-2xl mx-auto w-full space-y-4">
       <header>
         <h1 className="text-[22px] leading-tight font-bold tracking-tight text-white">
-          {initial ? "Recepción de reserva" : "Ingreso sin reserva"}
+          {initial ? "Recepción de reserva" : "Nuevo ingreso"}
         </h1>
         <p className="text-sm text-gray-500">
           {initial

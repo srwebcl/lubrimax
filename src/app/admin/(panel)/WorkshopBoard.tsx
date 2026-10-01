@@ -73,14 +73,14 @@ export default function WorkshopBoard({ board }: { board: BoardData }) {
           href="/admin/ingreso"
           className="inline-flex items-center justify-center gap-2 h-12 px-5 rounded-xl bg-brand-cyan text-black text-sm font-extrabold shadow-[0_0_15px_rgba(0,255,255,0.15)]"
         >
-          <span className="text-lg leading-none">+</span> Llegó sin reserva
+          <span className="text-lg leading-none">+</span> Nuevo ingreso
         </Link>
       </header>
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Bahías en uso" value={`${capacity.inProgress}/${capacity.bays}`} warn={capacity.inProgress >= capacity.bays} />
+        <Stat label="Puestos en uso" value={`${capacity.inProgress}/${capacity.bays}`} warn={capacity.inProgress >= capacity.bays} />
         <Stat label="En espera" value={String(capacity.waiting)} warn={capacity.waiting > 0 && capacity.inProgress >= capacity.bays} />
-        <Stat label="Próximo hueco" value={capacity.nextFreeSlot ?? "Sin cupo hoy"} warn={!capacity.nextFreeSlot} />
+        <Stat label="Próxima hora" value={capacity.nextFreeSlot ?? "Sin cupo hoy"} warn={!capacity.nextFreeSlot} />
       </div>
 
       {/* ── Columnas (apiladas en móvil) ── */}

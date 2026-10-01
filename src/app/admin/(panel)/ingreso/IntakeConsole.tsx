@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { lookupByPlate, registerIntake, type PlateLookup } from "@/actions/intake";
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { uploadFileToR2 } from "@/lib/uploadClient";
+import { NameInput, OdometerInput, PhoneInput, RutInput } from "@/components/admin/ContactInputs";
 
 type TodayBooking = {
   id: string;
@@ -20,7 +21,12 @@ type Service = {
   name: string;
   priceAuto: number | null;
   category: string;
+  /** Mecánica: va al final de la lista (ver ingreso/page.tsx). */
+  isMechanic: boolean;
 };
+
+/** Minúsculas y sin tildes, para buscar "mecanica" = "Mecánica". */
+const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const field =
   "w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-brand-cyan";
@@ -49,6 +55,8 @@ export default function IntakeConsole({
 
   const [selectedBookingId, setSelectedBookingId] = useState(initial?.bookingId ?? "");
   const [checkedServices, setCheckedServices] = useState<Set<string>>(new Set());
+  const [odometerLower, setOdometerLower] = useState(false);
+  const [serviceQuery, setServiceQuery] = useState("");
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({});
 
   function toggleService(id: string) {
@@ -85,6 +93,8 @@ export default function IntakeConsole({
     setSelectedBookingId(initial?.bookingId ?? "");
     setCheckedServices(new Set());
     setManualPrices({});
+    setOdometerLower(false);
+    setServiceQuery("");
     setPhase("form");
     setSearching(false);
   }
@@ -108,6 +118,14 @@ export default function IntakeConsole({
     setMsg(null);
     const fd = new FormData(e.currentTarget);
     fd.set("photoUrl", photoUrl);
+
+    if (
+      odometerLower &&
+      !confirm("El kilometraje es MENOR al último registrado. ¿Es correcto (por ejemplo, cambio de odómetro)?")
+    ) {
+      setSubmitting(false);
+      return;
+    }
     
     // Si no hay reserva seleccionada y no se seleccionaron servicios ni servicio personalizado
     if (!selectedBookingId) {
@@ -195,6 +213,8 @@ export default function IntakeConsole({
                 setSelectedBookingId("");
                 setCheckedServices(new Set());
                 setManualPrices({});
+                setOdometerLower(false);
+                setServiceQuery("");
               }}
               className="text-xs font-semibold text-gray-400 bg-white/5 px-3 py-1.5 rounded-full"
             >
@@ -244,43 +264,34 @@ export default function IntakeConsole({
 
           <div className="h-px bg-white/5 my-1" />
 
-          <div>
-            <label className={label}>Nombre del cliente</label>
-            <input
-              name="clientName"
-              required
-              defaultValue={c?.name ?? ""}
-              placeholder="Nombre y apellido"
-              className={field}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+          {/* key: al cambiar de patente se remontan con los datos nuevos */}
+          <div key={`client-${plate}`} className="space-y-4">
             <div>
-              <label className={label}>RUT (opcional)</label>
-              <input name="clientRut" defaultValue={c?.rut ?? ""} placeholder="12345678-9" className={field} />
+              <label className={label}>Nombre del cliente</label>
+              <NameInput name="clientName" required defaultValue={c?.name ?? ""} placeholder="Nombre Apellido" className={field} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={label}>Celular</label>
+                <PhoneInput name="clientPhone" required defaultValue={c?.phone} className={field} />
+              </div>
+              <div>
+                <label className={label}>RUT (opcional)</label>
+                <RutInput name="clientRut" defaultValue={c?.rut} className={field} />
+              </div>
             </div>
             <div>
-              <label className={label}>Teléfono</label>
+              <label className={label}>Correo</label>
               <input
-                name="clientPhone"
-                inputMode="tel"
+                name="clientEmail"
+                type="email"
+                inputMode="email"
                 required
-                defaultValue={c?.phone ?? ""}
-                placeholder="+56 9 …"
+                defaultValue={c?.email ?? ""}
+                placeholder="cliente@correo.com"
                 className={field}
               />
             </div>
-          </div>
-          <div>
-            <label className={label}>Correo (opcional)</label>
-            <input
-              name="clientEmail"
-              type="email"
-              inputMode="email"
-              defaultValue={c?.email ?? ""}
-              placeholder="cliente@correo.com"
-              className={field}
-            />
           </div>
 
           <div className="h-px bg-white/5 my-1" />
@@ -288,7 +299,13 @@ export default function IntakeConsole({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={label}>Kilometraje</label>
-              <input name="odometer" inputMode="numeric" placeholder="Opcional" className={field} />
+              <OdometerInput
+                key={`odo-${plate}`}
+                name="odometer"
+                className={field}
+                last={lookup?.lastOdometer}
+                onLowerChange={setOdometerLower}
+              />
             </div>
             <div>
               <label className={label}>Vincular Reserva Web</label>
@@ -318,14 +335,33 @@ export default function IntakeConsole({
                 Al registrar este ingreso sin reserva web, se creará automáticamente una cita en la Agenda con los siguientes servicios.
               </p>
               
+              <input
+                type="search"
+                value={serviceQuery}
+                onChange={(e) => setServiceQuery(e.target.value)}
+                placeholder="Buscar servicio…"
+                className={`${field} py-2 text-sm mb-3`}
+              />
+
               <div className="space-y-2 max-h-72 overflow-y-auto pr-2 mb-4">
-                {services.map(s => {
+                {services.map((s, idx) => {
                   const checked = checkedServices.has(s.id);
+                  // Los que no coinciden se OCULTAN (no se quitan del DOM): así
+                  // un servicio ya marcado sigue enviándose aunque se filtre.
+                  const q = fold(serviceQuery.trim());
+                  const visible = !q || fold(`${s.name} ${s.category}`).includes(q);
+                  const firstMechanic = s.isMechanic && !services[idx - 1]?.isMechanic;
                   // Sin precio de catálogo (ej. mecánica): el precio depende de
                   // la evaluación y se ingresa a mano al seleccionarlo.
                   const toEvaluate = !s.priceAuto;
                   return (
-                    <div key={s.id} className={`rounded-lg border transition-colors ${checked ? "border-brand-cyan/30 bg-white/[0.03]" : "border-transparent"}`}>
+                    <React.Fragment key={s.id}>
+                    {firstMechanic && !q && (
+                      <div className="pt-2 pb-1 px-2 text-[10px] font-bold uppercase tracking-widest text-amber-400/80 border-t border-white/5">
+                        Mecánica · precio según evaluación
+                      </div>
+                    )}
+                    <div className={`rounded-lg border transition-colors ${visible ? "" : "hidden"} ${checked ? "border-brand-cyan/30 bg-white/[0.03]" : "border-transparent"}`}>
                       <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer">
                         <input 
                           type="checkbox" 
@@ -359,8 +395,15 @@ export default function IntakeConsole({
                         </div>
                       )}
                     </div>
+                    </React.Fragment>
                   );
                 })}
+                {serviceQuery.trim() &&
+                  !services.some((s) => fold(`${s.name} ${s.category}`).includes(fold(serviceQuery.trim()))) && (
+                    <p className="text-xs text-gray-500 px-2 py-3">
+                      Sin resultados. Puedes usar &quot;Otro servicio (personalizado)&quot; más abajo.
+                    </p>
+                  )}
               </div>
 
               {checkedServices.size > 0 && (

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updateClient } from "@/actions/admin-clients";
 import { Field, INPUT, PrimaryBtn, Msg } from "@/components/admin/kit";
 import { formatPlate, normalizePlate } from "@/lib/plate";
+import { NameInput, PhoneInput, RutInput } from "@/components/admin/ContactInputs";
 
 export default function ClientProfileForm({ initialData }: { initialData: any }) {
   const router = useRouter();
@@ -64,16 +65,16 @@ export default function ClientProfileForm({ initialData }: { initialData: any })
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <Field label="Nombre Completo">
-        <input type="text" name="name" required defaultValue={initialData.name} className={INPUT} />
+        <NameInput name="name" required defaultValue={initialData.name} className={INPUT} />
       </Field>
       
       <Field label="RUT (Opcional)">
-        <input type="text" name="rut" defaultValue={initialData.rut || ""} placeholder="12345678-9" className={INPUT} />
+        <RutInput name="rut" defaultValue={initialData.rut} className={INPUT} />
       </Field>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Teléfono">
-          <input type="tel" name="phone" defaultValue={initialData.phone || ""} className={INPUT} />
+        <Field label="Celular">
+          <PhoneInput name="phone" defaultValue={initialData.phone} className={INPUT} />
         </Field>
         <Field label="Correo Electrónico">
           <input type="email" name="email" defaultValue={initialData.email || ""} className={INPUT} />
