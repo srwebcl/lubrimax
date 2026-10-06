@@ -7,6 +7,7 @@ import { intakeSchema, manualIntakeServicesSchema, flattenZodError } from "@/lib
 import { normalizePlate, isValidPlate, parseBookingVehicle } from "@/lib/plate";
 import { chileNow, bookingDateFromDay, addMinutesToTime } from "@/lib/chile-time";
 import { normalizeRut, formatPhone, titleCase } from "@/lib/contact";
+import { getExactPrice, isVehicleType, vehicleTypeFromMake, type VehicleType } from "@/lib/booking-constants";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
 class IntakeError extends Error {}
@@ -25,7 +26,15 @@ export type PlateLookup = {
    */
   source?: "WORKSHOP" | "WEB";
   client?: { id: string; name: string; rut: string | null; phone: string | null; email: string | null };
-  vehicle?: { id: string; plate: string; make: string; model: string; color: string | null };
+  vehicle?: {
+    id: string;
+    plate: string;
+    make: string;
+    model: string;
+    color: string | null;
+    /** Tipo para el precio, si se conoce (vehículo del taller o reserva web). */
+    vehicleType: VehicleType | null;
+  };
   openIntakeId?: string; // si ya hay un ingreso "en taller" para este vehículo
   /** Último kilometraje registrado para este vehículo (cualquier visita). */
   lastOdometer?: { km: number; date: string } | null;
@@ -79,6 +88,7 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
           make,
           model,
           color: null,
+          vehicleType: vehicleTypeFromMake(recentBooking.vehicleMake),
         },
       };
     }
@@ -115,6 +125,7 @@ export async function lookupByPlate(plateRaw: string): Promise<PlateLookup> {
       make: vehicle.make,
       model: vehicle.model,
       color: vehicle.color,
+      vehicleType: isVehicleType(vehicle.vehicleType) ? vehicle.vehicleType : null,
     },
     openIntakeId: open?.id,
     lastOdometer: lastWithKm?.odometer != null
@@ -162,6 +173,7 @@ export async function registerIntake(formData: FormData) {
 
   // Ingreso sin reserva web: se crea una cita interna con estos servicios.
   let manual: {
+    vehicleType: VehicleType;
     serviceIds: string[];
     customServiceDetail?: string;
     customServicePrice: number;
@@ -175,6 +187,7 @@ export async function registerIntake(formData: FormData) {
       manualPrices[key.slice("manualPrice:".length)] = Number(value);
     }
     const manualParsed = manualIntakeServicesSchema.safeParse({
+      vehicleType: formData.get("vehicleType") ?? "",
       serviceIds: formData.getAll("serviceIds").map(String),
       customServiceDetail: formData.get("customServiceDetail") || undefined,
       customServicePrice: formData.get("customServicePrice") ?? "",
@@ -248,20 +261,26 @@ export async function registerIntake(formData: FormData) {
         ).id;
       }
 
-      // 2. Upsert del vehículo por patente
+      // 2. Reserva enlazada (si vino) y tipo de vehículo: de la reserva web,
+      // o el elegido en el ingreso sin reserva.
+      const linked = d.bookingId
+        ? await tx.booking.findUnique({ where: { id: d.bookingId }, select: { id: true, vehicleMake: true } })
+        : null;
+      if (d.bookingId && !linked) throw new IntakeError("La reserva seleccionada ya no existe. Recarga la página.");
+      const vehicleType = manual?.vehicleType ?? (linked ? vehicleTypeFromMake(linked.vehicleMake) : null);
+
+      // 3. Upsert del vehículo por patente (recordando su tipo)
       const vehicle = await tx.vehicle.upsert({
         where: { plate },
-        create: { plate, make: d.make, model: d.model, color: d.color, clientId },
-        update: { make: d.make, model: d.model, color: d.color, clientId },
+        create: { plate, make: d.make, model: d.model, color: d.color, clientId, vehicleType },
+        update: { make: d.make, model: d.model, color: d.color, clientId, ...(vehicleType ? { vehicleType } : {}) },
       });
 
-      // 3. Validar la reserva enlazada (si vino) o Crear una nueva para ingresos manuales
+      // 4. Reserva enlazada o cita interna para el ingreso sin reserva
       let bookingId: string | undefined;
-      
-      if (d.bookingId) {
-        const b = await tx.booking.findUnique({ where: { id: d.bookingId }, select: { id: true } });
-        if (!b) throw new IntakeError("La reserva seleccionada ya no existe. Recarga la página.");
-        bookingId = b.id;
+
+      if (linked) {
+        bookingId = linked.id;
       } else if (manual) {
         // ES UN INGRESO MANUAL.
         const { serviceIds, customServiceDetail } = manual;
@@ -270,20 +289,21 @@ export async function registerIntake(formData: FormData) {
         // Buscar los servicios seleccionados para sumar su precio
         const dbServices = await tx.service.findMany({
           where: { id: { in: serviceIds } },
-          select: { id: true, priceAuto: true, duration: true }
+          select: { id: true, priceAuto: true, priceSuv2: true, priceSuv3: true, duration: true }
         });
         if (dbServices.length !== serviceIds.length) {
           throw new IntakeError("Alguno de los servicios ya no existe. Recarga la página.");
         }
 
-        // Servicios sin precio de catálogo ("a evaluar"): se usa el precio
-        // manual ingresado en la recepción, si lo hay. Solo se aceptan para
-        // esos servicios; un servicio con precio de catálogo no se pisa.
+        // Precio de catálogo según el TIPO de vehículo (igual que la web).
+        // Servicios sin precio para ese tipo ("a evaluar"): se usa el precio
+        // manual ingresado, si lo hay; un precio de catálogo no se pisa.
+        const priceOf = (s: (typeof dbServices)[number]) => getExactPrice(s, manual!.vehicleType);
         const manualPrices: Record<string, number> = {};
         for (const s of dbServices) {
-          if (!s.priceAuto && manual.manualPrices[s.id] !== undefined) manualPrices[s.id] = manual.manualPrices[s.id];
+          if (!priceOf(s) && manual.manualPrices[s.id] !== undefined) manualPrices[s.id] = manual.manualPrices[s.id];
         }
-        const catalogTotal = dbServices.reduce((acc, s) => acc + (s.priceAuto || manualPrices[s.id] || 0), 0);
+        const catalogTotal = dbServices.reduce((acc, s) => acc + (priceOf(s) || manualPrices[s.id] || 0), 0);
         const totalAmount = catalogTotal + customPrice;
 
         const selectedOptions =
@@ -315,7 +335,8 @@ export async function registerIntake(formData: FormData) {
             customerName: d.clientName,
             customerPhone: phone || "",
             customerEmail: email || null,
-            vehicleMake: d.make,
+            // Misma convención que la reserva web: "<tipo> - <marca>".
+            vehicleMake: `${manual.vehicleType} - ${d.make}`,
             vehicleModel: `${d.model} (Patente: ${plate})`,
             selectedOptions: selectedOptions,
             services: {

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { verifyStaffSession } from "@/lib/staff-session";
+import { STAFF_SESSION_EXPIRED_PATH, verifyStaffSession } from "@/lib/staff-session";
 import { Screen, PageHead, CARD } from "@/components/admin/kit";
 import ChangePasswordForm from "./ChangePasswordForm";
 import LogoutButton from "./LogoutButton";
@@ -10,13 +10,13 @@ export const metadata = { title: "Mi perfil | Lubrimax" };
 
 export default async function AdminProfilePage() {
   const session = await verifyStaffSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect(STAFF_SESSION_EXPIRED_PATH);
 
   const user = await prisma.staffUser.findUnique({
     where: { id: session.userId },
     select: { email: true, name: true, role: true, lastLoginAt: true },
   });
-  if (!user) redirect("/admin/login");
+  if (!user) redirect(STAFF_SESSION_EXPIRED_PATH);
 
   const roleLabel = user.role === "ADMIN" ? "Administrador" : "Trabajador";
   const initial = user.name.trim().charAt(0).toUpperCase() || "?";

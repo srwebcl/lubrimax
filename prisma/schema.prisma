@@ -121,6 +121,9 @@ model Vehicle {
   make      String
   model     String
   color     String?
+  // Tipo para el precio (uno de VEHICLE_TYPES en src/lib/booking-constants.ts).
+  // Se recuerda para precargarlo en la próxima llegada.
+  vehicleType String?
 
   clientId  String
   client    WorkshopClient @relation(fields: [clientId], references: [id], onDelete: Cascade)

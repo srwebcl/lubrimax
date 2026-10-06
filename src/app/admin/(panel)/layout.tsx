@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { verifyStaffSession } from "@/lib/staff-session";
+import { STAFF_SESSION_EXPIRED_PATH, verifyStaffSession } from "@/lib/staff-session";
 import AdminShell from "../AdminShell";
 
 // El panel siempre se renderiza por request y nunca se cachea: depende de la
@@ -15,7 +15,7 @@ export default async function PanelLayout({
   children: React.ReactNode;
 }) {
   const session = await verifyStaffSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect(STAFF_SESSION_EXPIRED_PATH);
 
   return (
     <AdminShell role={session.role} staffName={session.name} permissions={session.permissions}>

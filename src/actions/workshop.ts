@@ -79,7 +79,7 @@ function toMinutes(time: string) {
 }
 
 const bookingInclude = {
-  services: { select: { id: true, name: true, priceAuto: true } },
+  services: { select: { id: true, name: true, priceAuto: true, priceSuv2: true, priceSuv3: true } },
   payments: { select: { amount: true, method: true } },
 } as const;
 
@@ -96,7 +96,7 @@ type BoardBooking = {
   paymentStatus: string;
   amount: number | null;
   totalPrice: number | null;
-  services: { id: string; name: string; priceAuto: number | null }[];
+  services: { id: string; name: string; priceAuto: number | null; priceSuv2: number | null; priceSuv3: number | null }[];
   payments: { amount: number; method: string }[];
 };
 
@@ -401,7 +401,7 @@ export async function updateEvaluatedPrices(input: unknown) {
         ...(customService ? { customService } : {}),
         manualPrices,
       };
-      const total = localBookingTotal({ services: booking.services, selectedOptions });
+      const total = localBookingTotal({ services: booking.services, selectedOptions, vehicleMake: booking.vehicleMake });
       const { paid } = bookingMoney({ ...booking, totalPrice: total });
       if (paid > total) {
         return fail(`El total ($${total.toLocaleString("es-CL")}) no puede quedar bajo lo ya cobrado ($${paid.toLocaleString("es-CL")}).`);
@@ -412,7 +412,7 @@ export async function updateEvaluatedPrices(input: unknown) {
         data: { selectedOptions, totalPrice: total, amount: total, paymentStatus: paymentStatusFor(total, paid) },
       });
 
-      const after = evaluatedItems({ services: booking.services, selectedOptions });
+      const after = evaluatedItems({ services: booking.services, selectedOptions, vehicleMake: booking.vehicleMake });
       const changes = after
         .filter((a) => before.find((b) => b.key === a.key)?.price !== a.price)
         .map((a) => `${a.name}: ${a.price === null ? "por evaluar" : "$" + a.price}`);

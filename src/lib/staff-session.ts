@@ -26,6 +26,13 @@ import {
 
 export { STAFF_SESSION_COOKIE, STAFF_SESSION_MAX_AGE };
 
+/**
+ * A dónde mandar cuando no hay sesión válida: borra la cookie (si quedó una
+ * con firma válida pero ya no vigente) y redirige al login. Ver
+ * src/app/api/staff/session-expired/route.ts.
+ */
+export const STAFF_SESSION_EXPIRED_PATH = "/api/staff/session-expired";
+
 export type StaffSession = {
   userId: string;
   name: string;
@@ -45,7 +52,12 @@ export async function setStaffSessionCookie(user: {
   cookieStore.set(STAFF_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    // "lax", NO "strict": al abrir la PWA desde el ícono (Android/iOS) la
+    // primera carga cuenta como navegación "externa" y con "strict" el
+    // navegador no enviaba la cookie: la app pedía login cada vez y, al
+    // reingresar, el login quedaba pegado. "lax" sigue sin enviarse en
+    // POST de otros sitios, y las Server Actions además verifican el origen.
+    sameSite: "lax",
     maxAge: STAFF_SESSION_MAX_AGE,
     path: "/",
   });
@@ -130,7 +142,7 @@ export async function requirePermission(permission: Permission): Promise<StaffSe
  */
 export async function requireStaffPage(...required: (StaffRole | Permission)[]): Promise<StaffSession> {
   const session = await verifyStaffSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect(STAFF_SESSION_EXPIRED_PATH);
   const roles = required.filter((r): r is StaffRole => r === "ADMIN" || r === "WORKER");
   const permissions = required.filter((r): r is Permission => r !== "ADMIN" && r !== "WORKER");
   if (roles.length > 0 && !roles.includes(session.role)) redirect("/admin");

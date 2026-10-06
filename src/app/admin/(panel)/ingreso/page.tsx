@@ -4,6 +4,7 @@ import { lookupByPlate, type PlateLookup } from "@/actions/intake";
 import IntakeConsole from "./IntakeConsole";
 import { chileTodayRange } from "@/lib/chile-time";
 import { parseBookingVehicle } from "@/lib/plate";
+import { vehicleTypeFromMake } from "@/lib/booking-constants";
 
 export const metadata = { title: "Nuevo ingreso | Lubrimax" };
 export const dynamic = "force-dynamic";
@@ -27,7 +28,15 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
     }),
     prisma.service.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, priceAuto: true, category: true, serviceCategory: { select: { name: true } } },
+      select: {
+        id: true,
+        name: true,
+        priceAuto: true,
+        priceSuv2: true,
+        priceSuv3: true,
+        category: true,
+        serviceCategory: { select: { name: true } },
+      },
     }),
     reserva
       ? prisma.booking.findFirst({
@@ -52,7 +61,15 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
   const services = rawServices
     .map((s) => {
       const category = s.serviceCategory?.name ?? s.category;
-      return { id: s.id, name: s.name, priceAuto: s.priceAuto, category, isMechanic: isMechanic(category) };
+      return {
+        id: s.id,
+        name: s.name,
+        priceAuto: s.priceAuto,
+        priceSuv2: s.priceSuv2,
+        priceSuv3: s.priceSuv3,
+        category,
+        isMechanic: isMechanic(category),
+      };
     })
     .sort(
       (a, b) =>
@@ -82,7 +99,14 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
               phone: preBooking.customerPhone,
               email: preBooking.customerEmail,
             },
-            vehicle: { id: "", plate: v.plate, make: v.make, model: v.model, color: null },
+            vehicle: {
+              id: "",
+              plate: v.plate,
+              make: v.make,
+              model: v.model,
+              color: null,
+              vehicleType: vehicleTypeFromMake(preBooking.vehicleMake),
+            },
           },
     };
     if (!todayBookings.some((b) => b.id === preBooking.id)) todayBookings.unshift(preBooking);

@@ -7,6 +7,7 @@ import { lookupByPlate, registerIntake, type PlateLookup } from "@/actions/intak
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { uploadFileToR2 } from "@/lib/uploadClient";
 import { NameInput, OdometerInput, PhoneInput, RutInput } from "@/components/admin/ContactInputs";
+import { VEHICLE_TYPES, getExactPrice, type VehicleType } from "@/lib/booking-constants";
 
 type TodayBooking = {
   id: string;
@@ -20,6 +21,8 @@ type Service = {
   id: string;
   name: string;
   priceAuto: number | null;
+  priceSuv2: number | null;
+  priceSuv3: number | null;
   category: string;
   /** Mecánica: va al final de la lista (ver ingreso/page.tsx). */
   isMechanic: boolean;
@@ -55,6 +58,10 @@ export default function IntakeConsole({
 
   const [selectedBookingId, setSelectedBookingId] = useState(initial?.bookingId ?? "");
   const [checkedServices, setCheckedServices] = useState<Set<string>>(new Set());
+  // Tipo de vehículo: define el precio de catálogo (igual que la reserva web).
+  // Se precarga si el vehículo ya es conocido.
+  const [vehicleType, setVehicleType] = useState<VehicleType | "">(initial?.lookup.vehicle?.vehicleType ?? "");
+  const priceFor = (s: Service) => (vehicleType ? getExactPrice(s, vehicleType) : 0);
   const [odometerLower, setOdometerLower] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({});
@@ -73,7 +80,7 @@ export default function IntakeConsole({
   let pendingEvaluation = 0;
   for (const s of services) {
     if (!checkedServices.has(s.id)) continue;
-    if (s.priceAuto) estimatedTotal += s.priceAuto;
+    if (priceFor(s)) estimatedTotal += priceFor(s);
     else if (manualPrices[s.id]) estimatedTotal += Number(manualPrices[s.id]) || 0;
     else pendingEvaluation++;
   }
@@ -89,6 +96,7 @@ export default function IntakeConsole({
     setMsg(null);
     const res = await lookupByPlate(p);
     setLookup(res);
+    setVehicleType(res.vehicle?.vehicleType ?? "");
     setPlate(p);
     setSelectedBookingId(initial?.bookingId ?? "");
     setCheckedServices(new Set());
@@ -131,6 +139,11 @@ export default function IntakeConsole({
     if (!selectedBookingId) {
       const selectedServices = fd.getAll("serviceIds");
       const customDetail = fd.get("customServiceDetail") as string;
+      if (!vehicleType) {
+        setMsg({ type: "err", text: "Selecciona el tipo de vehículo para calcular el precio." });
+        setSubmitting(false);
+        return;
+      }
       if (selectedServices.length === 0 && !customDetail.trim()) {
         setMsg({ type: "err", text: "Debes seleccionar al menos un servicio o ingresar uno personalizado." });
         setSubmitting(false);
@@ -215,6 +228,7 @@ export default function IntakeConsole({
                 setManualPrices({});
                 setOdometerLower(false);
                 setServiceQuery("");
+                setVehicleType("");
               }}
               className="text-xs font-semibold text-gray-400 bg-white/5 px-3 py-1.5 rounded-full"
             >
@@ -334,7 +348,31 @@ export default function IntakeConsole({
               <p className="text-xs text-gray-400 mb-4">
                 Al registrar este ingreso sin reserva web, se creará automáticamente una cita en la Agenda con los siguientes servicios.
               </p>
-              
+
+              {/* Tipo de vehículo: define el precio, igual que al agendar por la web */}
+              <label className={label}>Tipo de vehículo</label>
+              <input type="hidden" name="vehicleType" value={vehicleType} />
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {VEHICLE_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setVehicleType(t)}
+                    className={`min-h-12 px-2 py-2 rounded-xl text-[11px] leading-tight font-bold border transition-colors ${
+                      vehicleType === t
+                        ? "bg-brand-cyan text-black border-brand-cyan"
+                        : "bg-white/5 text-gray-300 border-white/10"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              {!vehicleType && (
+                <p className="text-xs text-amber-400 mb-3">Selecciona el tipo de vehículo para ver los precios.</p>
+              )}
+
               <input
                 type="search"
                 value={serviceQuery}
@@ -353,7 +391,8 @@ export default function IntakeConsole({
                   const firstMechanic = s.isMechanic && !services[idx - 1]?.isMechanic;
                   // Sin precio de catálogo (ej. mecánica): el precio depende de
                   // la evaluación y se ingresa a mano al seleccionarlo.
-                  const toEvaluate = !s.priceAuto;
+                  const price = priceFor(s);
+                  const toEvaluate = !!vehicleType && !price;
                   return (
                     <React.Fragment key={s.id}>
                     {firstMechanic && !q && (
@@ -376,7 +415,7 @@ export default function IntakeConsole({
                           <div className="text-[10px] text-gray-500 uppercase">{s.category}</div>
                         </div>
                         <div className={`text-sm font-bold shrink-0 ${toEvaluate ? "text-amber-400" : "text-brand-cyan"}`}>
-                          {toEvaluate ? "A evaluar" : `$${s.priceAuto!.toLocaleString("es-CL")}`}
+                          {!vehicleType ? "—" : toEvaluate ? "A evaluar" : `$${price.toLocaleString("es-CL")}`}
                         </div>
                       </label>
                       {checked && toEvaluate && (

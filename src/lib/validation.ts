@@ -106,6 +106,8 @@ export const updateClientSchema = z.object({
 // Servicios de un ingreso manual (sin reserva web): catálogo + uno personalizado.
 export const manualIntakeServicesSchema = z
   .object({
+    // Define qué precio de catálogo aplica, igual que en la reserva web.
+    vehicleType: z.enum(VEHICLE_TYPES, { error: "Selecciona el tipo de vehículo." }),
     serviceIds: z.array(z.string().min(1).max(40)).max(30),
     customServiceDetail: z.string().trim().max(200).optional(),
     customServicePrice: z

@@ -11,6 +11,19 @@ export const VEHICLE_TYPES = [
 
 export type VehicleType = (typeof VEHICLE_TYPES)[number];
 
+export function isVehicleType(value: unknown): value is VehicleType {
+  return typeof value === "string" && (VEHICLE_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * Las reservas guardan vehicleMake como "<tipo> - <marca>". Devuelve el tipo
+ * si viene, o null (reservas locales antiguas no lo guardaban).
+ */
+export function vehicleTypeFromMake(vehicleMake: string): VehicleType | null {
+  const prefix = vehicleMake.split(" - ")[0]?.trim();
+  return isVehicleType(prefix) ? prefix : null;
+}
+
 export type PriceableService = {
   priceAuto: number | null;
   priceSuv2: number | null;

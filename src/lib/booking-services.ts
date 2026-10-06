@@ -1,3 +1,5 @@
+import { getExactPrice, vehicleTypeFromMake, VEHICLE_TYPES, type PriceableService } from "./booking-constants";
+
 // Nombres de los servicios de una reserva, incluido el "servicio
 // personalizado" que el ingreso sin reserva guarda en selectedOptions
 // (ver actions/intake.ts). Lo usan el Tablero, la Agenda y la ficha de cliente.
@@ -31,9 +33,16 @@ export type PricingItem = {
 };
 
 type WithPricing = {
-  services: { id: string; name: string; priceAuto: number | null }[];
+  services: (PriceableService & { id: string; name: string })[];
   selectedOptions: unknown;
+  /** "<tipo> - <marca>": define qué columna de precio aplica. */
+  vehicleMake: string;
 };
+
+/** Precio de catálogo del servicio para el tipo de vehículo de la reserva (0 = a evaluar). */
+function catalogPrice(s: PriceableService, vehicleMake: string) {
+  return getExactPrice(s, vehicleTypeFromMake(vehicleMake) ?? VEHICLE_TYPES[0]);
+}
 
 type LocalOptions = {
   customService?: { detail?: string; price?: number };
@@ -48,7 +57,7 @@ export function readLocalOptions(selectedOptions: unknown): LocalOptions {
 export function evaluatedItems(b: WithPricing): PricingItem[] {
   const opts = readLocalOptions(b.selectedOptions);
   const items: PricingItem[] = b.services
-    .filter((s) => !s.priceAuto)
+    .filter((s) => !catalogPrice(s, b.vehicleMake))
     .map((s) => ({ key: s.id, name: s.name, price: opts.manualPrices?.[s.id] ?? null }));
   const custom = customServiceDetail(b.selectedOptions);
   if (custom) {
@@ -60,6 +69,6 @@ export function evaluatedItems(b: WithPricing): PricingItem[] {
 
 /** Total de una reserva local: catálogo + precios evaluados (lo pendiente suma 0). */
 export function localBookingTotal(b: WithPricing) {
-  const catalog = b.services.reduce((sum, s) => sum + (s.priceAuto || 0), 0);
+  const catalog = b.services.reduce((sum, s) => sum + catalogPrice(s, b.vehicleMake), 0);
   return catalog + evaluatedItems(b).reduce((sum, i) => sum + (i.price ?? 0), 0);
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { verifyStaffSession } from "@/lib/staff-session";
+import { STAFF_SESSION_EXPIRED_PATH, verifyStaffSession } from "@/lib/staff-session";
 
 // Secciones de gestión (catálogo, tienda, cupones, club, ajustes, usuarios):
 // SOLO ADMIN. Un trabajador que llega acá — por link directo o URL a mano —
@@ -11,7 +11,7 @@ export default async function GestionLayout({
   children: React.ReactNode;
 }) {
   const session = await verifyStaffSession();
-  if (!session) redirect("/admin/login");
+  if (!session) redirect(STAFF_SESSION_EXPIRED_PATH);
   if (session.role !== "ADMIN") redirect("/admin");
 
   return children;

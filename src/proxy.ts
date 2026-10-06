@@ -27,6 +27,14 @@ export async function proxy(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
 
+  // Solo navegaciones (GET/HEAD). Un POST es una Server Action o un envío de
+  // formulario: cada acción verifica la sesión por su cuenta, y redirigirla
+  // rompe su respuesta. Ej.: "Ingresar" en /admin/login con una cookie aún
+  // vigente recibía un 307 al panel y el botón quedaba en "Ingresando…".
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return NextResponse.next();
+  }
+
   // ---------- Panel de personal (/admin) ----------
   if (path.startsWith('/admin') && path !== '/admin/login') {
     const token = request.cookies.get(STAFF_SESSION_COOKIE)?.value;
