@@ -73,8 +73,17 @@ model Booking {
 
   intakes       VehicleIntake[] // Ingresos de vehículo asociados a esta reserva
 
+  // Cliente del taller al que pertenece la reserva. Vínculo EXPLÍCITO: se
+  // asigna al registrar la llegada, en el ingreso sin reserva o al
+  // consolidar un cliente web. El historial usa esto en vez de adivinar
+  // por correo/teléfono (que se repiten entre personas y mezclaban fichas).
+  clientId      String?
+  client        WorkshopClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([clientId])
 }
 
 // Pagos de una reserva: el abono/total por Webpay y los cobros en el local
@@ -109,6 +118,7 @@ model WorkshopClient {
   email     String?
 
   vehicles  Vehicle[]
+  bookings  Booking[]
 
   createdByStaffId String?
   createdAt DateTime  @default(now())

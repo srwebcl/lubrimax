@@ -57,11 +57,41 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
 
   const history = await getClientHistory(id);
 
-  const totalSpent = history.reduce((sum, h) => sum + (h.amount || 0), 0);
-  const visitCount = history.length;
-  const avgTicket = visitCount > 0 ? Math.round(totalSpent / visitCount) : 0;
-  
-  const category = totalSpent > 300000 ? "VIP" : visitCount > 1 ? "Frecuente" : visitCount === 1 ? "Nuevo" : "Sin compras";
+  // Cliente web: sus vehículos salen de TODAS sus reservas (misma persona).
+  if (isWeb) {
+    const seen = new Set<string>();
+    clientData.vehicles = history
+      .filter((h) => h.plate && !seen.has(h.plate) && seen.add(h.plate))
+      .map((h) => {
+        const [make, ...rest] = h.vehicle.split(" ");
+        return { plate: h.plate, make, model: rest.join(" ") };
+      });
+  }
+
+  // Indicadores sobre lo REAL: visitas = veces que vino al taller; montos =
+  // lo efectivamente pagado (no cotizaciones pendientes ni reservas futuras).
+  const attended = history.filter((h) => h.status === "attended");
+  const totalPaid = history.reduce((sum, h) => sum + (h.paid ?? 0), 0);
+  const pendingBalance = attended.reduce((sum, h) => sum + (h.balance ?? 0), 0);
+  const visitCount = attended.length;
+  const avgTicket = visitCount > 0 ? Math.round(attended.reduce((s, h) => s + (h.total ?? 0), 0) / visitCount) : 0;
+  const nextBooking = [...history].reverse().find((h) => h.status === "upcoming");
+
+  const category = totalPaid > 300000 ? "VIP" : visitCount > 1 ? "Frecuente" : visitCount === 1 ? "Nuevo" : "Sin visitas";
+
+  const longDay = (day: string) =>
+    new Date(`${day}T12:00:00.000Z`).toLocaleDateString("es-CL", {
+      timeZone: "UTC",
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  const STATUS_LABEL = {
+    attended: { text: "Atendido", cls: "bg-green-500/15 text-green-400" },
+    upcoming: { text: "Próxima reserva", cls: "bg-sky-500/15 text-sky-400" },
+    booked: { text: "Reservada · sin llegada registrada", cls: "bg-white/10 text-gray-400" },
+  } as const;
 
   return (
     <Screen size="xl">
@@ -119,10 +149,13 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Total Gastado</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Total Pagado</div>
               <div className="text-3xl font-black text-brand-cyan">
-                ${totalSpent.toLocaleString("es-CL")}
+                ${totalPaid.toLocaleString("es-CL")}
               </div>
+              {pendingBalance > 0 && (
+                <div className="text-[11px] font-bold text-amber-400 mt-1">Saldo pendiente ${pendingBalance.toLocaleString("es-CL")}</div>
+              )}
             </div>
             
             <div className="bg-brand-surface border border-white/5 rounded-2xl p-5 flex flex-col justify-center relative overflow-hidden">
@@ -135,6 +168,11 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
               <div className="text-3xl font-black text-white">
                 {visitCount}
               </div>
+              {nextBooking && (
+                <div className="text-[11px] font-bold text-sky-400 mt-1">
+                  Próxima: {nextBooking.day.split("-").reverse().join("/")} {nextBooking.time ?? ""}
+                </div>
+              )}
             </div>
             
             <div className="bg-brand-surface border border-white/5 rounded-2xl p-5 flex flex-col justify-center col-span-2 sm:col-span-1 relative overflow-hidden">
@@ -164,23 +202,27 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
                 <svg className="w-12 h-12 text-white/10 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p className="text-sm text-gray-400">El cliente no registra servicios previos.</p>
+                <p className="text-sm text-gray-400">El cliente no registra visitas ni reservas.</p>
               </div>
             ) : (
               <div className="relative border-l border-white/10 ml-3 space-y-8 pb-4">
-                {history.map((h, i) => (
-                  <div key={i} className="relative pl-8">
+                {history.map((h) => (
+                  <div key={h.id} className="relative pl-8">
                     {/* Punto del timeline */}
                     <div className="absolute w-3 h-3 bg-brand-cyan rounded-full left-[-6px] top-1.5 shadow-[0_0_10px_rgba(45,212,191,0.5)]"></div>
                     
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 bg-[#0D1117] border border-white/5 p-5 rounded-2xl shadow-sm hover:border-white/10 transition-colors">
                       <div className="flex-1 space-y-3">
                         <div>
-                          <div className="text-xs font-bold text-brand-cyan mb-1">{h.type.toUpperCase()}</div>
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-xs font-bold text-brand-cyan">{h.origin.toUpperCase()}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_LABEL[h.status].cls}`}>
+                              {STATUS_LABEL[h.status].text}
+                            </span>
+                          </div>
                           <div className="text-[11px] text-gray-500 font-mono">
-                            {new Date(h.date).toLocaleDateString('es-CL', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} 
-                            {' - '} 
-                            {new Date(h.date).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                            {longDay(h.day)}
+                            {h.time ? ` - ${h.time}` : ""}
                           </div>
                         </div>
                         
@@ -195,7 +237,9 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
                         
                         {h.services && h.services.length > 0 && (
                           <div className="pt-2">
-                            <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5">Servicios Realizados</div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5">
+                              {h.status === "attended" ? "Servicios realizados" : "Servicios reservados"}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {h.services.map((s, idx) => (
                                 <span key={idx} className="text-xs font-semibold bg-white/5 text-white px-2.5 py-1 rounded-md border border-white/10">
@@ -224,12 +268,17 @@ export default async function ClientProfilePage(props: { params: Promise<{ id: s
                         )}
                       </div>
                       
-                      {h.amount ? (
+                      {h.total ? (
                         <div className="sm:text-right shrink-0">
-                          <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Monto</div>
-                          <div className="text-xl font-black text-green-400">
-                            ${h.amount.toLocaleString("es-CL")}
-                          </div>
+                          <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Total</div>
+                          <div className="text-xl font-black text-white">${h.total.toLocaleString("es-CL")}</div>
+                          {(h.balance ?? 0) > 0 ? (
+                            <div className="text-[11px] font-bold text-amber-400 mt-0.5">
+                              Pagado ${(h.paid ?? 0).toLocaleString("es-CL")} · saldo ${h.balance!.toLocaleString("es-CL")}
+                            </div>
+                          ) : (
+                            <div className="text-[11px] font-bold text-green-400 mt-0.5">Pagado</div>
+                          )}
                         </div>
                       ) : null}
                     </div>

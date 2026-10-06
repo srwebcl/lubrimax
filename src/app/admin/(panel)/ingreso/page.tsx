@@ -5,6 +5,7 @@ import IntakeConsole from "./IntakeConsole";
 import { chileTodayRange } from "@/lib/chile-time";
 import { parseBookingVehicle } from "@/lib/plate";
 import { vehicleTypeFromMake } from "@/lib/booking-constants";
+import { bookingMoney } from "@/lib/booking-money";
 
 export const metadata = { title: "Nuevo ingreso | Lubrimax" };
 export const dynamic = "force-dynamic";
@@ -49,6 +50,11 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
             customerEmail: true,
             vehicleMake: true,
             vehicleModel: true,
+            amount: true,
+            totalPrice: true,
+            paymentType: true,
+            paymentStatus: true,
+            payments: { select: { amount: true, method: true } },
           },
         })
       : null,
@@ -112,6 +118,9 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
     if (!todayBookings.some((b) => b.id === preBooking.id)) todayBookings.unshift(preBooking);
   }
 
+  // Estado de pago de la reserva que llega: lo primero que debe ver quien recibe.
+  const money = preBooking ? bookingMoney(preBooking) : null;
+
   return (
     <div className="px-4 sm:px-6 py-4 max-w-2xl mx-auto w-full space-y-4">
       <header>
@@ -124,6 +133,24 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
             : "Registra el auto por patente al llegar al local."}
         </p>
       </header>
+      {money && money.total > 0 && (
+        <div
+          className={`rounded-2xl border p-4 ${
+            money.balance === 0
+              ? "border-green-500/30 bg-green-500/10 text-green-400"
+              : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+          }`}
+        >
+          <div className="text-lg font-black uppercase tracking-wide">
+            {money.balance === 0 ? "✓ Pagada online" : `Por pagar: $${money.balance.toLocaleString("es-CL")}`}
+          </div>
+          <div className="text-xs opacity-80 mt-0.5">
+            {money.balance === 0
+              ? "El cliente ya pagó el 100%. No cobrar al recibir ni al entregar."
+              : "El cliente solo reservó. Se cobra en el local (al entregar, desde el Tablero)."}
+          </div>
+        </div>
+      )}
       <IntakeConsole todayBookings={todayBookings} services={services} initial={initial} />
     </div>
   );

@@ -8,6 +8,9 @@ import { updateClientSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate, formatPlate, parseBookingVehicle } from "@/lib/plate";
 import { titleCase, formatPhone, normalizeRut, phoneKey } from "@/lib/contact";
 import { realBookingWhere } from "@/lib/booking-constants";
+import { bookingMoney } from "@/lib/booking-money";
+import { chileNow } from "@/lib/chile-time";
+import { webPersonKey } from "@/lib/client-identity";
 import { bookingServiceNames } from "@/lib/booking-services";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
@@ -47,15 +50,17 @@ export async function updateClient(id: string, input: unknown) {
       vehicles.set(plate, { make: v.make, model: v.model });
     }
 
+    let webSource: { customerName: string; customerPhone: string; customerEmail: string | null } | null = null;
     const clientId = await prisma.$transaction(async (tx) => {
       let clientId: string;
 
       if (id.startsWith("web-")) {
         const booking = await tx.booking.findUnique({
           where: { id: id.slice("web-".length) },
-          select: { id: true },
+          select: { id: true, customerName: true, customerPhone: true, customerEmail: true },
         });
         if (!booking) throw new ClientError("Reserva original no encontrada.");
+        webSource = booking;
 
         // Evitar crear un duplicado en cada "Guardar y consolidar".
         const existing =
@@ -130,6 +135,19 @@ export async function updateClient(id: string, input: unknown) {
         });
       }
 
+      // Cliente web consolidado: sus reservas web (misma persona) quedan
+      // vinculadas a la ficha, para que el historial las muestre.
+      if (webSource) {
+        const key = webPersonKey(webSource);
+        const candidates = await tx.booking.findMany({
+          where: { clientId: null },
+          select: { id: true, customerName: true, customerPhone: true, customerEmail: true },
+          take: 3000,
+        });
+        const ids = candidates.filter((b) => webPersonKey(b) === key).map((b) => b.id);
+        if (ids.length > 0) await tx.booking.updateMany({ where: { id: { in: ids } }, data: { clientId } });
+      }
+
       return clientId;
     });
 
@@ -149,123 +167,140 @@ export async function updateClient(id: string, input: unknown) {
 
 export type ClientHistoryItem = {
   id: string;
-  date: Date;
-  type: string;
+  /** Día ("YYYY-MM-DD") y hora ("HH:mm") de la ATENCIÓN (no de cuando se reservó). */
+  day: string;
+  time: string | null;
+  /** Para ordenar: minutos desde época. */
+  sortKey: number;
+  /** "Reserva web" | "Atención en local" | "Ingreso". */
+  origin: string;
+  /** attended = vino al taller; upcoming = reserva futura; booked = reserva pasada sin ingreso registrado. */
+  status: "attended" | "upcoming" | "booked";
   plate: string;
   vehicle: string;
   services: string[];
-  amount: number | null;
+  total: number | null;
+  paid: number | null;
+  balance: number | null;
   notes: string | null;
   odometer: number | null;
 };
 
-/** Formatos en que puede estar guardado un mismo celular chileno. */
-function phoneVariants(phone: string | null) {
-  const key = phoneKey(phone);
-  if (!key) return [];
-  const variants = new Set([key, `56${key}`, `+56${key}`, formatPhone(key)]);
-  if (phone) variants.add(phone);
-  return [...variants];
+const historyBookingInclude = {
+  services: { select: { name: true } },
+  payments: { select: { amount: true, method: true } },
+  intakes: {
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+    include: { vehicle: { select: { plate: true, make: true, model: true } } },
+  },
+} as const;
+
+type HistoryBooking = Prisma.BookingGetPayload<{ include: typeof historyBookingInclude }>;
+
+function sortKeyOf(day: string, time: string | null) {
+  const [h, m] = (time ?? "00:00").split(":").map(Number);
+  return Math.floor(Date.parse(`${day}T00:00:00.000Z`) / 60000) + h * 60 + m;
 }
 
-type BookingWithServices = {
-  id: string;
-  createdAt: Date;
-  vehicleMake: string;
-  vehicleModel: string;
-  amount: number | null;
-  selectedOptions: Prisma.JsonValue;
-  services: { name: string }[];
-};
-
-
-function bookingItem(b: BookingWithServices, type: string): ClientHistoryItem {
+/** Una reserva (con su ingreso, si llegó) como fila del historial. */
+function bookingHistoryItem(b: HistoryBooking, today: string): ClientHistoryItem {
+  const intake = b.intakes[0];
   const v = parseBookingVehicle(b.vehicleMake, b.vehicleModel);
+  const money = bookingMoney(b);
+  const bookedDay = b.date.toISOString().substring(0, 10);
+  const at = intake ? chileNow(intake.createdAt) : null;
+  const day = at?.date ?? bookedDay;
+  const time = at?.time ?? b.startTime;
   return {
     id: b.id,
-    date: b.createdAt,
-    type,
-    plate: v.plate,
-    vehicle: `${v.make} ${v.model}`.trim(),
+    day,
+    time,
+    sortKey: sortKeyOf(day, time),
+    origin: b.paymentType ? "Reserva web" : "Atención en local",
+    status: intake ? "attended" : bookedDay >= today ? "upcoming" : "booked",
+    plate: intake?.vehicle.plate ?? v.plate,
+    vehicle: intake ? `${intake.vehicle.make} ${intake.vehicle.model}` : `${v.make} ${v.model}`.trim(),
     services: bookingServiceNames(b),
-    amount: b.amount,
-    notes: null,
-    odometer: null,
+    total: money.total || null,
+    paid: money.paid,
+    balance: money.balance,
+    notes: intake?.notes ?? null,
+    odometer: intake?.odometer ?? null,
   };
 }
 
 /**
- * Historial de reservas e ingresos de un cliente. Excluye reservas
- * canceladas y pagos abandonados (ver realBookingWhere).
+ * Historial de un cliente: SOLO lo que le pertenece de forma explícita.
+ *  - Cliente del taller: reservas vinculadas (Booking.clientId) + ingresos
+ *    de sus vehículos.
+ *  - Cliente web (aún no consolidado): sus reservas web, agrupadas por
+ *    persona (nombre + teléfono/correo, ver client-identity.ts).
+ * Ya NO se buscan reservas por correo/teléfono sueltos: se repetían entre
+ * personas distintas y mezclaban historiales, montos y patentes ajenas.
+ * Excluye canceladas, "no vino" y pagos abandonados (realBookingWhere).
  */
 export async function getClientHistory(clientId: string): Promise<ClientHistoryItem[]> {
   try {
     await requirePermission("clients_view");
-
-    const bookingInclude = { services: { select: { name: true } } } as const;
+    const today = chileNow().date;
+    const items: ClientHistoryItem[] = [];
 
     if (clientId.startsWith("web-")) {
-      const booking = await prisma.booking.findFirst({
-        where: { id: clientId.slice("web-".length), ...realBookingWhere() },
-        include: bookingInclude,
+      const source = await prisma.booking.findUnique({
+        where: { id: clientId.slice("web-".length) },
+        select: { customerName: true, customerPhone: true, customerEmail: true },
       });
-      return booking ? [bookingItem(booking, "Reserva Web")] : [];
-    }
-
-    const client = await prisma.workshopClient.findUnique({
-      where: { id: clientId },
-      include: {
-        vehicles: {
-          include: {
-            intakes: {
-              include: { booking: { include: bookingInclude } },
-              orderBy: { createdAt: "desc" },
-            },
-          },
-        },
-      },
-    });
-    if (!client) return [];
-
-    const history = new Map<string, ClientHistoryItem>();
-
-    // 1. Reservas que coinciden por teléfono (cualquier formato), correo o patente.
-    const plates = client.vehicles.map((v) => v.plate);
-    const or: Prisma.BookingWhereInput[] = [
-      ...phoneVariants(client.phone).map((p) => ({ customerPhone: p })),
-      ...(client.email ? [{ customerEmail: { equals: client.email, mode: "insensitive" as const } }] : []),
-      ...plates.map((p) => ({ vehicleModel: { contains: `(Patente: ${p})` } })),
-    ];
-    if (or.length > 0) {
-      const bookings = await prisma.booking.findMany({
-        where: { AND: [{ OR: or }, realBookingWhere()] },
-        include: bookingInclude,
-        take: 200,
+      if (!source) return [];
+      const key = webPersonKey(source);
+      const candidates = await prisma.booking.findMany({
+        where: { AND: [{ clientId: null }, realBookingWhere()] },
+        include: historyBookingInclude,
         orderBy: { createdAt: "desc" },
+        take: 3000,
       });
-      for (const b of bookings) history.set(`booking-${b.id}`, bookingItem(b, "Reserva"));
+      for (const b of candidates) if (webPersonKey(b) === key) items.push(bookingHistoryItem(b, today));
+      return items.sort((a, b) => b.sortKey - a.sortKey);
     }
 
-    // 2. Ingresos al taller: reemplazan a la reserva enlazada (tienen más datos).
-    for (const v of client.vehicles) {
-      for (const intake of v.intakes) {
-        const linked = intake.booking && intake.booking.status !== "CANCELLED" ? intake.booking : null;
-        if (intake.bookingId) history.delete(`booking-${intake.bookingId}`);
-        history.set(`intake-${intake.id}`, {
-          id: intake.id,
-          date: intake.createdAt,
-          type: "Ingreso a Taller",
-          plate: v.plate,
-          vehicle: `${v.make} ${v.model}`,
-          services: linked ? bookingServiceNames(linked) : ["Ingreso Manual (Sin Reserva)"],
-          amount: linked?.amount ?? null,
-          notes: intake.notes,
-          odometer: intake.odometer,
-        });
-      }
+    const [bookings, orphanIntakes] = await Promise.all([
+      prisma.booking.findMany({
+        where: { AND: [{ clientId }, realBookingWhere()] },
+        include: historyBookingInclude,
+        orderBy: { date: "desc" },
+        take: 300,
+      }),
+      // Ingresos antiguos sin reserva asociada (anteriores a la cita automática).
+      prisma.vehicleIntake.findMany({
+        where: { bookingId: null, vehicle: { clientId } },
+        include: { vehicle: { select: { plate: true, make: true, model: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 300,
+      }),
+    ]);
+
+    for (const b of bookings) items.push(bookingHistoryItem(b, today));
+    for (const i of orphanIntakes) {
+      const at = chileNow(i.createdAt);
+      items.push({
+        id: i.id,
+        day: at.date,
+        time: at.time,
+        sortKey: sortKeyOf(at.date, at.time),
+        origin: "Ingreso",
+        status: "attended",
+        plate: i.vehicle.plate,
+        vehicle: `${i.vehicle.make} ${i.vehicle.model}`,
+        services: ["Sin detalle de servicios"],
+        total: null,
+        paid: null,
+        balance: null,
+        notes: i.notes,
+        odometer: i.odometer,
+      });
     }
 
-    return [...history.values()].sort((a, b) => b.date.getTime() - a.date.getTime());
+    return items.sort((a, b) => b.sortKey - a.sortKey);
   } catch (error) {
     console.error("Error fetching client history:", error);
     return [];

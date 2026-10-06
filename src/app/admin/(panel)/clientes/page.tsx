@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireStaffPage } from "@/lib/staff-session";
 import { realBookingWhere } from "@/lib/booking-constants";
 import { parseBookingVehicle } from "@/lib/plate";
-import { phoneKey } from "@/lib/contact";
+import { nameKey, webPersonKey } from "@/lib/client-identity";
 import ClientManager, { type UnifiedClient } from "./ClientManager";
 
 export const metadata = {
@@ -42,26 +42,24 @@ export default async function ClientesPage() {
         customerPhone: true,
         vehicleMake: true,
         vehicleModel: true,
+        clientId: true,
         createdAt: true,
       },
     }),
   ]);
 
   const clients: UnifiedClient[] = [];
-  // Índices para deduplicar: el mismo cliente puede aparecer con el correo,
-  // el teléfono (en distintos formatos) o la patente.
-  const byEmail = new Map<string, UnifiedClient>();
-  const byPhone = new Map<string, UnifiedClient>();
-  const byPlate = new Map<string, UnifiedClient>();
+  const byId = new Map<string, UnifiedClient>();
+  // Patente -> cliente del taller dueño del vehículo (con su nombre normalizado).
+  const byPlate = new Map<string, { client: UnifiedClient; name: string }>();
+  // Persona web (nombre + teléfono/correo) -> su entrada en el directorio.
+  const byWebPerson = new Map<string, UnifiedClient>();
 
-  function index(c: UnifiedClient) {
-    if (c.email) byEmail.set(c.email.toLowerCase(), c);
-    const pk = phoneKey(c.phone);
-    if (pk) byPhone.set(pk, c);
-    for (const v of c.vehicles) if (v.plate) byPlate.set(v.plate, c);
+  function addVehicle(client: UnifiedClient, vehicle: { plate: string; make: string; model: string }) {
+    if (vehicle.plate && !client.vehicles.some((v) => v.plate === vehicle.plate)) client.vehicles.push(vehicle);
   }
 
-  // 1. Clientes del taller (tienen prioridad)
+  // 1. Clientes del taller
   for (const c of workshopClients) {
     const client: UnifiedClient = {
       id: c.id,
@@ -70,27 +68,34 @@ export default async function ClientesPage() {
       phone: c.phone,
       rut: c.rut,
       source: "Taller",
-      vehicles: c.vehicles,
+      vehicles: [...c.vehicles],
       date: c.createdAt,
     };
     clients.push(client);
-    index(client);
+    byId.set(c.id, client);
+    for (const v of c.vehicles) byPlate.set(v.plate, { client, name: nameKey(c.name) });
   }
 
-  // 2. Clientes de reservas web que no estén ya en el taller
+  // 2. Reservas web. Se asignan a un cliente del taller SOLO si están
+  // vinculadas (Booking.clientId) o si es su mismo vehículo y su mismo
+  // nombre. Correo o teléfono sueltos NO bastan: se repiten entre personas y
+  // juntaban a clientes distintos en una sola ficha.
   for (const b of webBookings) {
     const vehicle = parseBookingVehicle(b.vehicleMake, b.vehicleModel);
-    const existing =
-      (b.customerEmail && byEmail.get(b.customerEmail.toLowerCase())) ||
-      byPhone.get(phoneKey(b.customerPhone)) ||
-      (vehicle.plate && byPlate.get(vehicle.plate)) ||
-      undefined;
 
+    const linked = b.clientId ? byId.get(b.clientId) : undefined;
+    const sameCar = vehicle.plate ? byPlate.get(vehicle.plate) : undefined;
+    const owner = linked ?? (sameCar && sameCar.name === nameKey(b.customerName) ? sameCar.client : undefined);
+    if (owner) {
+      addVehicle(owner, vehicle);
+      continue;
+    }
+
+    // Misma persona web (nombre + teléfono/correo): una sola entrada.
+    const key = webPersonKey(b);
+    const existing = byWebPerson.get(key);
     if (existing) {
-      if (vehicle.plate && !existing.vehicles.some((v) => v.plate === vehicle.plate)) {
-        existing.vehicles.push(vehicle);
-        byPlate.set(vehicle.plate, existing);
-      }
+      addVehicle(existing, vehicle);
       continue;
     }
 
@@ -101,11 +106,11 @@ export default async function ClientesPage() {
       phone: b.customerPhone,
       rut: null,
       source: "Web",
-      vehicles: [vehicle],
+      vehicles: vehicle.plate ? [vehicle] : [],
       date: b.createdAt,
     };
     clients.push(client);
-    index(client);
+    byWebPerson.set(key, client);
   }
 
   clients.sort((a, b) => b.date.getTime() - a.date.getTime());

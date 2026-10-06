@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireStaffPage } from "@/lib/staff-session";
 import { can } from "@/lib/permissions";
+import { bookingMoney } from "@/lib/booking-money";
+import { ON_SITE_PAYMENT } from "@/lib/booking-constants";
 import BookingsManager from "./BookingsManager";
 import { chileTodayRange } from "@/lib/chile-time";
 import { customServiceDetail } from "@/lib/booking-services";
@@ -33,7 +35,10 @@ export default async function AdminDashboard() {
   const bookings = await prisma.booking.findMany({
     where: agendaWhere(),
     orderBy: [{ date: "desc" }, { startTime: "desc" }],
-    include: { services: { select: { name: true, duration: true } } },
+    include: {
+      services: { select: { name: true, duration: true } },
+      payments: { select: { amount: true, method: true } },
+    },
     take: AGENDA_MAX_ROWS,
   });
 
@@ -75,6 +80,9 @@ export default async function AdminDashboard() {
             status: b.status,
             workStatus: b.workStatus,
             paymentStatus: b.paymentStatus,
+            // Saldo real (total - pagos): "Pagada" o "Por pagar $X".
+            balance: bookingMoney(b).balance,
+            webOnSite: b.paymentType === ON_SITE_PAYMENT,
             arrived: arrived.has(b.id),
             customerName: b.customerName,
             customerPhone: b.customerPhone,

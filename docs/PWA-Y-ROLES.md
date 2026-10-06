@@ -62,8 +62,11 @@ reserva web o directo al local (`src/actions/workshop.ts`):
   `VehicleIntake`. El estado se deriva de `workStatus` + estado del ingreso.
 - "No vino" deja la reserva en `NO_SHOW` (libera el cupo). Una reserva se
   marca ATRASADA 30 min después de su hora.
-- La reserva web se paga **100% por Webpay** (sin abono). El cobro en el
-  local (efectivo/tarjeta/transferencia) se registra al entregar.
+- Reserva web, dos opciones: **"Solo reservar"** (queda confirmada y se
+  paga en el local) o **"Reservar y pagar ahora"** (100% por Webpay, sin
+  abono). Tablero, Agenda, recepción, avisos y correos muestran siempre
+  **PAGADA** o **POR PAGAR $X**. El cobro en el local
+  (efectivo/tarjeta/transferencia) se registra al entregar o después.
 - Pagos: `model BookingPayment` + `Booking.totalPrice`; saldo y totales en
   `src/lib/booking-money.ts`.
 - Horas y "hoy" siempre en `America/Santiago` (`src/lib/chile-time.ts`);

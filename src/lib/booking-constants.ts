@@ -36,6 +36,10 @@ export function getExactPrice(service: PriceableService, vehicleType: string): n
   return service.priceAuto || 0;
 }
 
+// Reserva web SIN pago online: el cliente paga el total en el local.
+// (Booking.paymentType = "ON_SITE"; "FULL" = pagó el 100% por Webpay.)
+export const ON_SITE_PAYMENT = "ON_SITE";
+
 // Porcentaje del antiguo abono (seña). Ya NO se cobra abono: la reserva web
 // se paga al 100%. Solo se usa para estimar el total de reservas antiguas
 // pagadas con abono (ver booking-money.ts).

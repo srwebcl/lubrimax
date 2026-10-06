@@ -377,7 +377,7 @@ export async function updateEvaluatedPrices(input: unknown) {
     const result = await prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({ where: { id: bookingId }, include: bookingInclude });
       if (!booking) return fail("Reserva no encontrada.");
-      if (booking.paymentType) return fail("Las reservas web se pagan al reservar; su precio no se ajusta aquí.");
+      if (booking.paymentType) return fail("Las reservas web usan el precio de catálogo; no se ajustan aquí.");
 
       const allowed = new Set(evaluatedItems(booking).map((i) => i.key));
       const opts = readLocalOptions(booking.selectedOptions);

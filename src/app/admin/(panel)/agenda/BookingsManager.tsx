@@ -15,6 +15,10 @@ type Booking = {
   status: string;
   workStatus: string;
   paymentStatus: string;
+  /** Lo que falta por cobrar (0 = pagada). */
+  balance: number;
+  /** Reserva web hecha con "Solo reservar" (paga en el local). */
+  webOnSite: boolean;
   arrived?: boolean;
   customerName: string;
   customerPhone: string;
@@ -211,7 +215,21 @@ export default function BookingsManager({
                         {format(d, "EEE d MMM", { locale: es })} · {Math.round((total / 60) * 10) / 10}h
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {/* Estado de pago: visible para todos (la recepción lo necesita). */}
+                      {b.status !== "CANCELLED" && b.status !== "NO_SHOW" && (
+                        <span
+                          className={`text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full border ${
+                            b.balance === 0
+                              ? "bg-green-500/10 text-green-400 border-green-500/25"
+                              : "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                          }`}
+                        >
+                          {b.balance === 0
+                            ? "✓ Pagada"
+                            : `Por pagar $${b.balance.toLocaleString("es-CL")}${b.webOnSite ? " · solo reservó" : ""}`}
+                        </span>
+                      )}
                       {b.arrived && (
                         <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full border bg-brand-cyan/10 text-brand-cyan border-brand-cyan/25">
                           En taller

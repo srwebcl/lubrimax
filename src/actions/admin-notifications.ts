@@ -8,10 +8,14 @@ export type NewBookingNotice = {
   customerName: string;
   date: string; // "YYYY-MM-DD"
   startTime: string;
+  /** true = pagó online (Webpay); false = solo reservó, paga en el local. */
+  paid: boolean;
+  /** Monto pagado (si paid) o por cobrar en el local. */
+  amount: number;
 };
 
 /**
- * Reservas WEB ya pagadas (o confirmadas en modo prueba) creadas en las
+ * Reservas WEB confirmadas (pagadas online o solo reservadas) creadas en las
  * últimas `windowMinutes`. El cliente guarda los ids que ya avisó y solo
  * notifica los nuevos. Se excluyen los pagos pendientes/abandonados y los
  * ingresos manuales del taller (esos no tienen `paymentType`).
@@ -28,7 +32,15 @@ export async function getRecentPaidBookings(windowMinutes = 60): Promise<NewBook
     },
     orderBy: { createdAt: "desc" },
     take: 20,
-    select: { id: true, customerName: true, date: true, startTime: true },
+    select: {
+      id: true,
+      customerName: true,
+      date: true,
+      startTime: true,
+      paymentStatus: true,
+      amount: true,
+      totalPrice: true,
+    },
   });
 
   return bookings.map((b) => ({
@@ -36,5 +48,10 @@ export async function getRecentPaidBookings(windowMinutes = 60): Promise<NewBook
     customerName: b.customerName,
     date: b.date.toISOString().substring(0, 10),
     startTime: b.startTime,
+    paid: b.paymentStatus === "PAID_FULL" || b.paymentStatus === "PAID_RESERVATION",
+    amount:
+      b.paymentStatus === "PAID_FULL" || b.paymentStatus === "PAID_RESERVATION"
+        ? b.amount ?? 0
+        : b.totalPrice ?? 0,
   }));
 }

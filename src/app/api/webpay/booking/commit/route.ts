@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendEmail, escapeHtml } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
 import { getWebpayTransaction } from "@/lib/webpay";
+import { sendNewBookingEmails } from "@/lib/booking-emails";
 import { getSettings } from "@/actions/admin-settings";
 import { computeAvailableSlots, getBlockingBookings } from "@/lib/availability";
 
@@ -96,45 +97,8 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
           }
         });
 
-        if (booking.customerEmail) {
-          const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
-          const friendlyDate = `${d}/${m}/${y}`;
-          const paidLabel = booking.paymentType === "FULL" ? "el servicio completo" : "la seña de reserva (20%)";
-
-          const ownerEmail = process.env.OWNER_EMAIL || "contacto@lubrimax.cl";
-          const adminEmailResult = await sendEmail({
-            to: ownerEmail,
-            subject: `NUEVA RESERVA - ${booking.customerName} - ${friendlyDate} ${booking.startTime}`,
-            html: (
-              `<h1>Nueva Reserva Pagada</h1>
-               <p><strong>Cliente:</strong> ${escapeHtml(booking.customerName)} (${escapeHtml(booking.customerPhone)})</p>
-               <p><strong>Vehículo:</strong> ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
-               <p><strong>Fecha y Hora:</strong> ${friendlyDate} de ${booking.startTime} a ${booking.endTime}</p>
-               <p><strong>Servicios:</strong> ${escapeHtml(booking.services.map(s => s.name).join(' + '))}</p>
-               <p><strong>Monto pagado (${paidLabel}):</strong> $${booking.amount?.toLocaleString("es-CL")}</p>
-               <p><a href="${baseUrl}/admin">Ver en panel de administración</a></p>`
-            )
-          });
-          if (!adminEmailResult.success) {
-            console.error("No se pudo notificar al administrador:", adminEmailResult.error);
-          }
-
-          const emailResult = await sendEmail({
-            to: booking.customerEmail,
-            subject: `Confirmación de tu hora en LUBRIMAX - ${friendlyDate}`,
-            html: (
-              `<h1>¡Hola ${escapeHtml(booking.customerName)}!</h1>
-               <p>Tu reserva para <strong>${escapeHtml(booking.services.map(s => s.name).join(' + '))}</strong> quedó confirmada.</p>
-               <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
-               <p>Vehículo: ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
-               <p>Pagaste ${paidLabel}: $${booking.amount?.toLocaleString("es-CL")}</p>
-               <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`
-            )
-          });
-          if (!emailResult.success) {
-            console.error("No se pudo enviar el correo de confirmación de reserva", booking.id, emailResult.error);
-          }
-        }
+        // Aviso al dueño (siempre) y confirmación al cliente (si dejó correo).
+        await sendNewBookingEmails(booking, { paid: true, amountPaid: commitResponse.amount });
       }
 
       return NextResponse.redirect(`${baseUrl}/agendar?success=true&booking=${booking.id}&token_ws=${tokenWs}`);

@@ -254,6 +254,20 @@ function Card({
           </div>
         ) : null}
         <div className="flex-1 min-w-0">
+          {/* Estado de pago bien visible: en la recepción no puede haber dudas. */}
+          {c.money && c.money.total > 0 && (
+            <div
+              className={`mb-1.5 inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-md ${
+                c.money.balance === 0
+                  ? "bg-green-500/15 text-green-400 border border-green-500/30"
+                  : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+              }`}
+            >
+              {c.money.balance === 0
+                ? `✓ Pagada${c.source === "WEB" ? " online" : ""}`
+                : `Por pagar ${clp(c.money.balance)}${c.source === "WEB" ? " · solo reservó" : ""}`}
+            </div>
+          )}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-mono font-black text-white tracking-wider">{c.plate ? formatPlate(c.plate) : "Sin patente"}</span>
             <span
@@ -274,12 +288,7 @@ function Card({
         <div className="text-right shrink-0">
           {c.startTime && c.stage === "ARRIVING" && <div className="text-sm font-black text-white">{c.startTime}</div>}
           {c.arrivedAt && c.stage !== "ARRIVING" && <div className="text-[11px] text-gray-500">llegó {hhmm(c.arrivedAt)}</div>}
-          {c.money && c.money.balance > 0 && (
-            <div className="text-[11px] font-bold text-amber-400">Saldo {clp(c.money.balance)}</div>
-          )}
-          {c.money && c.money.total > 0 && c.money.balance === 0 && (
-            <div className="text-[11px] font-bold text-green-400">Pagado</div>
-          )}
+
         </div>
       </div>
 

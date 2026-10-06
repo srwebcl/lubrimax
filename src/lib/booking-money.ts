@@ -41,6 +41,12 @@ export function bookingMoney(b: MoneyInput) {
     b.totalPrice ??
     (b.paymentType === "RESERVATION" && b.amount ? Math.round(b.amount / RESERVATION_PERCENT) : b.amount ?? 0);
 
+  // "Pago completo" marcado a mano por el admin (Agenda) sin registro de
+  // pago: se respeta, así la reserva no sigue figurando "por pagar".
+  if (b.paymentStatus === "PAID_FULL" && paid < total) {
+    return { total, paid: total, balance: 0 };
+  }
+
   return { total, paid, balance: Math.max(total - paid, 0) };
 }
 

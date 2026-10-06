@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getExactPrice } from "@/lib/booking-constants";
+import { getExactPrice, ON_SITE_PAYMENT } from "@/lib/booking-constants";
 import { getSessionCustomer } from "@/actions/customer-auth";
 import { getSettings } from "@/actions/admin-settings";
 import { bookingPaymentSchema, flattenZodError } from "@/lib/validation";
@@ -16,6 +16,7 @@ import { formatPhone } from "@/lib/contact";
 import { normalizePlate } from "@/lib/plate";
 
 import { getWebpayTransaction } from "@/lib/webpay";
+import { sendNewBookingEmails } from "@/lib/booking-emails";
 import { CLUB_ENABLED } from "@/lib/features";
 
 class SlotTakenError extends Error {}
@@ -75,9 +76,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: flattenZodError(parsed.error) }, { status: 400 });
     }
     const { date, startTime, serviceIds, selectedVariants, vehicleType, plate, make, model, customerName, customerPhone, customerEmail } = parsed.data;
-    // Política: quien reserva por la web paga el 100% del servicio. No hay
-    // abono parcial (se ignora cualquier paymentType que mande el navegador).
-    const paymentType = "FULL";
+    // Dos formas de reservar: "Reservar" (paga en el local) o "Reservar y
+    // pagar" (100% por Webpay). No hay abono parcial.
+    const payOnline = parsed.data.paymentType !== ON_SITE_PAYMENT;
+    const paymentType = payOnline ? "FULL" : ON_SITE_PAYMENT;
 
     const uniqueServiceIds = [...new Set(serviceIds)];
     const services = await prisma.service.findMany({ where: { id: { in: uniqueServiceIds } } });
@@ -124,7 +126,7 @@ export async function POST(request: Request) {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     // Validar la configuración de Webpay ANTES de bloquear el horario.
-    const webpay = getWebpayTransaction();
+    const webpay = payOnline ? getWebpayTransaction() : null;
 
     // Verificación de disponibilidad + creación en una sola transacción, con
     // un lock por día: dos personas pagando el mismo horario a la vez ya no
@@ -152,16 +154,33 @@ export async function POST(request: Request) {
           services: { connect: uniqueServiceIds.map((id) => ({ id })) },
           selectedOptions: selectedVariants ?? undefined,
           totalPrice: totalAmount,
-          // PENDING bloquea el horario mientras el cliente paga. Si el pago
-          // se abandona, se libera solo pasados PENDING_HOLD_MINUTES.
-          status: "PENDING",
           paymentStatus: "PENDING",
-          amount,
           paymentType,
+          ...(payOnline
+            ? {
+                // PENDING bloquea el horario mientras el cliente paga. Si el
+                // pago se abandona, se libera solo pasados PENDING_HOLD_MINUTES.
+                status: "PENDING",
+                amount,
+              }
+            : {
+                // Solo reservar: confirmada al tiro, nada cobrado todavía.
+                status: "CONFIRMED",
+                amount: 0,
+              }),
         },
+        include: { services: { select: { name: true } } },
       });
     });
     bookingId = booking.id;
+
+    if (!webpay) {
+      await sendNewBookingEmails(booking, { paid: false, amountDue: totalAmount });
+      return NextResponse.json({
+        reserved: true,
+        redirectUrl: `${baseUrl}/agendar?success=true&booking=${booking.id}`,
+      });
+    }
 
     const returnUrl = `${baseUrl}/api/webpay/booking/commit`;
     const createResponse = await webpay.create(booking.id, booking.id, amount, returnUrl);

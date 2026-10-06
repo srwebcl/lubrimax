@@ -56,6 +56,8 @@ type ConfirmedBooking = {
   vehicleMake: string;
   vehicleModel: string;
   amount: number | null;
+  total?: number | null;
+  paid?: boolean;
 };
 
 export default function BookingWizard() {
@@ -153,6 +155,8 @@ export default function BookingWizard() {
             vehicleMake: booking.vehicleMake,
             vehicleModel: booking.vehicleModel,
             amount: booking.amount,
+            total: booking.total,
+            paid: booking.paid,
           });
           setConfirmed(true);
         }
@@ -204,8 +208,9 @@ export default function BookingWizard() {
     totalAmount = totalAmount - (totalAmount * (discountPercent / 100));
   }
 
-  // La reserva web se paga siempre al 100% (sin abono).
-  const handlePayment = async () => {
+  // Dos formas: "Reservar" (paga en el local) o "Reservar y pagar" (100%
+  // por Webpay). Sin abono parcial.
+  const handlePayment = async (mode: "ON_SITE" | "FULL") => {
     if (formData.phone.length !== 8) {
       alert("Ingresa los 8 dígitos de tu celular (+56 9 XXXX XXXX).");
       return;
@@ -219,7 +224,7 @@ export default function BookingWizard() {
 
     setSubmitting(true);
     setPaymentError(null);
-    setPaymentStatus("Conectando con Webpay...");
+    setPaymentStatus(mode === "FULL" ? "Conectando con Webpay..." : "Confirmando tu reserva...");
 
     try {
       const response = await fetch("/api/webpay/booking/create", {
@@ -237,10 +242,17 @@ export default function BookingWizard() {
           customerName: formData.name,
           customerPhone: mobileFromDigits(formData.phone),
           customerEmail: formData.email,
+          paymentType: mode,
         }),
       });
 
       const data = await response.json();
+
+      // Solo reservar: ya quedó confirmada, sin pasar por Webpay.
+      if (data.reserved && data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
 
       if (data.token && data.url) {
         // Webpay exige un POST con el token como campo de formulario, no un
@@ -292,10 +304,16 @@ export default function BookingWizard() {
         </p>
         <div className="bg-brand-pure p-4 rounded mb-8 text-sm text-brand-chrome border border-white/5">
           Vehículo: {confirmedBooking?.vehicleMake} | Patente: {confirmedBooking?.vehicleModel}
-          {confirmedBooking?.amount != null && (
-            <> | Pagado: ${confirmedBooking.amount.toLocaleString('es-CL')}</>
-          )}
         </div>
+        {confirmedBooking?.paid ? (
+          <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-4 rounded mb-8 text-sm font-bold uppercase tracking-widest">
+            Pagado: ${(confirmedBooking.amount ?? 0).toLocaleString('es-CL')} · No tienes nada pendiente
+          </div>
+        ) : (
+          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 p-4 rounded mb-8 text-sm font-bold uppercase tracking-widest">
+            Pagas en el local: ${(confirmedBooking?.total ?? 0).toLocaleString('es-CL')}
+          </div>
+        )}
         <button 
           onClick={() => window.location.href = '/'}
           className="bg-brand-pure border border-white/10 text-brand-chrome px-8 py-3 rounded hover:bg-brand-cyan hover:text-brand-pure transition-colors uppercase tracking-widest font-bold"
@@ -713,12 +731,18 @@ export default function BookingWizard() {
                   ) : (
                     <div className="space-y-3">
                       <button 
-                        onClick={handlePayment}
+                        onClick={() => handlePayment("FULL")}
                         className="w-full bg-brand-chrome text-brand-pure py-3 px-2 rounded hover:bg-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(56,189,248,0.5)] flex flex-col sm:block items-center justify-center gap-1"
                       >
-                        <span>Pagar y reservar</span> <span className="opacity-75">(${totalAmount.toLocaleString('es-CL')})</span>
+                        <span>Reservar y pagar ahora</span> <span className="opacity-75">(${totalAmount.toLocaleString('es-CL')})</span>
                       </button>
-                      <p className="text-[10px] text-gray-500 text-center">Se paga el 100% del servicio para asegurar tu horario.</p>
+                      <button 
+                        onClick={() => handlePayment("ON_SITE")}
+                        className="w-full bg-transparent border border-white/20 text-white py-3 px-2 rounded hover:border-brand-cyan hover:text-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-xs flex flex-col sm:block items-center justify-center gap-1"
+                      >
+                        <span>Solo reservar</span> <span className="opacity-75">(pagas en el local)</span>
+                      </button>
+                      <p className="text-[10px] text-gray-500 text-center">Pagando ahora (Webpay) llegas sin nada pendiente.</p>
                     </div>
                   )}
                   

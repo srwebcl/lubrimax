@@ -97,6 +97,9 @@ export async function getBookingById(id: string) {
       vehicleMake: booking.vehicleMake,
       vehicleModel: booking.vehicleModel,
       amount: booking.amount,
+      total: booking.totalPrice ?? booking.amount,
+      // Pagó online (Webpay) o solo reservó y paga en el local.
+      paid: booking.paymentStatus === "PAID_FULL" || booking.paymentStatus === "PAID_RESERVATION",
     };
   } catch (error) {
     console.error("Error fetching booking:", error);

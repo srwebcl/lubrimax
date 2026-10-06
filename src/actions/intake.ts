@@ -281,6 +281,8 @@ export async function registerIntake(formData: FormData) {
 
       if (linked) {
         bookingId = linked.id;
+        // La reserva web queda vinculada al cliente que llegó (historial).
+        await tx.booking.update({ where: { id: linked.id }, data: { clientId } });
       } else if (manual) {
         // ES UN INGRESO MANUAL.
         const { serviceIds, customServiceDetail } = manual;
@@ -337,6 +339,7 @@ export async function registerIntake(formData: FormData) {
             customerEmail: email || null,
             // Misma convención que la reserva web: "<tipo> - <marca>".
             vehicleMake: `${manual.vehicleType} - ${d.make}`,
+            clientId,
             vehicleModel: `${d.model} (Patente: ${plate})`,
             selectedOptions: selectedOptions,
             services: {

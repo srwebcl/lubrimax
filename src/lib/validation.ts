@@ -136,9 +136,10 @@ export const bookingPaymentSchema = z.object({
   customerPhone: z.string().trim().refine(isChileMobile, "Celular inválido: debe ser +56 9 XXXX XXXX."),
   customerEmail: z.union([z.email(), z.literal("")]).optional(),
   selectedVariants: z.record(z.string(), z.string()).optional(),
-  // Obsoleto: siempre se cobra el 100%. Se acepta para no romper versiones
-  // del wizard que el navegador tenga en caché, pero el servidor lo ignora.
-  paymentType: z.enum(["RESERVATION", "FULL"]).optional(),
+  // "ON_SITE" = solo reservar (paga en el local). Cualquier otro valor (o
+  // ninguno) = reservar y pagar el 100% por Webpay. "RESERVATION" (abono)
+  // ya no existe: se trata como pago completo.
+  paymentType: z.enum(["RESERVATION", "FULL", "ON_SITE"]).optional(),
 });
 
 export const storeCheckoutSchema = z.object({
