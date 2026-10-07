@@ -3,13 +3,13 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
-import { requirePermission } from "@/lib/staff-session";
+import { requirePermission, requireRole } from "@/lib/staff-session";
 import { updateClientSchema, flattenZodError } from "@/lib/validation";
 import { normalizePlate, isValidPlate, formatPlate, parseBookingVehicle } from "@/lib/plate";
 import { titleCase, formatPhone, normalizeRut, phoneKey } from "@/lib/contact";
 import { realBookingWhere } from "@/lib/booking-constants";
 import { bookingMoney } from "@/lib/booking-money";
-import { chileNow } from "@/lib/chile-time";
+import { bookingDateFromDay, chileNow } from "@/lib/chile-time";
 import { webPersonKey } from "@/lib/client-identity";
 import { bookingServiceNames } from "@/lib/booking-services";
 
@@ -304,5 +304,147 @@ export async function getClientHistory(clientId: string): Promise<ClientHistoryI
   } catch (error) {
     console.error("Error fetching client history:", error);
     return [];
+  }
+}
+
+// ── Borrado de clientes (solo ADMIN) ──
+
+type DeletionScope = {
+  name: string;
+  clientId: string | null;
+  bookingIds: string[];
+  vehicleIds: string[];
+  intakeIds: string[];
+  /** Reserva confirmada futura que aún no llega: bloquea el borrado. */
+  upcoming: { day: string; time: string } | null;
+};
+
+/**
+ * Todo lo que pertenece a un cliente del directorio. Cliente del taller:
+ * ficha + vehículos + ingresos + reservas vinculadas. Cliente web: todas las
+ * reservas de esa persona (nombre + teléfono/correo) aún sin ficha.
+ */
+async function deletionScope(id: string): Promise<DeletionScope | null> {
+  const today = chileNow().date;
+  let name: string;
+  let clientId: string | null = null;
+  let vehicleIds: string[] = [];
+  let intakeIds: string[] = [];
+  let bookingIds: string[];
+
+  if (id.startsWith("web-")) {
+    const source = await prisma.booking.findUnique({
+      where: { id: id.slice("web-".length) },
+      select: { customerName: true, customerPhone: true, customerEmail: true },
+    });
+    if (!source) return null;
+    name = source.customerName;
+    const key = webPersonKey(source);
+    const candidates = await prisma.booking.findMany({
+      where: { clientId: null },
+      select: { id: true, customerName: true, customerPhone: true, customerEmail: true },
+      take: 5000,
+    });
+    bookingIds = candidates.filter((b) => webPersonKey(b) === key).map((b) => b.id);
+  } else {
+    const client = await prisma.workshopClient.findUnique({
+      where: { id },
+      include: { vehicles: { include: { intakes: { select: { id: true, bookingId: true } } } } },
+    });
+    if (!client) return null;
+    name = client.name;
+    clientId = client.id;
+    vehicleIds = client.vehicles.map((v) => v.id);
+    const intakes = client.vehicles.flatMap((v) => v.intakes);
+    intakeIds = intakes.map((i) => i.id);
+    const linked = await prisma.booking.findMany({
+      where: {
+        OR: [
+          { clientId: client.id },
+          // Citas de sus ingresos que no quedaron vinculadas a otro cliente.
+          { id: { in: intakes.map((i) => i.bookingId).filter((b): b is string => !!b) }, clientId: null },
+        ],
+      },
+      select: { id: true },
+    });
+    bookingIds = linked.map((b) => b.id);
+  }
+
+  const next = await prisma.booking.findFirst({
+    where: {
+      id: { in: bookingIds },
+      status: "CONFIRMED",
+      date: { gte: bookingDateFromDay(today) },
+      intakes: { none: {} },
+    },
+    orderBy: [{ date: "asc" }, { startTime: "asc" }],
+    select: { date: true, startTime: true },
+  });
+
+  return {
+    name,
+    clientId,
+    bookingIds,
+    vehicleIds,
+    intakeIds,
+    upcoming: next ? { day: next.date.toISOString().substring(0, 10), time: next.startTime } : null,
+  };
+}
+
+/** Lo que se borraría (para mostrarlo antes de confirmar). */
+export async function getClientDeletionImpact(id: string) {
+  try {
+    await requireRole("ADMIN");
+    const scope = await deletionScope(id);
+    if (!scope) return fail("Cliente no encontrado.");
+    return {
+      success: true as const,
+      name: scope.name,
+      vehicles: scope.vehicleIds.length,
+      visits: scope.intakeIds.length,
+      bookings: scope.bookingIds.length,
+      upcoming: scope.upcoming,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "No autorizado.") return fail("Solo el administrador puede borrar clientes.");
+    console.error("getClientDeletionImpact:", error);
+    return fail("No se pudo revisar el cliente.");
+  }
+}
+
+/**
+ * Borra un cliente y TODO su historial (irreversible). No borra si tiene una
+ * reserva próxima: hay que cancelarla primero desde la Agenda, para que no
+ * desaparezca de la agenda alguien que va a llegar.
+ */
+export async function deleteClient(id: string) {
+  try {
+    const session = await requireRole("ADMIN");
+    const scope = await deletionScope(id);
+    if (!scope) return fail("Cliente no encontrado.");
+    if (scope.upcoming) {
+      const [y, m, d] = scope.upcoming.day.split("-");
+      return fail(
+        `Tiene una reserva próxima (${d}/${m}/${y} ${scope.upcoming.time}). Cancélala primero desde la Agenda.`
+      );
+    }
+
+    await prisma.$transaction([
+      prisma.bookingActivityLog.deleteMany({ where: { bookingId: { in: scope.bookingIds } } }),
+      prisma.vehicleIntake.deleteMany({ where: { id: { in: scope.intakeIds } } }),
+      prisma.booking.deleteMany({ where: { id: { in: scope.bookingIds } } }), // pagos en cascada
+      prisma.vehicle.deleteMany({ where: { id: { in: scope.vehicleIds } } }),
+      ...(scope.clientId ? [prisma.workshopClient.delete({ where: { id: scope.clientId } })] : []),
+    ]);
+
+    console.info(
+      `deleteClient: ${session.name} borró a "${scope.name}" (${scope.bookingIds.length} reservas, ${scope.intakeIds.length} ingresos, ${scope.vehicleIds.length} vehículos)`
+    );
+    revalidatePath("/admin", "layout");
+    return { success: true as const };
+  } catch (error) {
+    if (error instanceof Error && error.message === "No autorizado.") return fail("Solo el administrador puede borrar clientes.");
+    console.error("deleteClient:", error);
+    return fail("No se pudo borrar el cliente.");
   }
 }

@@ -41,9 +41,12 @@ export default function IntakeConsole({
   todayBookings,
   services = [],
   initial,
+  canDiscount = false,
 }: {
   todayBookings: TodayBooking[];
   services?: Service[];
+  /** Puede aplicar descuentos (permiso "Ajustar precios"; el admin siempre). */
+  canDiscount?: boolean;
   /** Llegada de una reserva desde el Tablero: datos precargados. */
   initial?: { bookingId: string; plate: string; lookup: PlateLookup };
 }) {
@@ -71,6 +74,9 @@ export default function IntakeConsole({
     return getExactPrice(variant ?? s, vehicleType);
   };
   const [odometerLower, setOdometerLower] = useState(false);
+  const [customPrice, setCustomPrice] = useState("");
+  const [discountType, setDiscountType] = useState<"PERCENT" | "AMOUNT">("PERCENT");
+  const [discountValue, setDiscountValue] = useState("");
   const [serviceQuery, setServiceQuery] = useState("");
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({});
 
@@ -115,6 +121,8 @@ export default function IntakeConsole({
     setCheckedServices(new Set());
     setVariantOf({});
     setManualPrices({});
+    setCustomPrice("");
+    setDiscountValue("");
     setOdometerLower(false);
     setServiceQuery("");
     setPhase("form");
@@ -241,6 +249,8 @@ export default function IntakeConsole({
                 setCheckedServices(new Set());
                 setVariantOf({});
                 setManualPrices({});
+                setCustomPrice("");
+                setDiscountValue("");
                 setOdometerLower(false);
                 setServiceQuery("");
                 setVehicleType("");
@@ -508,11 +518,84 @@ export default function IntakeConsole({
                     type="number" 
                     min={0}
                     step={1}
+                    value={customPrice}
+                    onChange={(e) => setCustomPrice(e.target.value)}
                     placeholder="Precio ($)" 
                     className={`${field} py-2 text-sm`} 
                   />
                 </div>
               </div>
+
+              {/* Descuento sobre el total de los servicios */}
+              {canDiscount && (() => {
+                const subtotal = estimatedTotal + (Number(customPrice) || 0);
+                const value = Number(discountValue) || 0;
+                const off =
+                  discountType === "PERCENT"
+                    ? Math.round((subtotal * Math.min(value, 100)) / 100)
+                    : Math.min(value, subtotal);
+                const invalid = discountType === "PERCENT" ? value > 100 : value > subtotal;
+                return (
+                  <div className="pt-4 mt-4 border-t border-brand-cyan/20">
+                    <label className={label}>Descuento (opcional)</label>
+                    <div className="grid grid-cols-[auto_1fr] gap-2">
+                      <div className="flex rounded-xl border border-white/10 overflow-hidden">
+                        {(["PERCENT", "AMOUNT"] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setDiscountType(t)}
+                            className={`px-4 text-sm font-bold ${discountType === t ? "bg-brand-cyan text-black" : "bg-white/5 text-gray-300"}`}
+                          >
+                            {t === "PERCENT" ? "%" : "$"}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        max={discountType === "PERCENT" ? 100 : undefined}
+                        step={1}
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        placeholder={discountType === "PERCENT" ? "Ej: 10" : "Ej: 5000"}
+                        className={`${field} py-2 text-sm ${invalid ? "border-red-500/60" : ""}`}
+                      />
+                    </div>
+                    <input type="hidden" name="discountType" value={value > 0 ? discountType : ""} />
+                    <input type="hidden" name="discountValue" value={value > 0 ? String(value) : ""} />
+                    {invalid && (
+                      <p className="text-[11px] text-red-400 mt-1">
+                        {discountType === "PERCENT" ? "Máximo 100%." : "No puede superar el total de los servicios."}
+                      </p>
+                    )}
+                    {subtotal > 0 && (
+                      <div className="mt-3 space-y-1 text-xs">
+                        <div className="flex justify-between text-gray-400">
+                          <span>Subtotal</span>
+                          <span>${subtotal.toLocaleString("es-CL")}</span>
+                        </div>
+                        {off > 0 && !invalid && (
+                          <div className="flex justify-between text-green-400">
+                            <span>Descuento{discountType === "PERCENT" ? ` (${Math.min(value, 100)}%)` : ""}</span>
+                            <span>−${off.toLocaleString("es-CL")}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-white font-bold text-sm pt-1 border-t border-white/10">
+                          <span>Total</span>
+                          <span>${(subtotal - (invalid ? 0 : off)).toLocaleString("es-CL")}</span>
+                        </div>
+                        {pendingEvaluation > 0 && (
+                          <p className="text-[11px] text-amber-400">
+                            + {pendingEvaluation} servicio(s) por evaluar (el descuento en % también se les aplica).
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

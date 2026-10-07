@@ -29,6 +29,8 @@ export function bookingServiceNames(b: WithServices) {
   });
   const custom = customServiceDetail(b.selectedOptions);
   if (custom) names.push(`[Personalizado] ${custom}`);
+  const discount = readDiscount(b.selectedOptions);
+  if (discount) names.push(discountLabel(discount));
   return names;
 }
 
@@ -67,7 +69,35 @@ function catalogPrice(
 type LocalOptions = {
   customService?: { detail?: string; price?: number };
   manualPrices?: Record<string, number>;
+  discount?: BookingDiscount;
 };
+
+// ── Descuento (ingreso del taller) ──
+// Se guarda en selectedOptions.discount y se aplica sobre el subtotal
+// (catálogo + precios evaluados). Un % se recalcula si cambia el subtotal
+// (ej. al ajustar un precio "a evaluar" en el Tablero); un monto fijo no.
+
+export type BookingDiscount = { type: "PERCENT" | "AMOUNT"; value: number };
+
+export function readDiscount(selectedOptions: unknown): BookingDiscount | null {
+  const d = (selectedOptions as { discount?: { type?: unknown; value?: unknown } } | null)?.discount;
+  if (!d || (d.type !== "PERCENT" && d.type !== "AMOUNT") || typeof d.value !== "number" || d.value <= 0) return null;
+  return { type: d.type, value: d.value };
+}
+
+/** Monto a descontar de un subtotal (nunca más que el subtotal). */
+export function discountAmount(discount: BookingDiscount | null, subtotal: number) {
+  if (!discount || subtotal <= 0) return 0;
+  const raw = discount.type === "PERCENT" ? Math.round((subtotal * Math.min(discount.value, 100)) / 100) : discount.value;
+  return Math.min(Math.max(raw, 0), subtotal);
+}
+
+/** "Descuento −10%" / "Descuento −$5.000" (para listas de servicios). */
+export function discountLabel(discount: BookingDiscount) {
+  return discount.type === "PERCENT"
+    ? `Descuento −${discount.value}%`
+    : `Descuento −$${discount.value.toLocaleString("es-CL")}`;
+}
 
 export function readLocalOptions(selectedOptions: unknown): LocalOptions {
   return selectedOptions && typeof selectedOptions === "object" ? (selectedOptions as LocalOptions) : {};
@@ -90,5 +120,6 @@ export function evaluatedItems(b: WithPricing): PricingItem[] {
 /** Total de una reserva local: catálogo + precios evaluados (lo pendiente suma 0). */
 export function localBookingTotal(b: WithPricing) {
   const catalog = b.services.reduce((sum, s) => sum + catalogPrice(s, b), 0);
-  return catalog + evaluatedItems(b).reduce((sum, i) => sum + (i.price ?? 0), 0);
+  const subtotal = catalog + evaluatedItems(b).reduce((sum, i) => sum + (i.price ?? 0), 0);
+  return subtotal - discountAmount(readDiscount(b.selectedOptions), subtotal);
 }

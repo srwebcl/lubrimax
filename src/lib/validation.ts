@@ -114,6 +114,12 @@ export const manualIntakeServicesSchema = z
       .union([z.coerce.number().int().min(0, "El precio no puede ser negativo.").max(20_000_000, "Precio fuera de rango."), z.literal("")])
       .optional()
       .transform((v) => (v === "" || v === undefined ? 0 : Number(v))),
+    // Descuento opcional sobre el subtotal (requiere permiso "pricing").
+    discountType: z.enum(["PERCENT", "AMOUNT"]).optional(),
+    discountValue: z
+      .union([z.coerce.number().int().min(0, "El descuento no puede ser negativo.").max(20_000_000), z.literal("")])
+      .optional()
+      .transform((v) => (v === "" || v === undefined ? 0 : Number(v))),
     // Precio manual de servicios sin precio de catálogo ("a evaluar", ej.
     // mecánica). serviceId -> precio. Vacío = aún por evaluar.
     manualPrices: z

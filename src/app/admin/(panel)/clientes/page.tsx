@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 const MAX_WEB_BOOKINGS = 3000;
 
 export default async function ClientesPage() {
-  await requireStaffPage("clients_view");
+  const session = await requireStaffPage("clients_view");
 
   const [workshopClients, webBookings] = await Promise.all([
     prisma.workshopClient.findMany({
@@ -115,5 +115,5 @@ export default async function ClientesPage() {
 
   clients.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  return <ClientManager initialClients={clients} />;
+  return <ClientManager initialClients={clients} canDelete={session.role === "ADMIN"} />;
 }

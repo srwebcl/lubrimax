@@ -6,6 +6,7 @@ import { chileTodayRange } from "@/lib/chile-time";
 import { parseBookingVehicle } from "@/lib/plate";
 import { readServiceVariants, vehicleTypeFromMake } from "@/lib/booking-constants";
 import { bookingMoney } from "@/lib/booking-money";
+import { can } from "@/lib/permissions";
 
 export const metadata = { title: "Nuevo ingreso | Lubrimax" };
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 //  - "Llegó" en una reserva web → /admin/ingreso?reserva=<id> (datos precargados)
 //  - "Nuevo ingreso"            → /admin/ingreso (búsqueda por patente)
 export default async function IntakePage(props: { searchParams: Promise<{ reserva?: string }> }) {
-  await requireStaffPage("intake");
+  const session = await requireStaffPage("intake");
   const { reserva } = await props.searchParams;
 
   // "Hoy" en Chile: el servidor corre en UTC y desde las 20/21 h ya sería mañana.
@@ -154,7 +155,12 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
           </div>
         </div>
       )}
-      <IntakeConsole todayBookings={todayBookings} services={services} initial={initial} />
+      <IntakeConsole
+        todayBookings={todayBookings}
+        services={services}
+        initial={initial}
+        canDiscount={can(session, "pricing")}
+      />
     </div>
   );
 }

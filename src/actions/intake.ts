@@ -15,6 +15,8 @@ import {
   type VehicleType,
 } from "@/lib/booking-constants";
 import { totalDuration } from "@/lib/availability";
+import { discountAmount, type BookingDiscount } from "@/lib/booking-services";
+import { can } from "@/lib/permissions";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
 class IntakeError extends Error {}
@@ -184,6 +186,8 @@ export async function registerIntake(formData: FormData) {
     serviceIds: string[];
     customServiceDetail?: string;
     customServicePrice: number;
+    discountType?: "PERCENT" | "AMOUNT";
+    discountValue: number;
     manualPrices: Record<string, number>;
     /** serviceId -> opción elegida (servicios con opciones, ej. Cerámico 2 años). */
     variants: Record<string, string>;
@@ -205,6 +209,8 @@ export async function registerIntake(formData: FormData) {
       serviceIds: formData.getAll("serviceIds").map(String),
       customServiceDetail: formData.get("customServiceDetail") || undefined,
       customServicePrice: formData.get("customServicePrice") ?? "",
+      discountType: formData.get("discountType") || undefined,
+      discountValue: formData.get("discountValue") ?? "",
       manualPrices,
     });
     if (!manualParsed.success) return fail(flattenZodError(manualParsed.error));
@@ -332,16 +338,31 @@ export async function registerIntake(formData: FormData) {
           if (!priceOf(s) && manual.manualPrices[s.id] !== undefined) manualPrices[s.id] = manual.manualPrices[s.id];
         }
         const catalogTotal = dbServices.reduce((acc, s) => acc + (priceOf(s) || manualPrices[s.id] || 0), 0);
-        const totalAmount = catalogTotal + customPrice;
+        // Descuento sobre el subtotal (mismo cálculo que el Tablero al
+        // reajustar precios, ver localBookingTotal).
+        const subtotal = catalogTotal + customPrice;
+        const discount: BookingDiscount | null =
+          manual.discountType && manual.discountValue > 0
+            ? { type: manual.discountType, value: manual.discountValue }
+            : null;
+        if (discount) {
+          if (!can(session, "pricing")) throw new IntakeError("No tienes permiso para aplicar descuentos.");
+          if (discount.type === "PERCENT" && discount.value > 100) throw new IntakeError("El descuento no puede superar el 100%.");
+          if (discount.type === "AMOUNT" && discount.value > subtotal) {
+            throw new IntakeError("El descuento no puede ser mayor que el total de los servicios.");
+          }
+        }
+        const totalAmount = subtotal - discountAmount(discount, subtotal);
 
         // Misma forma que la reserva web: { [serviceId]: opción } + extras locales.
         const hasOptions =
-          customServiceDetail || Object.keys(manualPrices).length > 0 || Object.keys(chosenVariants).length > 0;
+          customServiceDetail || Object.keys(manualPrices).length > 0 || Object.keys(chosenVariants).length > 0 || discount;
         const selectedOptions = hasOptions
           ? {
               ...chosenVariants,
               ...(customServiceDetail ? { customService: { detail: customServiceDetail, price: customPrice } } : {}),
               ...(Object.keys(manualPrices).length > 0 ? { manualPrices } : {}),
+              ...(discount ? { discount } : {}),
             }
           : undefined;
 
