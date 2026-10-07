@@ -4,7 +4,7 @@ import { lookupByPlate, type PlateLookup } from "@/actions/intake";
 import IntakeConsole from "./IntakeConsole";
 import { chileTodayRange } from "@/lib/chile-time";
 import { parseBookingVehicle } from "@/lib/plate";
-import { vehicleTypeFromMake } from "@/lib/booking-constants";
+import { readServiceVariants, vehicleTypeFromMake } from "@/lib/booking-constants";
 import { bookingMoney } from "@/lib/booking-money";
 
 export const metadata = { title: "Nuevo ingreso | Lubrimax" };
@@ -35,6 +35,7 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
         priceAuto: true,
         priceSuv2: true,
         priceSuv3: true,
+        variants: true,
         category: true,
         serviceCategory: { select: { name: true } },
       },
@@ -73,6 +74,8 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
         priceAuto: s.priceAuto,
         priceSuv2: s.priceSuv2,
         priceSuv3: s.priceSuv3,
+        // Mismas opciones que la agenda web (ej. Nanotecnología / Cerámico).
+        variants: readServiceVariants(s.variants),
         category,
         isMechanic: isMechanic(category),
       };
@@ -142,12 +145,12 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
           }`}
         >
           <div className="text-lg font-black uppercase tracking-wide">
-            {money.balance === 0 ? "✓ Pagada online" : `Por pagar: $${money.balance.toLocaleString("es-CL")}`}
+            {money.balance === 0 ? "✓ Pagada online" : `Por cobrar: $${money.balance.toLocaleString("es-CL")}`}
           </div>
           <div className="text-xs opacity-80 mt-0.5">
             {money.balance === 0
               ? "El cliente ya pagó el 100%. No cobrar al recibir ni al entregar."
-              : "El cliente solo reservó. Se cobra en el local (al entregar, desde el Tablero)."}
+              : "Reserva sin pago. Se cobra en el local al entregar (desde el Tablero)."}
           </div>
         </div>
       )}

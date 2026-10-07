@@ -62,11 +62,14 @@ reserva web o directo al local (`src/actions/workshop.ts`):
   `VehicleIntake`. El estado se deriva de `workStatus` + estado del ingreso.
 - "No vino" deja la reserva en `NO_SHOW` (libera el cupo). Una reserva se
   marca ATRASADA 30 min después de su hora.
-- Reserva web, dos opciones: **"Solo reservar"** (queda confirmada y se
-  paga en el local) o **"Reservar y pagar ahora"** (100% por Webpay, sin
-  abono). Tablero, Agenda, recepción, avisos y correos muestran siempre
-  **PAGADA** o **POR PAGAR $X**. El cobro en el local
+- Reserva web: **solo "Reservar"**, sin cobro online (queda confirmada y se
+  paga en el local). Tablero, Agenda, recepción, avisos y correos muestran
+  **POR COBRAR $X**; las reservas antiguas que sí se pagaron por Webpay
+  siguen mostrando **PAGADA**. El cobro en el local
   (efectivo/tarjeta/transferencia) se registra al entregar o después.
+- El ingreso del taller ofrece los mismos servicios y **opciones** que la
+  agenda web (ej. Detailing Exterior: Nanotecnología / Cerámico 2 o 3 años),
+  con el precio según el tipo de vehículo.
 - Pagos: `model BookingPayment` + `Booking.totalPrice`; saldo y totales en
   `src/lib/booking-money.ts`.
 - Horas y "hoy" siempre en `America/Santiago` (`src/lib/chile-time.ts`);

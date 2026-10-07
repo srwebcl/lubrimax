@@ -5,7 +5,7 @@ import { bookingMoney } from "@/lib/booking-money";
 import { ON_SITE_PAYMENT } from "@/lib/booking-constants";
 import BookingsManager from "./BookingsManager";
 import { chileTodayRange } from "@/lib/chile-time";
-import { customServiceDetail } from "@/lib/booking-services";
+import { customServiceDetail, selectedVariantOf } from "@/lib/booking-services";
 
 const AGENDA_PAST_DAYS = 60;
 const AGENDA_MAX_ROWS = 500;
@@ -36,7 +36,7 @@ export default async function AdminDashboard() {
     where: agendaWhere(),
     orderBy: [{ date: "desc" }, { startTime: "desc" }],
     include: {
-      services: { select: { name: true, duration: true } },
+      services: { select: { id: true, name: true, duration: true } },
       payments: { select: { amount: true, method: true } },
     },
     take: AGENDA_MAX_ROWS,
@@ -67,7 +67,11 @@ export default async function AdminDashboard() {
         role={role}
         canWork={can(session, "work")}
         initialBookings={bookings.map((b) => {
-          const srvs = b.services.map((s) => ({ name: s.name, duration: s.duration }));
+          // Con la opción elegida (ej. "Detailing Exterior · Cerámico (2 años)").
+          const srvs = b.services.map((s) => {
+            const variant = selectedVariantOf(b.selectedOptions, s.id);
+            return { name: variant ? `${s.name} · ${variant}` : s.name, duration: s.duration };
+          });
           // Servicio personalizado del ingreso sin reserva.
           const custom = customServiceDetail(b.selectedOptions);
           if (custom) srvs.push({ name: `[Personalizado] ${custom}`, duration: 0 });

@@ -7,7 +7,14 @@ import { intakeSchema, manualIntakeServicesSchema, flattenZodError } from "@/lib
 import { normalizePlate, isValidPlate, parseBookingVehicle } from "@/lib/plate";
 import { chileNow, bookingDateFromDay, addMinutesToTime } from "@/lib/chile-time";
 import { normalizeRut, formatPhone, titleCase } from "@/lib/contact";
-import { getExactPrice, isVehicleType, vehicleTypeFromMake, type VehicleType } from "@/lib/booking-constants";
+import {
+  isVehicleType,
+  readServiceVariants,
+  servicePriceFor,
+  vehicleTypeFromMake,
+  type VehicleType,
+} from "@/lib/booking-constants";
+import { totalDuration } from "@/lib/availability";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
 class IntakeError extends Error {}
@@ -178,11 +185,18 @@ export async function registerIntake(formData: FormData) {
     customServiceDetail?: string;
     customServicePrice: number;
     manualPrices: Record<string, number>;
+    /** serviceId -> opción elegida (servicios con opciones, ej. Cerámico 2 años). */
+    variants: Record<string, string>;
   } | null = null;
   if (!d.bookingId) {
     // Precios manuales: campos "manualPrice:<serviceId>" con valor no vacío.
     const manualPrices: Record<string, number> = {};
+    const variants: Record<string, string> = {};
     for (const [key, value] of formData.entries()) {
+      if (key.startsWith("variant:") && typeof value === "string" && value.trim()) {
+        variants[key.slice("variant:".length)] = value.trim().slice(0, 120);
+        continue;
+      }
       if (!key.startsWith("manualPrice:") || typeof value !== "string" || value.trim() === "") continue;
       manualPrices[key.slice("manualPrice:".length)] = Number(value);
     }
@@ -194,7 +208,7 @@ export async function registerIntake(formData: FormData) {
       manualPrices,
     });
     if (!manualParsed.success) return fail(flattenZodError(manualParsed.error));
-    manual = { ...manualParsed.data, serviceIds: [...new Set(manualParsed.data.serviceIds)] };
+    manual = { ...manualParsed.data, serviceIds: [...new Set(manualParsed.data.serviceIds)], variants };
   }
   const plate = normalizePlate(d.plate);
   const rut = normalizeRut(d.clientRut);
@@ -291,7 +305,7 @@ export async function registerIntake(formData: FormData) {
         // Buscar los servicios seleccionados para sumar su precio
         const dbServices = await tx.service.findMany({
           where: { id: { in: serviceIds } },
-          select: { id: true, priceAuto: true, priceSuv2: true, priceSuv3: true, duration: true }
+          select: { id: true, name: true, priceAuto: true, priceSuv2: true, priceSuv3: true, duration: true, variants: true }
         });
         if (dbServices.length !== serviceIds.length) {
           throw new IntakeError("Alguno de los servicios ya no existe. Recarga la página.");
@@ -300,7 +314,19 @@ export async function registerIntake(formData: FormData) {
         // Precio de catálogo según el TIPO de vehículo (igual que la web).
         // Servicios sin precio para ese tipo ("a evaluar"): se usa el precio
         // manual ingresado, si lo hay; un precio de catálogo no se pisa.
-        const priceOf = (s: (typeof dbServices)[number]) => getExactPrice(s, manual!.vehicleType);
+        // Opciones: igual que en la web, un servicio con opciones exige elegir
+        // una (y debe existir); define precio y duración.
+        const chosenVariants: Record<string, string> = {};
+        for (const s of dbServices) {
+          const options = readServiceVariants(s.variants);
+          if (options.length === 0) continue;
+          const chosen = manual.variants[s.id];
+          if (!chosen) throw new IntakeError(`Elige la opción de "${s.name}".`);
+          if (!options.some((o) => o.name === chosen)) throw new IntakeError(`La opción elegida de "${s.name}" ya no existe. Recarga la página.`);
+          chosenVariants[s.id] = chosen;
+        }
+        const priceOf = (s: (typeof dbServices)[number]) =>
+          servicePriceFor(s, manual!.vehicleType, chosenVariants[s.id]);
         const manualPrices: Record<string, number> = {};
         for (const s of dbServices) {
           if (!priceOf(s) && manual.manualPrices[s.id] !== undefined) manualPrices[s.id] = manual.manualPrices[s.id];
@@ -308,18 +334,21 @@ export async function registerIntake(formData: FormData) {
         const catalogTotal = dbServices.reduce((acc, s) => acc + (priceOf(s) || manualPrices[s.id] || 0), 0);
         const totalAmount = catalogTotal + customPrice;
 
-        const selectedOptions =
-          customServiceDetail || Object.keys(manualPrices).length > 0
-            ? {
-                ...(customServiceDetail ? { customService: { detail: customServiceDetail, price: customPrice } } : {}),
-                ...(Object.keys(manualPrices).length > 0 ? { manualPrices } : {}),
-              }
-            : undefined;
+        // Misma forma que la reserva web: { [serviceId]: opción } + extras locales.
+        const hasOptions =
+          customServiceDetail || Object.keys(manualPrices).length > 0 || Object.keys(chosenVariants).length > 0;
+        const selectedOptions = hasOptions
+          ? {
+              ...chosenVariants,
+              ...(customServiceDetail ? { customService: { detail: customServiceDetail, price: customPrice } } : {}),
+              ...(Object.keys(manualPrices).length > 0 ? { manualPrices } : {}),
+            }
+          : undefined;
 
         // Hora de Chile, no del servidor (UTC). `date` sigue la convención
         // del resto de reservas: el día a las 00:00 UTC.
         const { date: today, time: startTime } = chileNow();
-        const duration = dbServices.reduce((acc, s) => acc + s.duration, 0) || 60;
+        const duration = totalDuration(dbServices, chosenVariants) || 60;
         const endTime = addMinutesToTime(startTime, duration);
 
         // Crear la reserva interna para que aparezca en la Agenda

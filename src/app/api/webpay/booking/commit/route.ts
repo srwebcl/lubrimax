@@ -32,7 +32,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { services: { select: { name: true, duration: true } } }
+      include: { services: { select: { id: true, name: true, duration: true } } }
     });
 
     if (!booking) {

@@ -1,10 +1,21 @@
-import { getExactPrice, vehicleTypeFromMake, VEHICLE_TYPES, type PriceableService } from "./booking-constants";
+import { servicePriceFor, vehicleTypeFromMake, VEHICLE_TYPES, type PriceableService } from "./booking-constants";
 
 // Nombres de los servicios de una reserva, incluido el "servicio
 // personalizado" que el ingreso sin reserva guarda en selectedOptions
 // (ver actions/intake.ts). Lo usan el Tablero, la Agenda y la ficha de cliente.
 
-type WithServices = { services: { name: string }[]; selectedOptions: unknown };
+type WithServices = { services: { id?: string; name: string }[]; selectedOptions: unknown };
+
+/**
+ * Opción elegida de un servicio con opciones (ej. "Cerámico (2 años)").
+ * selectedOptions guarda { [serviceId]: "<nombre de la opción>" } — así lo
+ * deja la reserva web y también el ingreso del taller.
+ */
+export function selectedVariantOf(selectedOptions: unknown, serviceId: string | undefined): string | null {
+  if (!serviceId || !selectedOptions || typeof selectedOptions !== "object") return null;
+  const value = (selectedOptions as Record<string, unknown>)[serviceId];
+  return typeof value === "string" && value.trim() ? value : null;
+}
 
 export function customServiceDetail(selectedOptions: unknown): string | null {
   const detail = (selectedOptions as { customService?: { detail?: unknown } } | null)?.customService?.detail;
@@ -12,7 +23,10 @@ export function customServiceDetail(selectedOptions: unknown): string | null {
 }
 
 export function bookingServiceNames(b: WithServices) {
-  const names = b.services.map((s) => s.name);
+  const names = b.services.map((s) => {
+    const variant = selectedVariantOf(b.selectedOptions, s.id);
+    return variant ? `${s.name} · ${variant}` : s.name;
+  });
   const custom = customServiceDetail(b.selectedOptions);
   if (custom) names.push(`[Personalizado] ${custom}`);
   return names;
@@ -33,15 +47,21 @@ export type PricingItem = {
 };
 
 type WithPricing = {
-  services: (PriceableService & { id: string; name: string })[];
+  services: (PriceableService & { id: string; name: string; variants?: unknown })[];
   selectedOptions: unknown;
   /** "<tipo> - <marca>": define qué columna de precio aplica. */
   vehicleMake: string;
 };
 
-/** Precio de catálogo del servicio para el tipo de vehículo de la reserva (0 = a evaluar). */
-function catalogPrice(s: PriceableService, vehicleMake: string) {
-  return getExactPrice(s, vehicleTypeFromMake(vehicleMake) ?? VEHICLE_TYPES[0]);
+/**
+ * Precio de catálogo del servicio (con su opción elegida) para el tipo de
+ * vehículo de la reserva. 0 = a evaluar.
+ */
+function catalogPrice(
+  s: PriceableService & { id: string; variants?: unknown },
+  b: { vehicleMake: string; selectedOptions: unknown }
+) {
+  return servicePriceFor(s, vehicleTypeFromMake(b.vehicleMake) ?? VEHICLE_TYPES[0], selectedVariantOf(b.selectedOptions, s.id));
 }
 
 type LocalOptions = {
@@ -57,7 +77,7 @@ export function readLocalOptions(selectedOptions: unknown): LocalOptions {
 export function evaluatedItems(b: WithPricing): PricingItem[] {
   const opts = readLocalOptions(b.selectedOptions);
   const items: PricingItem[] = b.services
-    .filter((s) => !catalogPrice(s, b.vehicleMake))
+    .filter((s) => !catalogPrice(s, b))
     .map((s) => ({ key: s.id, name: s.name, price: opts.manualPrices?.[s.id] ?? null }));
   const custom = customServiceDetail(b.selectedOptions);
   if (custom) {
@@ -69,6 +89,6 @@ export function evaluatedItems(b: WithPricing): PricingItem[] {
 
 /** Total de una reserva local: catálogo + precios evaluados (lo pendiente suma 0). */
 export function localBookingTotal(b: WithPricing) {
-  const catalog = b.services.reduce((sum, s) => sum + catalogPrice(s, b.vehicleMake), 0);
+  const catalog = b.services.reduce((sum, s) => sum + catalogPrice(s, b), 0);
   return catalog + evaluatedItems(b).reduce((sum, i) => sum + (i.price ?? 0), 0);
 }

@@ -67,3 +67,51 @@ export function realBookingWhere(now = Date.now()) {
     },
   };
 }
+
+// ── Opciones (variantes) de un servicio ──
+// Ej. Detailing Exterior: "Nanotecnología (7 meses)", "Cerámico (2 años)"…
+// cada una con su duración y precio por tipo de vehículo. La web y el
+// ingreso del taller deben ofrecer exactamente las mismas.
+
+export type ServiceVariant = {
+  name: string;
+  duration?: number;
+  priceAuto: number | null;
+  priceSuv2: number | null;
+  priceSuv3: number | null;
+};
+
+/** Lee Service.variants (JSON o string JSON) como una lista válida. */
+export function readServiceVariants(raw: unknown): ServiceVariant[] {
+  let list: unknown = raw;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((v): v is Record<string, unknown> => !!v && typeof v === "object" && typeof (v as { name?: unknown }).name === "string")
+    .map((v) => ({
+      name: String(v.name),
+      duration: typeof v.duration === "number" ? v.duration : undefined,
+      priceAuto: typeof v.priceAuto === "number" ? v.priceAuto : null,
+      priceSuv2: typeof v.priceSuv2 === "number" ? v.priceSuv2 : null,
+      priceSuv3: typeof v.priceSuv3 === "number" ? v.priceSuv3 : null,
+    }));
+}
+
+/**
+ * Precio de catálogo de un servicio para un tipo de vehículo, usando la
+ * opción elegida si el servicio tiene opciones. 0 = sin precio ("a evaluar").
+ */
+export function servicePriceFor(
+  service: PriceableService & { variants?: unknown },
+  vehicleType: string,
+  variantName?: string | null
+) {
+  const variant = variantName ? readServiceVariants(service.variants).find((v) => v.name === variantName) : undefined;
+  return getExactPrice(variant ?? service, vehicleType);
+}

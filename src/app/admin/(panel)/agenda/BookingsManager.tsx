@@ -227,7 +227,7 @@ export default function BookingsManager({
                         >
                           {b.balance === 0
                             ? "✓ Pagada"
-                            : `Por pagar $${b.balance.toLocaleString("es-CL")}${b.webOnSite ? " · solo reservó" : ""}`}
+                            : `Por cobrar $${b.balance.toLocaleString("es-CL")}`}
                         </span>
                       )}
                       {b.arrived && (

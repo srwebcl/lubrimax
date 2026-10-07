@@ -79,7 +79,7 @@ function toMinutes(time: string) {
 }
 
 const bookingInclude = {
-  services: { select: { id: true, name: true, priceAuto: true, priceSuv2: true, priceSuv3: true } },
+  services: { select: { id: true, name: true, priceAuto: true, priceSuv2: true, priceSuv3: true, variants: true } },
   payments: { select: { amount: true, method: true } },
 } as const;
 
@@ -96,7 +96,14 @@ type BoardBooking = {
   paymentStatus: string;
   amount: number | null;
   totalPrice: number | null;
-  services: { id: string; name: string; priceAuto: number | null; priceSuv2: number | null; priceSuv3: number | null }[];
+  services: {
+    id: string;
+    name: string;
+    priceAuto: number | null;
+    priceSuv2: number | null;
+    priceSuv3: number | null;
+    variants: unknown;
+  }[];
   payments: { amount: number; method: string }[];
 };
 

@@ -7,7 +7,7 @@ import { lookupByPlate, registerIntake, type PlateLookup } from "@/actions/intak
 import { formatPlate, normalizePlate } from "@/lib/plate";
 import { uploadFileToR2 } from "@/lib/uploadClient";
 import { NameInput, OdometerInput, PhoneInput, RutInput } from "@/components/admin/ContactInputs";
-import { VEHICLE_TYPES, getExactPrice, type VehicleType } from "@/lib/booking-constants";
+import { VEHICLE_TYPES, getExactPrice, type ServiceVariant, type VehicleType } from "@/lib/booking-constants";
 
 type TodayBooking = {
   id: string;
@@ -23,6 +23,8 @@ type Service = {
   priceAuto: number | null;
   priceSuv2: number | null;
   priceSuv3: number | null;
+  /** Opciones del servicio (igual que en la agenda web). */
+  variants: ServiceVariant[];
   category: string;
   /** Mecánica: va al final de la lista (ver ingreso/page.tsx). */
   isMechanic: boolean;
@@ -61,18 +63,29 @@ export default function IntakeConsole({
   // Tipo de vehículo: define el precio de catálogo (igual que la reserva web).
   // Se precarga si el vehículo ya es conocido.
   const [vehicleType, setVehicleType] = useState<VehicleType | "">(initial?.lookup.vehicle?.vehicleType ?? "");
-  const priceFor = (s: Service) => (vehicleType ? getExactPrice(s, vehicleType) : 0);
+  // Opción elegida por servicio (ej. Detailing Exterior → "Cerámico (2 años)").
+  const [variantOf, setVariantOf] = useState<Record<string, string>>({});
+  const priceFor = (s: Service) => {
+    if (!vehicleType) return 0;
+    const variant = s.variants.find((v) => v.name === variantOf[s.id]);
+    return getExactPrice(variant ?? s, vehicleType);
+  };
   const [odometerLower, setOdometerLower] = useState(false);
   const [serviceQuery, setServiceQuery] = useState("");
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({});
 
   function toggleService(id: string) {
+    const service = services.find((s) => s.id === id);
     setCheckedServices((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    // Como en la web: al marcar un servicio con opciones, se preselecciona la primera.
+    if (service && service.variants.length > 0 && !variantOf[id]) {
+      setVariantOf((p) => ({ ...p, [id]: service.variants[0].name }));
+    }
   }
 
   // Total estimado de los servicios marcados (catálogo + precios manuales).
@@ -100,6 +113,7 @@ export default function IntakeConsole({
     setPlate(p);
     setSelectedBookingId(initial?.bookingId ?? "");
     setCheckedServices(new Set());
+    setVariantOf({});
     setManualPrices({});
     setOdometerLower(false);
     setServiceQuery("");
@@ -225,6 +239,7 @@ export default function IntakeConsole({
                 setPhotoUrl("");
                 setSelectedBookingId("");
                 setCheckedServices(new Set());
+                setVariantOf({});
                 setManualPrices({});
                 setOdometerLower(false);
                 setServiceQuery("");
@@ -415,9 +430,31 @@ export default function IntakeConsole({
                           <div className="text-[10px] text-gray-500 uppercase">{s.category}</div>
                         </div>
                         <div className={`text-sm font-bold shrink-0 ${toEvaluate ? "text-amber-400" : "text-brand-cyan"}`}>
-                          {!vehicleType ? "—" : toEvaluate ? "A evaluar" : `$${price.toLocaleString("es-CL")}`}
+                          {!vehicleType
+                            ? "—"
+                            : toEvaluate
+                              ? "A evaluar"
+                              : `${s.variants.length > 0 && !checked ? "Desde " : ""}$${price.toLocaleString("es-CL")}`}
                         </div>
                       </label>
+                      {checked && s.variants.length > 0 && (
+                        <div className="px-2 pb-2 pl-9">
+                          <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-1">Opción</label>
+                          <select
+                            name={`variant:${s.id}`}
+                            value={variantOf[s.id] ?? s.variants[0].name}
+                            onChange={(e) => setVariantOf((p) => ({ ...p, [s.id]: e.target.value }))}
+                            className={`${field} py-2 text-sm`}
+                          >
+                            {s.variants.map((v) => (
+                              <option key={v.name} value={v.name}>
+                                {v.name}
+                                {vehicleType ? ` — $${getExactPrice(v, vehicleType).toLocaleString("es-CL")}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       {checked && toEvaluate && (
                         <div className="px-2 pb-2 pl-9">
                           <input

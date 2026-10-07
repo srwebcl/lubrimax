@@ -1,9 +1,10 @@
 // Correos de "reserva nueva" (al dueño y al cliente). El estado de pago va
-// en el ASUNTO y destacado en el cuerpo: con dos formas de reservar
-// ("Reservar" = paga en el local, "Reservar y pagar" = Webpay 100%) en la
-// recepción no puede haber dudas de si el cliente ya pagó.
+// en el ASUNTO y destacado en el cuerpo. Las reservas web ahora son sin
+// cobro (se paga en el local); "PAGADA" queda para reservas pagadas por
+// Webpay antes del cambio (las que aún confirme webpay/booking/commit).
 
 import { escapeHtml, sendEmail } from "./email";
+import { bookingServiceNames } from "./booking-services";
 
 type NewBooking = {
   id: string;
@@ -15,7 +16,8 @@ type NewBooking = {
   customerEmail: string | null;
   vehicleMake: string;
   vehicleModel: string;
-  services: { name: string }[];
+  services: { id?: string; name: string }[];
+  selectedOptions?: unknown;
 };
 
 const clp = (n: number) => `$${n.toLocaleString("es-CL")}`;
@@ -27,12 +29,15 @@ export async function sendNewBookingEmails(
   const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
   const friendlyDate = `${d}/${m}/${y}`;
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lubrimax.cl";
-  const services = escapeHtml(booking.services.map((s) => s.name).join(" + "));
+  // Con la opción elegida (ej. "Detailing Exterior · Cerámico (2 años)").
+  const services = escapeHtml(
+    bookingServiceNames({ services: booking.services, selectedOptions: booking.selectedOptions ?? null }).join(" + ")
+  );
 
-  const tag = payment.paid ? `PAGADA ${clp(payment.amountPaid)}` : `POR PAGAR EN LOCAL ${clp(payment.amountDue)}`;
+  const tag = payment.paid ? `PAGADA ${clp(payment.amountPaid)}` : `POR COBRAR EN LOCAL ${clp(payment.amountDue)}`;
   const banner = payment.paid
     ? `<p style="background:#dcfce7;color:#166534;padding:10px 14px;border-radius:8px;font-weight:bold">✅ PAGADA ONLINE (Webpay): ${clp(payment.amountPaid)}. No cobrar al recibir.</p>`
-    : `<p style="background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:8px;font-weight:bold">⚠️ SOLO RESERVÓ — NO HA PAGADO. Cobrar ${clp(payment.amountDue)} en el local.</p>`;
+    : `<p style="background:#fef3c7;color:#92400e;padding:10px 14px;border-radius:8px;font-weight:bold">Reserva sin pago online. Cobrar ${clp(payment.amountDue)} en el local.</p>`;
 
   const owner = await sendEmail({
     to: process.env.OWNER_EMAIL || "contacto@lubrimax.cl",

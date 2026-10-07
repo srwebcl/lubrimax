@@ -187,7 +187,7 @@ export type ClientHistoryItem = {
 };
 
 const historyBookingInclude = {
-  services: { select: { name: true } },
+  services: { select: { id: true, name: true } },
   payments: { select: { amount: true, method: true } },
   intakes: {
     orderBy: { createdAt: "desc" as const },
