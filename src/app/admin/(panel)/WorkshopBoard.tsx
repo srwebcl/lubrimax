@@ -265,7 +265,7 @@ function Card({
             >
               {c.money.balance === 0
                 ? `✓ Pagada${c.source === "WEB" ? " online" : ""}`
-                : `Por cobrar ${clp(c.money.balance)}`}
+                : `Por pagar ${clp(c.money.balance)}${c.source === "WEB" ? " · solo reservó" : ""}`}
             </div>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">

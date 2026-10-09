@@ -146,12 +146,12 @@ export default async function IntakePage(props: { searchParams: Promise<{ reserv
           }`}
         >
           <div className="text-lg font-black uppercase tracking-wide">
-            {money.balance === 0 ? "✓ Pagada online" : `Por cobrar: $${money.balance.toLocaleString("es-CL")}`}
+            {money.balance === 0 ? "✓ Pagada online" : `Por pagar: $${money.balance.toLocaleString("es-CL")}`}
           </div>
           <div className="text-xs opacity-80 mt-0.5">
             {money.balance === 0
               ? "El cliente ya pagó el 100%. No cobrar al recibir ni al entregar."
-              : "Reserva sin pago. Se cobra en el local al entregar (desde el Tablero)."}
+              : "El cliente solo reservó. Se cobra en el local (al entregar, desde el Tablero)."}
           </div>
         </div>
       )}

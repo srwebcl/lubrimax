@@ -136,7 +136,7 @@ export default function BookingWizard() {
     loadServicesAndSession();
   }, []);
 
-  // Tras reservar, /agendar trae ?success=true&booking=<id> o
+  // Al volver de Webpay, /agendar trae ?success=true&booking=<id> o
   // ?error=<mensaje>. Como el pago implica una navegación completa fuera
   // del SPA, el estado local del wizard se pierde: la confirmación se arma
   // de nuevo con los datos reales que quedaron en la BD, no con lo que
@@ -189,8 +189,9 @@ export default function BookingWizard() {
     }
   }, [step]);
 
-  // Precio "de vitrina" para que el usuario vea cuánto pagará en el local; el
-  // total real se recalcula en el servidor (ver /api/webpay/booking/create).
+  // Precio "de vitrina" para que el usuario vea cuánto va a pagar; el monto
+  // que realmente se cobra se recalcula en el servidor (ver
+  // /api/webpay/booking/create) antes de crear la transacción Webpay.
 
   let totalAmount = selectedServicesData.reduce((sum, s) => {
     let source = s;
@@ -207,8 +208,9 @@ export default function BookingWizard() {
     totalAmount = totalAmount - (totalAmount * (discountPercent / 100));
   }
 
-  // Reserva SIN cobro online: se confirma el horario y se paga en el local.
-  const handleReserve = async () => {
+  // Dos formas: "Reservar" (paga en el local) o "Reservar y pagar" (100%
+  // por Webpay). Sin abono parcial.
+  const handlePayment = async (mode: "ON_SITE" | "FULL") => {
     if (formData.phone.length !== 8) {
       alert("Ingresa los 8 dígitos de tu celular (+56 9 XXXX XXXX).");
       return;
@@ -222,7 +224,7 @@ export default function BookingWizard() {
 
     setSubmitting(true);
     setPaymentError(null);
-    setPaymentStatus("Confirmando tu reserva...");
+    setPaymentStatus(mode === "FULL" ? "Conectando con Webpay..." : "Confirmando tu reserva...");
 
     try {
       const response = await fetch("/api/webpay/booking/create", {
@@ -240,19 +242,36 @@ export default function BookingWizard() {
           customerName: formData.name,
           customerPhone: mobileFromDigits(formData.phone),
           customerEmail: formData.email,
-          paymentType: "ON_SITE",
+          paymentType: mode,
         }),
       });
 
       const data = await response.json();
 
+      // Solo reservar: ya quedó confirmada, sin pasar por Webpay.
       if (data.reserved && data.redirectUrl) {
         window.location.href = data.redirectUrl;
         return;
       }
-      throw new Error(data.error || "No pudimos crear tu reserva.");
+
+      if (data.token && data.url) {
+        // Webpay exige un POST con el token como campo de formulario, no un
+        // simple redirect GET (ver documentación de Webpay Plus).
+        const form = document.createElement("form");
+        form.action = data.url;
+        form.method = "POST";
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "token_ws";
+        input.value = data.token;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        throw new Error(data.error || "No se pudo iniciar el pago.");
+      }
     } catch (err: any) {
-      setPaymentError(err.message || "No pudimos crear tu reserva. Intenta de nuevo.");
+      setPaymentError(err.message || "Error al conectar con Webpay.");
       setSubmitting(false);
     }
   };
@@ -700,7 +719,7 @@ export default function BookingWizard() {
 
                   <div className="border-t border-white/10 pt-4 mb-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-brand-cyan uppercase text-xs font-bold tracking-widest">Total (se paga en el local)</span>
+                      <span className="text-brand-cyan uppercase text-xs font-bold tracking-widest">Total a pagar</span>
                       <span className="text-brand-cyan text-xl font-black">${totalAmount.toLocaleString('es-CL')}</span>
                     </div>
                   </div>
@@ -712,14 +731,22 @@ export default function BookingWizard() {
                   ) : (
                     <div className="space-y-3">
                       <button 
-                        onClick={handleReserve}
-                        className="w-full bg-brand-chrome text-brand-pure py-3 px-2 rounded hover:bg-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(56,189,248,0.5)]"
+                        onClick={() => handlePayment("FULL")}
+                        className="w-full bg-brand-chrome text-brand-pure py-3 px-2 rounded hover:bg-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-sm shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_20px_rgba(56,189,248,0.5)] flex flex-col sm:block items-center justify-center gap-1"
                       >
-                        Reservar
+                        <span>Reservar y pagar ahora</span> <span className="opacity-75">(${totalAmount.toLocaleString('es-CL')})</span>
                       </button>
-                      <p className="text-[10px] text-gray-500 text-center">Sin pago online: pagas en el local al retirar tu vehículo.</p>
+                      <button 
+                        onClick={() => handlePayment("ON_SITE")}
+                        className="w-full bg-transparent border border-white/20 text-white py-3 px-2 rounded hover:border-brand-cyan hover:text-brand-cyan transition-colors uppercase tracking-wider md:tracking-widest font-bold text-[10px] md:text-xs flex flex-col sm:block items-center justify-center gap-1"
+                      >
+                        <span>Solo reservar</span> <span className="opacity-75">(pagas en el local)</span>
+                      </button>
+                      <p className="text-[10px] text-gray-500 text-center">Pagando ahora (Webpay) llegas sin nada pendiente.</p>
                     </div>
                   )}
+                  
+                  <p className="text-[10px] text-gray-500 text-center mt-4 uppercase tracking-widest">Pago seguro vía Webpay Plus</p>
                 </div>
               </div>
             </div>

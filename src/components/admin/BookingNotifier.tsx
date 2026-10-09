@@ -15,11 +15,9 @@ async function showNotice(b: NewBookingNotice) {
   const [y, m, d] = b.date.split("-");
   // El estado de pago va en el TÍTULO: en la recepción no puede haber dudas.
   const amount = `$${b.amount.toLocaleString("es-CL")}`;
-  // Reservas nuevas: sin pago (se cobra en el local). "PAGADA" solo aparece en
-  // reservas antiguas que sí se pagaron por Webpay.
-  const title = b.paid ? `Nueva reserva · PAGADA ${amount}` : `Nueva reserva · ${amount} por cobrar`;
+  const title = b.paid ? `Nueva reserva · PAGADA ${amount}` : `Nueva reserva · POR PAGAR ${amount}`;
   const options: NotificationOptions = {
-    body: `${b.customerName} · ${d}/${m}/${y} ${b.startTime}${b.paid ? " · pagó online" : " · se cobra en el local"}`,
+    body: `${b.customerName} · ${d}/${m}/${y} ${b.startTime}${b.paid ? " · pagó online" : " · cobrar en el local"}`,
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
     tag: `booking-${b.id}`,
@@ -107,7 +105,7 @@ export default function BookingNotifier() {
       <div className="flex-1 min-w-0">
         <h3 className="text-brand-cyan font-bold text-sm">Avisos de reservas</h3>
         <p className="text-xs text-gray-400 mt-1">
-          Recibe un aviso cuando alguien reserva en la web (con el panel abierto).
+          Recibe un aviso cuando alguien reserva en la web, indicando si ya pagó (con el panel abierto).
         </p>
       </div>
       <div className="flex flex-col gap-1.5 shrink-0">
