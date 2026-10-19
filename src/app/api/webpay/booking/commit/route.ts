@@ -5,6 +5,7 @@ import { getWebpayTransaction } from "@/lib/webpay";
 import { sendNewBookingEmails } from "@/lib/booking-emails";
 import { getSettings } from "@/actions/admin-settings";
 import { computeAvailableSlots, getBlockingBookings } from "@/lib/availability";
+import { getSiteBaseUrl } from "@/lib/site-url";
 
 async function cancelAbandoned(buyOrder: string | null) {
   if (!buyOrder) return;
@@ -14,8 +15,8 @@ async function cancelAbandoned(buyOrder: string | null) {
   }).catch(() => {});
 }
 
-async function processPayment(tokenWs: string | null, tbkToken: string | null, abortBuyOrder: string | null) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+async function processPayment(request: Request, tokenWs: string | null, tbkToken: string | null, abortBuyOrder: string | null) {
+  const baseUrl = getSiteBaseUrl(request);
 
   if (tbkToken) {
     await cancelAbandoned(abortBuyOrder);
@@ -118,6 +119,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
 export async function GET(request: Request) {
   const url = new URL(request.url);
   return processPayment(
+    request,
     url.searchParams.get("token_ws"),
     url.searchParams.get("TBK_TOKEN"),
     url.searchParams.get("TBK_ORDEN_COMPRA")
@@ -127,6 +129,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const formData = await request.formData();
   return processPayment(
+    request,
     formData.get("token_ws") as string | null,
     formData.get("TBK_TOKEN") as string | null,
     formData.get("TBK_ORDEN_COMPRA") as string | null

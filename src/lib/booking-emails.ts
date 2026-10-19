@@ -5,6 +5,8 @@
 
 import { escapeHtml, sendEmail } from "./email";
 import { bookingServiceNames } from "./booking-services";
+import { buildBookingConfirmedCustomerHtml } from "./email-templates";
+import { OFFICIAL_SITE_URL } from "./site-url";
 
 type NewBooking = {
   id: string;
@@ -28,7 +30,7 @@ export async function sendNewBookingEmails(
 ) {
   const [y, m, d] = booking.date.toISOString().substring(0, 10).split("-");
   const friendlyDate = `${d}/${m}/${y}`;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lubrimax.cl";
+  const baseUrl = OFFICIAL_SITE_URL;
   // Con la opción elegida (ej. "Detailing Exterior · Cerámico (2 años)").
   const services = escapeHtml(
     bookingServiceNames({ services: booking.services, selectedOptions: booking.selectedOptions ?? null }).join(" + ")
@@ -56,18 +58,18 @@ export async function sendNewBookingEmails(
   const customer = await sendEmail({
     to: booking.customerEmail,
     subject: payment.paid
-      ? `Reserva confirmada y pagada - LUBRIMAX - ${friendlyDate}`
-      : `Reserva confirmada - LUBRIMAX - ${friendlyDate}`,
-    html: `<h1>¡Hola ${escapeHtml(booking.customerName)}!</h1>
-      <p>Tu reserva para <strong>${services}</strong> quedó confirmada.</p>
-      <p>Fecha: ${friendlyDate}<br/>Hora: ${booking.startTime} - ${booking.endTime}</p>
-      <p>Vehículo: ${escapeHtml(booking.vehicleMake)} ${escapeHtml(booking.vehicleModel)}</p>
-      ${
-        payment.paid
-          ? `<p><strong>Pagaste ${clp(payment.amountPaid)}</strong>. No tienes nada pendiente.</p>`
-          : `<p><strong>Total a pagar en el local: ${clp(payment.amountDue)}</strong> (efectivo, tarjeta o transferencia).</p>`
-      }
-      <p>Te esperamos en Av. Gabriela Mistral 3061, La Serena.</p>`,
+      ? `✅ Reserva confirmada y pagada - LUBRIMAX - ${friendlyDate}`
+      : `📅 Reserva confirmada - LUBRIMAX - ${friendlyDate}`,
+    html: buildBookingConfirmedCustomerHtml({
+      customerName: booking.customerName,
+      friendlyDate,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      vehicleMake: booking.vehicleMake,
+      vehicleModel: booking.vehicleModel,
+      services,
+      payment,
+    }),
   });
   if (!customer.success) console.error("No se pudo enviar la confirmación al cliente", booking.id, customer.error);
 }

@@ -6,6 +6,7 @@ import { storeCheckoutSchema, flattenZodError } from "@/lib/validation";
 import { checkRateLimit, getClientIpFromRequest } from "@/lib/rate-limit";
 
 import { getWebpayTransaction } from "@/lib/webpay";
+import { getSiteBaseUrl } from "@/lib/site-url";
 
 // Recalcula el total desde los precios reales en la BD. Nunca confiar en el
 // monto/precio que envía el cliente: viene de localStorage y es manipulable.
@@ -160,7 +161,7 @@ export async function POST(request: Request) {
     const sessionId = customerId;
 
     // Configurar URL de retorno absoluto (importante para producción vs dev)
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const baseUrl = getSiteBaseUrl(request);
     const returnUrl = `${baseUrl}/api/webpay/commit`;
 
     const createResponse = await webpay.create(buyOrder, sessionId, amount, returnUrl);

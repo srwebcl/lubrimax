@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateBookingStatus, updateWorkStatus } from "@/actions/admin-bookings";
+import EditBookingServicesSheet from "@/components/admin/EditBookingServicesSheet";
 import { format, isToday, isSameWeek, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -82,10 +84,12 @@ export default function BookingsManager({
   canWork?: boolean;
 }) {
   const isAdmin = role === "ADMIN";
+  const router = useRouter();
   const [bookings, setBookings] = useState(initialBookings);
   const [filter, setFilter] = useState<FilterKey>("pending");
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [editingServicesId, setEditingServicesId] = useState<string | null>(null);
 
   const counts = useMemo(() => {
     let pending = 0;
@@ -255,10 +259,10 @@ export default function BookingsManager({
                   </p>
 
                   {/* Acciones rápidas: llamar + (admin) editar */}
-                  <div className="flex gap-2 mb-3">
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
                     <a
                       href={`tel:${b.customerPhone}`}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan bg-brand-cyan/10 px-3 py-1.5 rounded-full"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-brand-cyan bg-brand-cyan/10 hover:bg-brand-cyan/20 px-3 py-1.5 rounded-full transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path
@@ -271,12 +275,20 @@ export default function BookingsManager({
                       Llamar
                     </a>
                     {isAdmin && (
-                      <button
-                        onClick={() => setEditing(open ? null : b.id)}
-                        className="text-xs font-semibold text-gray-300 bg-white/5 px-3 py-1.5 rounded-full"
-                      >
-                        {open ? "Cerrar" : "Editar reserva"}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setEditing(open ? null : b.id)}
+                          className="text-xs font-semibold text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors"
+                        >
+                          {open ? "Cerrar" : "Editar reserva"}
+                        </button>
+                        <button
+                          onClick={() => setEditingServicesId(b.id)}
+                          className="text-xs font-semibold text-brand-cyan bg-brand-cyan/10 hover:bg-brand-cyan/20 px-3 py-1.5 rounded-full transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <span className="font-bold">+</span> Servicios
+                        </button>
+                      </>
                     )}
                   </div>
 
@@ -356,6 +368,16 @@ export default function BookingsManager({
                       defaultValue={b.startTime}
                       className="bg-black border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white"
                     />
+                    <div className="col-span-2 pt-2 border-t border-white/5 flex items-center justify-between">
+                      <span className="text-xs text-gray-400">Servicios contratados:</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingServicesId(b.id)}
+                        className="text-xs font-bold text-brand-cyan bg-brand-cyan/10 hover:bg-brand-cyan/20 px-3 py-1.5 rounded-lg border border-brand-cyan/25 transition-colors"
+                      >
+                        Modificar / Agregar Servicios →
+                      </button>
+                    </div>
                     <button
                       type="submit"
                       disabled={busy === b.id}
@@ -370,6 +392,12 @@ export default function BookingsManager({
           })}
         </ul>
       )}
+
+      <EditBookingServicesSheet
+        bookingId={editingServicesId}
+        onClose={() => setEditingServicesId(null)}
+        onSaved={() => router.refresh()}
+      />
     </div>
   );
 }

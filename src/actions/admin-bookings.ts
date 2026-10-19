@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireRole, requirePermission } from "@/lib/staff-session";
 import { sendEmail, escapeHtml } from "@/lib/email";
+import { bookingMoney } from "@/lib/booking-money";
+import { bookingServiceNames } from "@/lib/booking-services";
+import { buildVehicleReadyCustomerHtml, renderEmailBase } from "@/lib/email-templates";
+import { OFFICIAL_SITE_URL } from "@/lib/site-url";
 
 import { addMinutes, format } from "date-fns";
 
@@ -81,7 +85,7 @@ export async function updateBookingStatus(id: string, formData: FormData) {
       
       // Enviar correo al cliente
       if (currentBooking.customerEmail) {
-        const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.lubrimax.cl";
+        const baseUrl = OFFICIAL_SITE_URL;
         const dateStr = updateData.date ? format(updateData.date, "dd/MM/yyyy") : format(currentBooking.date, "dd/MM/yyyy");
         const timeStr = updateData.startTime || currentBooking.startTime;
         
@@ -93,17 +97,44 @@ export async function updateBookingStatus(id: string, formData: FormData) {
           ? `Reserva Cancelada - LUBRIMAX`
           : `Actualización de Reserva - LUBRIMAX`;
 
+        const updateBody = `
+          <h2 style="margin:0 0 12px 0;font-size:20px;font-weight:700;color:#ffffff;line-height:1.3;">
+            ¡Hola, ${escapeHtml(currentBooking.customerName)}!
+          </h2>
+          <p style="margin:0 0 16px 0;font-size:14px;color:#cbd5e1;line-height:1.6;">
+            Te informamos que tu reserva para el vehículo <strong style="color:#ffffff;">${escapeHtml(currentBooking.vehicleMake)} ${escapeHtml(currentBooking.vehicleModel)}</strong> ha sido <strong style="color:${status === "CANCELLED" ? "#f87171" : "#38bdf8"};">${statusText}</strong>.
+          </p>
+          ${status !== "CANCELLED" ? `
+            <div style="margin:16px 0;padding:16px 20px;background-color:#141c2e;border:1px solid #27354f;border-radius:12px;">
+              <div style="font-size:13px;color:#94a3b8;margin-bottom:4px;">Tu cita quedó programada para:</div>
+              <div style="font-size:16px;font-weight:700;color:#38bdf8;">${dateStr} a las ${timeStr} hrs</div>
+              ${rescheduled ? `<div style="font-size:12px;color:#fbbf24;margin-top:6px;">⚠️ Nota: El horario fue reprogramado por la administración.</div>` : ""}
+            </div>
+          ` : `
+            <div style="margin:16px 0;padding:14px 18px;background-color:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:10px;font-size:13px;color:#fca5a5;">
+              Tu reserva ha sido cancelada en el sistema. Si requieres agendar una nueva fecha, puedes hacerlo directamente en nuestro sitio web o contactándonos.
+            </div>
+          `}
+          <div style="margin-top:24px;padding-top:18px;border-top:1px solid #1e293b;">
+            <p style="margin:0 0 8px 0;font-size:13px;color:#94a3b8;">
+              Si tienes cualquier duda o consulta, puedes comunicarte con nosotros respondiendo directamente a este correo o vía WhatsApp.
+            </p>
+            <p style="margin:14px 0 2px 0;font-size:14px;font-weight:700;color:#38bdf8;">
+              Te esperamos. Equipo de Lubrimax
+            </p>
+            <div style="font-size:12px;color:#64748b;">Clínica de Estética Automotriz</div>
+          </div>
+        `;
+
         await sendEmail({
           to: currentBooking.customerEmail,
           subject,
-          html: (
-            `<h1>Hola ${escapeHtml(currentBooking.customerName)}</h1>
-             <p>Te informamos que tu reserva para el vehículo <strong>${escapeHtml(currentBooking.vehicleMake)} ${escapeHtml(currentBooking.vehicleModel)}</strong> ha sido <strong>${statusText}</strong>.</p>
-             ${status !== "CANCELLED" ? `<p>Tu cita quedó para el <strong>${dateStr}</strong> a las <strong>${timeStr}</strong> hrs.</p>` : ''}
-             ${rescheduled ? `<p><em>Nota: El horario de tu reserva fue reprogramado por la administración.</em></p>` : ''}
-             <p>Cualquier duda, puedes contactarnos respondiendo a este correo.</p>
-             <p>Saludos,<br>El equipo de LUBRIMAX</p>`
-          )
+          html: renderEmailBase({
+            title: subject,
+            badgeText: status === "CANCELLED" ? "Reserva Cancelada" : "Actualización de Cita",
+            badgeColor: status === "CANCELLED" ? "amber" : "cyan",
+            contentHtml: updateBody,
+          }),
         });
       }
     }
@@ -153,20 +184,44 @@ export async function updateWorkStatus(id: string, workStatus: string) {
       if (workStatus === "DONE") {
         const bookingInfo = await prisma.booking.findUnique({
           where: { id },
-          select: { customerEmail: true, customerName: true, vehicleMake: true, vehicleModel: true }
+          select: {
+            customerEmail: true,
+            customerName: true,
+            vehicleMake: true,
+            vehicleModel: true,
+            services: { select: { id: true, name: true } },
+            selectedOptions: true,
+            totalPrice: true,
+            amount: true,
+            paymentType: true,
+            paymentStatus: true,
+            payments: { select: { amount: true, method: true } },
+            intakes: {
+              select: { vehicle: { select: { plate: true } } },
+              take: 1,
+            },
+          },
         });
         
         if (bookingInfo?.customerEmail) {
+          const money = bookingMoney(bookingInfo);
+          const servicesList = bookingServiceNames({
+            services: bookingInfo.services,
+            selectedOptions: bookingInfo.selectedOptions ?? null,
+          }).join(" · ");
+          const plate = bookingInfo.intakes[0]?.vehicle?.plate || null;
+
           await sendEmail({
             to: bookingInfo.customerEmail,
-            subject: `¡Tu vehículo está listo! - LUBRIMAX`,
-            html: (
-              `<h1>Hola ${escapeHtml(bookingInfo.customerName)}</h1>
-               <p>Te informamos que los servicios en tu vehículo <strong>${escapeHtml(bookingInfo.vehicleMake)} ${escapeHtml(bookingInfo.vehicleModel)}</strong> han sido <strong>terminados</strong> exitosamente.</p>
-               <p>Ya puedes pasar a retirar tu auto por nuestras instalaciones en Av. Gabriela Mistral 3061.</p>
-               <p>¡Te esperamos!</p>
-               <p>Saludos,<br>El equipo de LUBRIMAX</p>`
-            )
+            subject: `🚗 ¡Tu vehículo está listo para retirar! - LUBRIMAX`,
+            html: buildVehicleReadyCustomerHtml({
+              customerName: bookingInfo.customerName,
+              vehicleMake: bookingInfo.vehicleMake,
+              vehicleModel: bookingInfo.vehicleModel,
+              plate,
+              services: servicesList,
+              balance: money.balance,
+            }),
           });
         }
       }

@@ -12,10 +12,12 @@ import {
   readServiceVariants,
   servicePriceFor,
   vehicleTypeFromMake,
+  VEHICLE_TYPES,
   type VehicleType,
 } from "@/lib/booking-constants";
 import { totalDuration } from "@/lib/availability";
-import { discountAmount, type BookingDiscount } from "@/lib/booking-services";
+import { discountAmount, readLocalOptions, type BookingDiscount } from "@/lib/booking-services";
+import { bookingMoney, paymentStatusFor } from "@/lib/booking-money";
 import { can } from "@/lib/permissions";
 
 /** Error de negocio con mensaje apto para mostrar al usuario. */
@@ -192,7 +194,11 @@ export async function registerIntake(formData: FormData) {
     /** serviceId -> opción elegida (servicios con opciones, ej. Cerámico 2 años). */
     variants: Record<string, string>;
   } | null = null;
-  if (!d.bookingId) {
+  const rawServiceIds = formData.getAll("serviceIds").map(String).filter(Boolean);
+  const rawCustom = ((formData.get("customServiceDetail") as string) || "").trim();
+  const hasAdditional = rawServiceIds.length > 0 || rawCustom.length > 0;
+
+  if (!d.bookingId || hasAdditional) {
     // Precios manuales: campos "manualPrice:<serviceId>" con valor no vacío.
     const manualPrices: Record<string, number> = {};
     const variants: Record<string, string> = {};
@@ -206,15 +212,18 @@ export async function registerIntake(formData: FormData) {
     }
     const manualParsed = manualIntakeServicesSchema.safeParse({
       vehicleType: formData.get("vehicleType") ?? "",
-      serviceIds: formData.getAll("serviceIds").map(String),
-      customServiceDetail: formData.get("customServiceDetail") || undefined,
+      serviceIds: rawServiceIds,
+      customServiceDetail: rawCustom || undefined,
       customServicePrice: formData.get("customServicePrice") ?? "",
       discountType: formData.get("discountType") || undefined,
       discountValue: formData.get("discountValue") ?? "",
       manualPrices,
     });
-    if (!manualParsed.success) return fail(flattenZodError(manualParsed.error));
-    manual = { ...manualParsed.data, serviceIds: [...new Set(manualParsed.data.serviceIds)], variants };
+    if (!manualParsed.success) {
+      if (!d.bookingId) return fail(flattenZodError(manualParsed.error));
+    } else {
+      manual = { ...manualParsed.data, serviceIds: [...new Set(manualParsed.data.serviceIds)], variants };
+    }
   }
   const plate = normalizePlate(d.plate);
   const rut = normalizeRut(d.clientRut);
@@ -303,6 +312,88 @@ export async function registerIntake(formData: FormData) {
         bookingId = linked.id;
         // La reserva web queda vinculada al cliente que llegó (historial).
         await tx.booking.update({ where: { id: linked.id }, data: { clientId } });
+
+        // Si el cliente solicitó servicios adicionales al llegar a la sucursal:
+        if (manual && (manual.serviceIds.length > 0 || manual.customServiceDetail)) {
+          const currentBooking = await tx.booking.findUnique({
+            where: { id: linked.id },
+            include: {
+              services: { select: { id: true, name: true, priceAuto: true, priceSuv2: true, priceSuv3: true, variants: true } },
+              payments: { select: { amount: true, method: true } },
+            },
+          });
+
+          if (currentBooking) {
+            const vType = manual.vehicleType || vehicleType || VEHICLE_TYPES[0];
+            const existingIds = new Set(currentBooking.services.map((s) => s.id));
+            const newServiceIds = manual.serviceIds.filter((id) => !existingIds.has(id));
+
+            const dbNewServices = newServiceIds.length > 0
+              ? await tx.service.findMany({
+                  where: { id: { in: newServiceIds } },
+                  select: { id: true, name: true, priceAuto: true, priceSuv2: true, priceSuv3: true, variants: true },
+                })
+              : [];
+
+            let additionalAmount = 0;
+            const updatedVariants: Record<string, string> = {};
+
+            for (const s of dbNewServices) {
+              const options = readServiceVariants(s.variants);
+              const chosen = manual.variants[s.id] || (options.length > 0 ? options[0].name : "");
+              if (chosen) updatedVariants[s.id] = chosen;
+              const price = servicePriceFor(s, vType, chosen) || manual.manualPrices[s.id] || 0;
+              additionalAmount += price;
+            }
+
+            if (manual.customServiceDetail?.trim()) {
+              additionalAmount += manual.customServicePrice || 0;
+            }
+
+            const currentMoney = bookingMoney(currentBooking);
+            const newTotal = (currentBooking.totalPrice ?? currentMoney.total) + additionalAmount;
+
+            const prevOpts = readLocalOptions(currentBooking.selectedOptions);
+            const mergedOptions: Record<string, any> = {
+              ...prevOpts,
+              ...updatedVariants,
+            };
+            if (Object.keys(manual.manualPrices).length > 0) {
+              mergedOptions.manualPrices = { ...(prevOpts.manualPrices || {}), ...manual.manualPrices };
+            }
+            if (manual.customServiceDetail?.trim()) {
+              mergedOptions.customService = {
+                detail: manual.customServiceDetail.trim(),
+                price: manual.customServicePrice || 0,
+              };
+            }
+
+            await tx.booking.update({
+              where: { id: linked.id },
+              data: {
+                services: {
+                  connect: newServiceIds.map((id) => ({ id })),
+                },
+                selectedOptions: mergedOptions,
+                totalPrice: newTotal,
+                paymentStatus: paymentStatusFor(newTotal, currentMoney.paid),
+              },
+            });
+
+            const addedNames = dbNewServices.map((s) => s.name);
+            if (manual.customServiceDetail?.trim()) addedNames.push(`[Personalizado] ${manual.customServiceDetail}`);
+
+            await tx.bookingActivityLog.create({
+              data: {
+                bookingId: linked.id,
+                staffUserId: session.userId,
+                staffName: session.name,
+                action: "SERVICES_ADDED_ON_INTAKE",
+                detail: `Servicios adicionales en sucursal: ${addedNames.join(", ")} (+$${additionalAmount.toLocaleString("es-CL")}). Nuevo total: $${newTotal.toLocaleString("es-CL")}`,
+              },
+            });
+          }
+        }
       } else if (manual) {
         // ES UN INGRESO MANUAL.
         const { serviceIds, customServiceDetail } = manual;

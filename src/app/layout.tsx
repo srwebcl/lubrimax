@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import FloatingWhatsApp from "@/components/dom/FloatingWhatsApp";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import { getSiteBaseUrl } from "@/lib/site-url";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,7 +15,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://lubrimax.cl";
+const siteUrl = getSiteBaseUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

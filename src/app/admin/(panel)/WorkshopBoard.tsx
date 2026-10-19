@@ -17,6 +17,7 @@ import {
 import { LOCAL_PAYMENT_METHODS, PAYMENT_METHODS } from "@/lib/booking-money";
 import { formatPlate } from "@/lib/plate";
 import { INPUT, LABEL, Msg, PrimaryBtn, Sheet } from "@/components/admin/kit";
+import EditBookingServicesSheet from "@/components/admin/EditBookingServicesSheet";
 
 const REFRESH_MS = 20_000;
 
@@ -47,6 +48,7 @@ export default function WorkshopBoard({ board, allowed }: { board: BoardData; al
   const [delivering, setDelivering] = useState<BoardCard | null>(null);
   const [pricing, setPricing] = useState<BoardCard | null>(null);
   const [charging, setCharging] = useState<BoardCard | null>(null);
+  const [editingServicesBookingId, setEditingServicesBookingId] = useState<string | null>(null);
   const [showDelivered, setShowDelivered] = useState(false);
 
   // Refresco automático: puede haber otro teléfono moviendo tarjetas.
@@ -133,6 +135,7 @@ export default function WorkshopBoard({ board, allowed }: { board: BoardData; al
                         }}
                         onDeliver={() => setDelivering(c)}
                         onPrice={() => setPricing(c)}
+                        onEditServices={() => c.bookingId && setEditingServicesBookingId(c.bookingId)}
                       />
                     </li>
                   ))}
@@ -209,6 +212,12 @@ export default function WorkshopBoard({ board, allowed }: { board: BoardData; al
           startTransition(() => router.refresh());
         }}
       />
+
+      <EditBookingServicesSheet
+        bookingId={editingServicesBookingId}
+        onClose={() => setEditingServicesBookingId(null)}
+        onSaved={() => startTransition(() => router.refresh())}
+      />
     </div>
   );
 }
@@ -230,6 +239,7 @@ function Card({
   onNoShow,
   onDeliver,
   onPrice,
+  onEditServices,
   allowed,
 }: {
   card: BoardCard;
@@ -240,13 +250,13 @@ function Card({
   onNoShow: () => void;
   onDeliver: () => void;
   onPrice: () => void;
+  onEditServices?: () => void;
 }) {
-  const btn = "flex-1 h-10 rounded-xl text-xs font-extrabold uppercase tracking-wider disabled:opacity-50";
   const pendingPrices = c.pricing.filter((i) => i.price === null).length;
   const canPrice = allowed.pricing && c.pricing.length > 0 && c.stage !== "ARRIVING" && c.stage !== "DELIVERED";
 
   return (
-    <div className={`rounded-2xl border bg-brand-surface p-3 space-y-2.5 ${c.late ? "border-red-500/40" : "border-white/8"}`}>
+    <div className={`rounded-2xl border bg-brand-surface p-3 space-y-2.5 overflow-hidden transition-all ${c.late ? "border-red-500/40" : "border-white/8"}`}>
       <div className="flex items-start gap-3">
         {c.photoUrl ? (
           <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0">
@@ -288,37 +298,51 @@ function Card({
         <div className="text-right shrink-0">
           {c.startTime && c.stage === "ARRIVING" && <div className="text-sm font-black text-white">{c.startTime}</div>}
           {c.arrivedAt && c.stage !== "ARRIVING" && <div className="text-[11px] text-gray-500">llegó {hhmm(c.arrivedAt)}</div>}
-
         </div>
       </div>
 
-      {c.services.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {c.services.map((s, i) => (
-            <span key={i} className="text-[10px] font-semibold bg-white/5 border border-white/8 text-gray-300 px-2 py-0.5 rounded-md">
-              {s}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Servicios y botón para agregar adicionales */}
+      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        {c.services.map((s, i) => (
+          <span key={i} className="text-[10px] font-semibold bg-white/5 border border-white/8 text-gray-300 px-2 py-0.5 rounded-md">
+            {s}
+          </span>
+        ))}
+        {c.bookingId && c.stage !== "DELIVERED" && onEditServices && (
+          <button
+            type="button"
+            onClick={onEditServices}
+            title="Agregar o modificar servicios de la reserva"
+            className="text-[10px] font-bold text-brand-cyan hover:text-white bg-brand-cyan/10 hover:bg-brand-cyan/25 border border-brand-cyan/30 px-2 py-0.5 rounded-md transition-all inline-flex items-center gap-1 cursor-pointer"
+          >
+            <span className="text-xs font-bold leading-none">+</span> Servicios
+          </button>
+        )}
+      </div>
+
       {c.notes && <p className="text-[11px] text-gray-500 italic line-clamp-2">“{c.notes}”</p>}
 
-      <div className="flex gap-2">
+      {/* Acciones principales de la tarjeta */}
+      <div className="pt-1 flex items-center gap-1.5 min-w-0">
         {canPrice && (
           <button
             onClick={onPrice}
-            className={`h-10 shrink-0 px-3 rounded-xl border text-[11px] font-bold ${
-              pendingPrices > 0 ? "bg-amber-500/10 border-amber-500/30 text-amber-300" : "bg-white/5 border-white/10 text-gray-300"
+            className={`h-9 shrink-0 px-2.5 rounded-xl border text-[11px] font-bold transition-colors ${
+              pendingPrices > 0
+                ? "bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25"
+                : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10"
             }`}
           >
             $ Precio
           </button>
         )}
+
         {c.customerPhone && (
           <a
             href={`tel:${c.customerPhone.replace(/\s/g, "")}`}
-            className="w-10 h-10 shrink-0 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-300"
+            className="w-9 h-9 shrink-0 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:text-white flex items-center justify-center text-gray-300 transition-colors"
             aria-label="Llamar al cliente"
+            title={`Llamar a ${c.customerName || "cliente"}`}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -326,43 +350,72 @@ function Card({
           </a>
         )}
 
-        {c.stage === "ARRIVING" && c.bookingId && (
-          <>
-            {allowed.intake && (
-              <Link href={`/admin/ingreso?reserva=${c.bookingId}`} className={`${btn} bg-sky-500 text-black inline-flex items-center justify-center`}>
-                Llegó
-              </Link>
-            )}
-            {allowed.noshow && (
-              <button onClick={onNoShow} disabled={busy} className={`${btn} flex-none px-3 bg-white/5 text-gray-400 border border-white/10`}>
-                No vino
-              </button>
-            )}
-          </>
-        )}
-        {c.stage === "WAITING" && allowed.work && (
-          <button onClick={onStart} disabled={busy} className={`${btn} bg-amber-400 text-black`}>
-            {busy ? "…" : "Iniciar"}
-          </button>
-        )}
-        {c.stage === "IN_PROGRESS" &&
-          (c.bookingId ? (
-            allowed.work && 
-            <button onClick={onFinish} disabled={busy} className={`${btn} bg-brand-cyan text-black`}>
-              {busy ? "…" : "Terminar"}
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          {c.stage === "ARRIVING" && c.bookingId && (
+            <>
+              {allowed.intake && (
+                <Link
+                  href={`/admin/ingreso?reserva=${c.bookingId}`}
+                  className="flex-1 min-w-0 h-9 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-sky-500 hover:bg-sky-400 text-black inline-flex items-center justify-center transition-colors truncate px-2 text-center"
+                >
+                  Llegó
+                </Link>
+              )}
+              {allowed.noshow && (
+                <button
+                  onClick={onNoShow}
+                  disabled={busy}
+                  className="shrink-0 h-9 px-2.5 rounded-xl text-[11px] font-bold bg-white/5 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-300 text-gray-400 border border-white/10 transition-colors disabled:opacity-50"
+                >
+                  No vino
+                </button>
+              )}
+            </>
+          )}
+
+          {c.stage === "WAITING" && allowed.work && (
+            <button
+              onClick={onStart}
+              disabled={busy}
+              className="flex-1 min-w-0 h-9 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-amber-400 hover:bg-amber-300 text-black transition-colors disabled:opacity-50 truncate px-2 text-center"
+            >
+              {busy ? "…" : "Iniciar"}
             </button>
-          ) : (
-            allowed.deliver && (
-              <button onClick={onDeliver} disabled={busy} className={`${btn} bg-green-500 text-black`}>
-                Entregar
-              </button>
-            )
-          ))}
-        {c.stage === "READY" && allowed.deliver && (
-          <button onClick={onDeliver} disabled={busy} className={`${btn} bg-green-500 text-black`}>
-            {c.money && c.money.balance > 0 && allowed.charge ? "Cobrar y entregar" : "Entregar"}
-          </button>
-        )}
+          )}
+
+          {c.stage === "IN_PROGRESS" &&
+            (c.bookingId ? (
+              allowed.work && (
+                <button
+                  onClick={onFinish}
+                  disabled={busy}
+                  className="flex-1 min-w-0 h-9 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-brand-cyan hover:bg-cyan-300 text-black transition-colors disabled:opacity-50 truncate px-2 text-center"
+                >
+                  {busy ? "…" : "Terminar"}
+                </button>
+              )
+            ) : (
+              allowed.deliver && (
+                <button
+                  onClick={onDeliver}
+                  disabled={busy}
+                  className="flex-1 min-w-0 h-9 rounded-xl text-xs font-extrabold uppercase tracking-wider bg-green-500 hover:bg-green-400 text-black transition-colors disabled:opacity-50 truncate px-2 text-center"
+                >
+                  Entregar
+                </button>
+              )
+            ))}
+
+          {c.stage === "READY" && allowed.deliver && (
+            <button
+              onClick={onDeliver}
+              disabled={busy}
+              className="flex-1 min-w-0 h-9 rounded-xl text-[11px] font-extrabold uppercase tracking-wider bg-green-500 hover:bg-green-400 text-black transition-colors disabled:opacity-50 truncate px-2 text-center"
+            >
+              {c.money && c.money.balance > 0 && allowed.charge ? "Cobrar y entregar" : "Entregar"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

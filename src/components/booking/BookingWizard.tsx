@@ -250,7 +250,11 @@ export default function BookingWizard() {
 
       // Solo reservar: ya quedó confirmada, sin pasar por Webpay.
       if (data.reserved && data.redirectUrl) {
-        window.location.href = data.redirectUrl;
+        // Siempre navegar relativo al origen actual del usuario (nunca redirigir a un dominio externo o vercel.app)
+        const targetPath = typeof data.redirectUrl === "string" && data.redirectUrl.startsWith("http")
+          ? new URL(data.redirectUrl).pathname + new URL(data.redirectUrl).search
+          : data.redirectUrl;
+        window.location.href = targetPath;
         return;
       }
 

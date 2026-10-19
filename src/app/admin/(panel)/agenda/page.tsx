@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireStaffPage } from "@/lib/staff-session";
 import { can } from "@/lib/permissions";
@@ -56,12 +57,25 @@ export default async function AdminDashboard() {
 
   return (
     <div className="px-4 sm:px-6 py-4 max-w-3xl mx-auto w-full space-y-1">
-      <header className="pb-1">
-        <h1 className="text-[22px] leading-tight font-bold tracking-tight text-white">Agenda</h1>
-        <p className="text-sm text-gray-500">
-          {role === "ADMIN" ? "Reservas y avance de los trabajos." : "Marca el avance de cada trabajo."}{" "}
-          <span className="text-gray-600">Últimos {AGENDA_PAST_DAYS} días y próximas.</span>
-        </p>
+      <header className="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h1 className="text-[22px] leading-tight font-bold tracking-tight text-white">Agenda</h1>
+          <p className="text-sm text-gray-500">
+            {role === "ADMIN" ? "Reservas y avance de los trabajos." : "Marca el avance de cada trabajo."}{" "}
+            <span className="text-gray-600">Últimos {AGENDA_PAST_DAYS} días y próximas.</span>
+          </p>
+        </div>
+        {role === "ADMIN" && (
+          <Link
+            href="/admin/estadisticas"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/25 transition-all self-start sm:self-auto shrink-0"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Historial de Servicios →
+          </Link>
+        )}
       </header>
       <BookingsManager
         role={role}

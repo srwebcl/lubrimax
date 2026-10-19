@@ -364,15 +364,23 @@ export default function IntakeConsole({
             </div>
           </div>
 
-          {/* SERVICIOS - Solo visible si NO hay una reserva web seleccionada */}
-          {!selectedBookingId && (
-            <div className="mt-4 p-4 border border-brand-cyan/30 bg-brand-cyan/5 rounded-2xl">
-              <h3 className="text-sm font-bold text-brand-cyan uppercase tracking-widest mb-3">
-                Cotización de Servicios
+          {/* SERVICIOS */}
+          <div className="mt-4 p-4 border border-brand-cyan/30 bg-brand-cyan/5 rounded-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-brand-cyan uppercase tracking-widest">
+                {selectedBookingId ? "Servicios Adicionales en Sucursal" : "Cotización de Servicios"}
               </h3>
-              <p className="text-xs text-gray-400 mb-4">
-                Al registrar este ingreso sin reserva web, se creará automáticamente una cita en la Agenda con los siguientes servicios.
-              </p>
+              {selectedBookingId && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                  Reserva Web Vinculada
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              {selectedBookingId
+                ? "Si el cliente solicita agregar servicios extra o complementarios al llegar al local, márcalos aquí para sumarlos a su reserva."
+                : "Al registrar este ingreso sin reserva web, se creará automáticamente una cita en la Agenda con los siguientes servicios."}
+            </p>
 
               {/* Tipo de vehículo: define el precio, igual que al agendar por la web */}
               <label className={label}>Tipo de vehículo</label>
@@ -597,7 +605,6 @@ export default function IntakeConsole({
                 );
               })()}
             </div>
-          )}
 
           <div className="mt-4">
             <label className={label}>Observaciones de recepción</label>

@@ -50,7 +50,7 @@ const DESTS: Dest[] = [
   { name: "Taller", href: "/admin", icon: ICONS.ingreso },
   { name: "Agenda", href: "/admin/agenda", icon: ICONS.agenda, permission: "agenda" },
   { name: "Clientes", href: "/admin/clientes", icon: ICONS.clientes, permission: "clients_view" },
-  { name: "Estadísticas", href: "/admin/estadisticas", icon: ICONS.estadisticas, adminOnly: true },
+  { name: "Historial y Métricas", href: "/admin/estadisticas", icon: ICONS.estadisticas, adminOnly: true },
   { name: "Productos", href: "/admin/tienda", icon: ICONS.productos, adminOnly: true },
   { name: "Pedidos", href: "/admin/pedidos", icon: ICONS.pedidos, adminOnly: true },
   { name: "Catálogo", href: "/admin/servicios", icon: ICONS.catalogo, adminOnly: true },

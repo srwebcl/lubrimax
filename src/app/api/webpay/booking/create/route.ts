@@ -18,6 +18,7 @@ import { normalizePlate } from "@/lib/plate";
 import { getWebpayTransaction } from "@/lib/webpay";
 import { sendNewBookingEmails } from "@/lib/booking-emails";
 import { CLUB_ENABLED } from "@/lib/features";
+import { getSiteBaseUrl } from "@/lib/site-url";
 
 class SlotTakenError extends Error {}
 
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
     const duration = totalDuration(services, selectedVariants);
     const endTimeStr = computeEndTime(startTime, duration, settings);
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const baseUrl = getSiteBaseUrl(request);
 
     // Validar la configuración de Webpay ANTES de bloquear el horario.
     const webpay = payOnline ? getWebpayTransaction() : null;
@@ -139,7 +140,7 @@ export async function POST(request: Request) {
       await sendNewBookingEmails(booking, { paid: false, amountDue: totalAmount });
       return NextResponse.json({
         reserved: true,
-        redirectUrl: `${baseUrl}/agendar?success=true&booking=${booking.id}`,
+        redirectUrl: `/agendar?success=true&booking=${booking.id}`,
       });
     }
 

@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail, escapeHtml } from "@/lib/email";
 import { revalidateTag } from "next/cache";
 import { getWebpayTransaction } from "@/lib/webpay";
+import { getSiteBaseUrl } from "@/lib/site-url";
 
-async function processPayment(tokenWs: string | null, tbkToken: string | null, abortToken: string | null) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+async function processPayment(request: Request, tokenWs: string | null, tbkToken: string | null, abortToken: string | null) {
+  const baseUrl = getSiteBaseUrl(request);
 
   if (tbkToken || abortToken) {
     return NextResponse.redirect(`${baseUrl}/checkout?error=Pago%20Cancelado&token_ws=${tbkToken || ""}`);
@@ -71,6 +72,7 @@ async function processPayment(tokenWs: string | null, tbkToken: string | null, a
 export async function GET(request: Request) {
   const url = new URL(request.url);
   return processPayment(
+    request,
     url.searchParams.get("token_ws"),
     url.searchParams.get("TBK_TOKEN"),
     url.searchParams.get("TBK_ORDEN_COMPRA")
@@ -80,6 +82,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const formData = await request.formData();
   return processPayment(
+    request,
     formData.get("token_ws") as string | null,
     formData.get("TBK_TOKEN") as string | null,
     formData.get("TBK_ORDEN_COMPRA") as string | null
