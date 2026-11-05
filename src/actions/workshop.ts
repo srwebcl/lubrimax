@@ -225,7 +225,7 @@ export async function getBoard(): Promise<BoardData> {
   // Capacidad: bahías en uso y próximo hueco libre desde ahora (sin la
   // anticipación mínima de la web: el cliente ya está en el local).
   const nextFreeSlot =
-    computeAvailableSlots(now.date, 60, settings, blocking, now, { advanceMinutes: 0 })[0] ?? null;
+    computeAvailableSlots(now.date, 60, settings, blocking, now, { advanceMinutes: 0, allowClosedDays: true })[0] ?? null;
 
   return {
     cards,

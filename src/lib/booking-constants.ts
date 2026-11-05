@@ -115,3 +115,14 @@ export function servicePriceFor(
   const variant = variantName ? readServiceVariants(service.variants).find((v) => v.name === variantName) : undefined;
   return getExactPrice(variant ?? service, vehicleType);
 }
+
+// ── Días sin atención para reservas web ──
+// 0 = domingo (convención de Date#getDay). Los clientes no pueden agendar
+// esos días: el calendario los deshabilita y el servidor no ofrece horarios.
+export const CLOSED_WEEKDAYS = [0] as const;
+
+/** true si el día ("YYYY-MM-DD") no admite reservas web (ej. domingo). */
+export function isClosedDay(day: string) {
+  const weekday = new Date(`${day}T12:00:00.000Z`).getUTCDay();
+  return (CLOSED_WEEKDAYS as readonly number[]).includes(weekday);
+}

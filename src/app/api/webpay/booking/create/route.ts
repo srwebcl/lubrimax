@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ON_SITE_PAYMENT, servicePriceFor } from "@/lib/booking-constants";
+import { ON_SITE_PAYMENT, isClosedDay, servicePriceFor } from "@/lib/booking-constants";
 import { getSessionCustomer } from "@/actions/customer-auth";
 import { getSettings } from "@/actions/admin-settings";
 import { bookingPaymentSchema, flattenZodError } from "@/lib/validation";
@@ -42,6 +42,11 @@ export async function POST(request: Request) {
     // pagar" (100% por Webpay). No hay abono parcial.
     const payOnline = parsed.data.paymentType !== ON_SITE_PAYMENT;
     const paymentType = payOnline ? "FULL" : ON_SITE_PAYMENT;
+
+    // Domingos cerrado: no se agenda (el calendario ya los deshabilita).
+    if (isClosedDay(date)) {
+      return NextResponse.json({ error: "Los domingos no atendemos. Elige otro día." }, { status: 400 });
+    }
 
     const uniqueServiceIds = [...new Set(serviceIds)];
     const services = await prisma.service.findMany({ where: { id: { in: uniqueServiceIds } } });

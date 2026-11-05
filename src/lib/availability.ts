@@ -8,7 +8,7 @@
 // el servidor corre en UTC y `new Date(y, m, d, h)` quedaba desfasado 3–4 h.
 
 import type { Prisma } from "@prisma/client";
-import { PENDING_HOLD_MINUTES } from "./booking-constants";
+import { PENDING_HOLD_MINUTES, isClosedDay } from "./booking-constants";
 import { bookingDateFromDay, chileNow } from "./chile-time";
 
 export type AgendaSettings = {
@@ -89,8 +89,12 @@ export function computeAvailableSlots(
   settings: AgendaSettings,
   bookings: { startTime: string; endTime: string }[],
   now: { date: string; time: string } | null = chileNow(),
-  opts: { advanceMinutes?: number } = {}
+  opts: { advanceMinutes?: number; allowClosedDays?: boolean } = {}
 ) {
+  // Domingos (CLOSED_WEEKDAYS): sin horarios para reservas. El Tablero del
+  // taller pasa allowClosedDays para no impedir un ingreso presencial.
+  if (!opts.allowClosedDays && isClosedDay(day)) return [];
+
   const open = settings.workStartHour * 60;
   const close = settings.workEndHour * 60;
   const interval = settings.slotInterval || 30;

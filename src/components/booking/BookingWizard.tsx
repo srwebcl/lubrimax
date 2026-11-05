@@ -9,7 +9,7 @@ import { es } from "date-fns/locale";
 import { useSearchParams } from "next/navigation";
 import { getServices, getAvailableSlots, getBookingById } from "@/actions/booking";
 import { getSessionCustomer } from "@/actions/customer-auth";
-import { VEHICLE_TYPES, getExactPrice as sharedGetExactPrice } from "@/lib/booking-constants";
+import { VEHICLE_TYPES, CLOSED_WEEKDAYS, getExactPrice as sharedGetExactPrice } from "@/lib/booking-constants";
 import { CLUB_ENABLED } from "@/lib/features";
 import { mobileDigits, mobileFromDigits } from "@/lib/contact";
 
@@ -578,7 +578,8 @@ export default function BookingWizard() {
                   selected={selectedDate} 
                   onSelect={setSelectedDate}
                   locale={es}
-                  disabled={{ before: new Date() }}
+                  // Fechas pasadas y domingos (sin atención) no se pueden elegir.
+                  disabled={[{ before: new Date() }, { dayOfWeek: [...CLOSED_WEEKDAYS] }]}
                 />
               </div>
 
